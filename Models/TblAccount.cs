@@ -27,13 +27,13 @@ public partial class TblAccount
 
     public string? AreaId { get; set; }
 
-    public decimal? Zipcode { get; set; }
+    public string? Zipcode { get; set; }
 
     public string? Remark { get; set; }
 
     public string IsScret { get; set; } = null!;
 
-    public string IsEnable { get; set; } = null!;
+    public string? IsEnable { get; set; }
 
     public string? Created { get; set; }
 
@@ -42,6 +42,4 @@ public partial class TblAccount
     public string? Updated { get; set; }
 
     public string? UpdatedBy { get; set; }
-
-    public virtual ICollection<TblAccountDetail> TblAccountDetails { get; set; } = new List<TblAccountDetail>();
 }

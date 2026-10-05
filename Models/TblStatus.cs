@@ -32,6 +32,4 @@ public partial class TblStatus
     public virtual ICollection<TblStatus> InverseRef { get; set; } = new List<TblStatus>();
 
     public virtual TblStatus Ref { get; set; } = null!;
-
-    public virtual ICollection<TblService> TblServices { get; set; } = new List<TblService>();
 }

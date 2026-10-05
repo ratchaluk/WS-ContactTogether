@@ -7,7 +7,7 @@ namespace ContactTogetherApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-[Authorize]
+//[Authorize]
 public class ReportController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -19,163 +19,6 @@ public class ReportController : ControllerBase
         _logger = logger;
     }
 
-    // [HttpPost]
-    // public async Task<IActionResult> GetReport(ServiceRequestReportRequest request)
-    // {
-    //     // ===========================
-    //     // DateTime Filter
-    //     // ===========================
-
-    //     TimeSpan startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-    //         ? TimeSpan.Zero
-    //         : TimeSpan.Parse(request.P_Time_Start);
-
-    //     TimeSpan finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-    //         ? new TimeSpan(23, 59, 59)
-    //         : TimeSpan.Parse(request.P_Time_Finish);
-
-    //     DateTime startDateTime = request.P_Start.Date.Add(startTime);
-    //     DateTime finishDateTime = request.P_Finish.Date.Add(finishTime);
-
-    //     // ===========================
-    //     // SR Code Filter (ค.ศ. -> พ.ศ.)
-    //     // ===========================
-
-    //     string startCode =
-    //         $"{(request.P_Start.Year + 543).ToString().Substring(2,2)}" +
-    //         $"{request.P_Start:MMdd}" +
-    //         "00000";
-
-    //     string finishCode =
-    //         $"{(request.P_Finish.Year + 543).ToString().Substring(2,2)}" +
-    //         $"{request.P_Finish:MMdd}" +
-    //         "99999";
-
-    //     var result =
-    //         await (
-    //             from sr in _db.TblServices
-
-    //             join st in _db.TblStatuses
-    //                 on sr.StatusId equals st.Id
-
-    //             where st.RefId != "1B751556C1458196BA0EB37037415A25"
-
-    //             join ac in _db.TblActivities
-    //                 on sr.Id equals ac.ServiceId into acJoin
-    //             from ac in acJoin.DefaultIfEmpty()
-
-    //             join c1 in _db.TblContacts
-    //                 on ac.ContactId equals c1.Id into cJoin
-    //             from c1 in cJoin.DefaultIfEmpty()
-
-    //             join ch in _db.TblChannels
-    //                 on sr.ChannelIncomingId equals ch.Id into chJoin
-    //             from ch in chJoin.DefaultIfEmpty()
-
-    //             join cat in _db.TblCategories
-    //                 on sr.CategoryId equals cat.Id into catJoin
-    //             from cat in catJoin.DefaultIfEmpty()
-
-    //             join rf in _db.TblReferences
-    //                 on sr.ServiceReference equals rf.Id into refJoin
-    //             from rf in refJoin.DefaultIfEmpty()
-
-    //             join org in _db.TblOrganizations
-    //                 on sr.OrganizationId equals org.Id into orgJoin
-    //             from org in orgJoin.DefaultIfEmpty()
-
-    //             join org2 in _db.TblOrganizations
-    //                 on org.RefId equals org2.Id into org2Join
-    //             from org2 in org2Join.DefaultIfEmpty()
-
-    //             join acc in _db.TblAccounts
-    //                 on sr.AccountId equals acc.Id into accJoin
-    //             from acc in accJoin.DefaultIfEmpty()
-
-    //             join gen in _db.TblGenders
-    //                 on acc.GenderId equals gen.Id into genJoin
-    //             from gen in genJoin.DefaultIfEmpty()
-
-    //             join emp1 in _db.TblEmployees
-    //                 on sr.CreatedBy equals emp1.Id into emp1Join
-    //             from emp1 in emp1Join.DefaultIfEmpty()
-
-    //             join emp2 in _db.TblEmployees
-    //                 on sr.OwnerId equals emp2.Id into emp2Join
-    //             from emp2 in emp2Join.DefaultIfEmpty()
-
-    //             join emp3 in _db.TblEmployees
-    //                 on sr.UpdatedBy equals emp3.Id into emp3Join
-    //             from emp3 in emp3Join.DefaultIfEmpty()
-
-    //             where sr.IsEnable == "T"
-
-    //             where string.Compare(sr.Code, startCode) >= 0 &&
-    //                   string.Compare(sr.Code, finishCode) <= 0
-
-    //             where sr.Created >= startDateTime &&
-    //                   sr.Created <= finishDateTime
-
-
-    //             select new ServiceRequestReportDto
-    //             {
-    //                 Code = sr.Code,
-    //                 Summary = sr.Summary,
-    //                 Detail = sr.Detail,
-    //                 SrReferenceLink = sr.ServiceReferenceLink,
-    //                 SrOpened = sr.DateOpened,
-    //                 SrClosed = sr.DateClosed,
-    //                 SrRequireCallBack = sr.CallBack,
-    //                 Created = sr.Created,
-
-    //                 ANumber = c1.ContactDetail,
-
-    //                 ChannelName = ch.NameTh,
-    //                 SrTypeName = cat.NameTh,
-    //                 SrReference = rf.NameTh,
-    //                 SrStatusName = st.NameTh,
-
-    //                 CreatedUName = emp1.UserName,
-    //                 CreaterName = (emp1.SalutationTh ?? "") +
-    //                               (emp1.FirstnameTh ?? "") + " " +
-    //                               (emp1.LastnameTh ?? ""),
-
-    //                 SkillAgentCreated =
-    //                     emp1.Position != null &&
-    //                     EF.Functions.Like(emp1.Position, "%Claim%")
-    //                         ? 1
-    //                         : 2,
-
-    //                 OwnerUName = emp2.UserName,
-    //                 OwnerName = (emp2.SalutationTh ?? "") +
-    //                             (emp2.FirstnameTh ?? "") + " " +
-    //                             (emp2.LastnameTh ?? ""),
-
-    //                 LastUpdatedUName = emp3.UserName,
-    //                 UpdateName = (emp3.SalutationTh ?? "") +
-    //                              (emp3.FirstnameTh ?? "") + " " +
-    //                              (emp3.LastnameTh ?? ""),
-
-    //                 SubOrgId = sr.OrganizationId,
-    //                 SubOrgName = org.NameTh,
-
-    //                 MainOrgId = org2.Id,
-    //                 MainOrgName = org2.NameTh,
-
-    //                 ContactName = (acc.SalutationTh ?? "") +
-    //                               (acc.FirstnameTh ?? "") + " " +
-    //                               (acc.LastnameTh ?? ""),
-
-    //                 Gender = gen.NameTh,
-
-    //                 Remark = sr.Remark
-    //             })
-    //             .Distinct()
-    //             .OrderBy(x => x.Code)
-    //             .ToListAsync();
-
-    //     return Ok(result);
-    // }
 
     [HttpPost("GetReport01")]
     public async Task<IActionResult> GetReport01([FromBody] ServiceRequestReportRequest request)
@@ -183,6 +26,7 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
         var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
             ? TimeSpan.Zero
             : TimeSpan.Parse(request.P_Time_Start);
@@ -191,21 +35,18 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        var startDateTime = request.P_Start.Date.Add(startTime);
-        var finishDateTime = request.P_Finish.Date.Add(finishTime);
+        //var startDate = DateTime.Parse(request.P_Start);
+        //var finishDate = DateTime.Parse(request.P_Finish);
+        //var startDateTime = startDate.Date.Add(startTime);
+        //var finishDateTime = finishDate.Date.Add(finishTime);
 
-        // -------------------------
-        // แปลงปี ค.ศ. -> พ.ศ. สำหรับ SR Code
-        // -------------------------
-        string startCode =
-            $"{request.P_Start.Year + 543}"[2..] +
-            request.P_Start.ToString("MMdd") +
-            "00000";
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
 
-        string finishCode =
-            $"{request.P_Finish.Year + 543}"[2..] +
-            request.P_Finish.ToString("MMdd") +
-            "99999";
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
 
         var result = await (
             from sr in _db.TblServices.AsNoTracking()
@@ -275,11 +116,8 @@ public class ReportController : ControllerBase
             from emp3 in emp3Group.DefaultIfEmpty()
 
             where sr.IsEnable == "T"
-               && string.Compare(sr.Code, startCode) >= 0
-               && string.Compare(sr.Code, finishCode) <= 0
-               && sr.Created >= startDateTime
-               && sr.Created <= finishDateTime
-              
+              && string.Compare(sr.Created, startStr) >= 0
+              && string.Compare(sr.Created, finishStr) <= 0
 
             orderby sr.Code
 
@@ -294,40 +132,34 @@ public class ReportController : ControllerBase
                 SrRequireCallBack = sr.CallBack,
                 Created = sr.Created,
 
-                ANumber = c1 != null ? c1.ContactDetail : "",
+                ANumber = c1.ContactDetail ?? "",
 
                 ChannelName = ch != null ? ch.NameTh : "",
                 SrTypeName = cat != null ? cat.NameTh : "",
                 SrReference = rf != null ? rf.NameTh : "",
                 SrStatusName = st.NameTh,
 
-                CreatedUName = emp1 != null ? emp1.UserName : "",
-                CreaterName = emp1 == null
+                CreatedUName = emp1.UserName ?? "",
+                CreaterName = emp1.Id == null
                     ? ""
                     : $"{emp1.SalutationTh}{emp1.FirstnameTh} {emp1.LastnameTh}",
-
                 SkillAgentCreated =
-                    emp1 != null && EF.Functions.Like(emp1.Position ?? "", "%Claim%")
+                    emp1.Id != null && EF.Functions.Like(emp1.Position ?? "", "%Claim%")
                         ? 1 // ใส่ข้อมูลแสดง Info
                         : 2,// ปล่อยว่าง
-
-                OwnerUName = emp2 != null ? emp2.UserName : "",
-                OwnerName = emp2 == null
+                OwnerUName = emp2.UserName ?? "",
+                OwnerName = emp2.Id == null
                     ? ""
                     : $"{emp2.SalutationTh}{emp2.FirstnameTh} {emp2.LastnameTh}",
-
-                LastUpdatedUName = emp3 != null ? emp3.UserName : "",
-                UpdateName = emp3 == null
+                LastUpdatedUName = emp3.UserName ?? "",
+                UpdateName = emp3.Id == null
                     ? ""
                     : $"{emp3.SalutationTh}{emp3.FirstnameTh} {emp3.LastnameTh}",
-
                 SubOrgId = sr.OrganizationId,
                 SubOrgName = org != null ? org.NameTh : "",
-
                 MainOrgId = org2 != null ? org2.Id : null,
                 MainOrgName = org2 != null ? org2.NameTh : "",
-
-                ContactName = acc == null
+                ContactName = acc.Id == null
                     ? ""
                     : $"{acc.SalutationTh}{acc.FirstnameTh} {acc.LastnameTh}",
 
@@ -337,6 +169,7 @@ public class ReportController : ControllerBase
             })
             .Distinct()
             .ToListAsync();
+            
 
         return Ok(result);
     }
@@ -355,22 +188,12 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        var startDateTime = request.P_Start.Date.Add(startTime);
-        var finishDateTime = request.P_Finish.Date.Add(finishTime);
+        var startDate = DateTime.Parse(request.P_Start);
+        var finishDate = DateTime.Parse(request.P_Finish);
 
-        // -------------------------
-        // แปลงปี ค.ศ. -> พ.ศ. สำหรับ SR Code
-        // -------------------------
-        string startCode =
-            $"{request.P_Start.Year + 543}"[2..] +
-            request.P_Start.ToString("MMdd") +
-            "00000";
-
-        string finishCode =
-            $"{request.P_Finish.Year + 543}"[2..] +
-            request.P_Finish.ToString("MMdd") +
-            "99999";
-
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
+ 
         // ============================================================
         // Query
         // ============================================================
@@ -441,11 +264,9 @@ public class ReportController : ControllerBase
             where sr.IsEnable == "T"
                 && sr.CallBack == "D"
 
-                // SR Code ตามวันที่
-                && string.Compare(sr.Code, startCode) >= 0
-                && string.Compare(sr.Code, finishCode) <= 0
-                && sr.Created >= startDateTime
-                && sr.Created <= finishDateTime
+                
+                && string.Compare(sr.Created, startDateTime.ToString("MM/dd/yyyy HH:mm")) >= 0
+                && string.Compare(sr.Created, finishDateTime.ToString("MM/dd/yyyy HH:mm")) <= 0
 
             select new SrCallbackResponse
             {
@@ -459,9 +280,7 @@ public class ReportController : ControllerBase
                 SrRequireCallBack = sr.CallBack,
                 Created = sr.Created,
 
-                ANumber = c1 != null
-                    ? c1.ContactDetail
-                    : null,
+                ANumber = c1.ContactDetail ?? "",
 
                 ChannelName = ch != null
                     ? ch.NameTh
@@ -560,21 +379,10 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        var startDateTime = request.P_Start.Date.Add(startTime);
-        var finishDateTime = request.P_Finish.Date.Add(finishTime);
-
-        // -------------------------
-        // แปลงปี ค.ศ. -> พ.ศ. สำหรับ SR Code
-        // -------------------------
-        string startCode =
-            $"{request.P_Start.Year + 543}"[2..] +
-            request.P_Start.ToString("MMdd") +
-            "00000";
-
-        string finishCode =
-            $"{request.P_Finish.Year + 543}"[2..] +
-            request.P_Finish.ToString("MMdd") +
-            "99999";
+        var startDate = DateTime.Parse(request.P_Start);
+        var finishDate = DateTime.Parse(request.P_Finish);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
 
         // ============================================================
         // Query
@@ -647,10 +455,8 @@ public class ReportController : ControllerBase
                 && sr.CallBack == "Y"
 
                 // SR Code ตามวันที่
-                && string.Compare(sr.Code, startCode) >= 0
-                && string.Compare(sr.Code, finishCode) <= 0
-                && sr.Created >= startDateTime
-                && sr.Created <= finishDateTime
+                && string.Compare(sr.Created, startDateTime.ToString("MM/dd/yyyy HH:mm")) >= 0
+                && string.Compare(sr.Created, finishDateTime.ToString("MM/dd/yyyy HH:mm")) <= 0
 
             select new SrCallbackResponse
             {
@@ -664,9 +470,7 @@ public class ReportController : ControllerBase
                 SrRequireCallBack = sr.CallBack,
                 Created = sr.Created,
 
-                ANumber = c1 != null
-                    ? c1.ContactDetail
-                    : null,
+                ANumber = c1.ContactDetail ?? "",
 
                 ChannelName = ch != null
                     ? ch.NameTh

@@ -61,7 +61,8 @@ public class AuthController : ControllerBase
                 "This account is disabled."));
         }
 
-        if (employee.DateExpire is { } expiry && expiry < DateTime.Now)
+        if (DateTime.TryParse(employee.DateExpire, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var expiry)
+            && expiry < DateTime.Now)
         {
             return Unauthorized(new MessageResponse(
                 StatusCodes.Status401Unauthorized,

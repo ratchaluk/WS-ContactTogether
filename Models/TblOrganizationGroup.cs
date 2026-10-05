@@ -3,19 +3,17 @@ using System.Collections.Generic;
 
 namespace ContactTogetherApi.Models;
 
-public partial class TblAccountType
+public partial class TblOrganizationGroup
 {
-    public string Id { get; set; } = null!;
+    public string? GroupId { get; set; }
 
-    public string? NameTh { get; set; }
+    public string? RefGroupId { get; set; }
 
-    public string? NameEn { get; set; }
+    public string? GroupName { get; set; }
 
     public string? IsDefault { get; set; }
 
     public string? IsEnable { get; set; }
-
-    public string? Remark { get; set; }
 
     public string? Created { get; set; }
 

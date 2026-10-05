@@ -53,20 +53,20 @@ public class AccountController : ControllerBase
                 "Token has no sub claim; cannot attribute the new account."));
         }
 
-        decimal? zipcode = null;
+        string? zipcode = null;
         if (!string.IsNullOrWhiteSpace(request.Zipcode))
         {
-            // The model maps this column as decimal(18, 0) even though it is nvarchar(100) in the
-            // database, so anything that is not a plain number cannot round-trip.
+            // The model maps this column as nvarchar(100) in the database, so anything that is not a
+            // plain number cannot round-trip; normalize it to the canonical string form.
             if (!decimal.TryParse(request.Zipcode, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
             {
                 ModelState.AddModelError(
                     nameof(request.Zipcode),
-                    "Zipcode must be digits only; the scaffolded model maps this column as a number.");
+                    "Zipcode must be digits only; the database column stores it as text.");
             }
             else
             {
-                zipcode = parsed;
+                zipcode = parsed.ToString(CultureInfo.InvariantCulture);
             }
         }
 
