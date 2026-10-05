@@ -35,10 +35,6 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        //var startDate = DateTime.Parse(request.P_Start);
-        //var finishDate = DateTime.Parse(request.P_Finish);
-        //var startDateTime = startDate.Date.Add(startTime);
-        //var finishDateTime = finishDate.Date.Add(finishTime);
 
         var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
         var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
@@ -180,6 +176,7 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
         var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
             ? TimeSpan.Zero
             : TimeSpan.Parse(request.P_Time_Start);
@@ -188,11 +185,14 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        var startDate = DateTime.Parse(request.P_Start);
-        var finishDate = DateTime.Parse(request.P_Finish);
 
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
         var startDateTime = startDate.Date.Add(startTime);
         var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
  
         // ============================================================
         // Query
@@ -265,8 +265,8 @@ public class ReportController : ControllerBase
                 && sr.CallBack == "D"
 
                 
-                && string.Compare(sr.Created, startDateTime.ToString("MM/dd/yyyy HH:mm")) >= 0
-                && string.Compare(sr.Created, finishDateTime.ToString("MM/dd/yyyy HH:mm")) <= 0
+                && string.Compare(sr.Created, startStr) >= 0
+                && string.Compare(sr.Created, finishStr) <= 0
 
             select new SrCallbackResponse
             {
@@ -298,60 +298,49 @@ public class ReportController : ControllerBase
                     ? st.NameTh
                     : null,
 
-                CreatedUname = emp1 != null
+                CreatedUname = emp1.Id != null
                     ? emp1.UserName
                     : null,
-
-                CreatorName = emp1 != null
+                CreatorName = emp1.Id != null
                     ? (emp1.SalutationTh ?? "") +
                     (emp1.FirstnameTh ?? "") + " " +
                     (emp1.LastnameTh ?? "")
                     : null,
-
                 SkillAgentCreated =
-                    emp1 != null &&
+                    emp1.Id != null &&
                     EF.Functions.Like(
                         emp1.Position ?? "",
                         "%Claim%"
                     )
                         ? 1
                         : 2,
-
-                OwnerUname = emp2 != null
+                OwnerUname = emp2.Id != null
                     ? emp2.UserName
                     : null,
-
-                OwnerName = emp2 != null
+                OwnerName = emp2.Id != null
                     ? (emp2.SalutationTh ?? "") +
                     (emp2.FirstnameTh ?? "") + " " +
                     (emp2.LastnameTh ?? "")
                     : null,
-
-                LastUpdatedUname = emp3 != null
+                LastUpdatedUname = emp3.Id != null
                     ? emp3.UserName
                     : null,
-
-                UpdaterName = emp3 != null
+                UpdaterName = emp3.Id != null
                     ? (emp3.SalutationTh ?? "") +
                     (emp3.FirstnameTh ?? "") + " " +
                     (emp3.LastnameTh ?? "")
                     : null,
-
                 SubOrgId = sr.OrganizationId,
-
                 SubOrgName = org != null
                     ? org.NameTh
                     : null,
-
                 MainOrgId = org2 != null
                     ? org2.Id
                     : null,
-
                 MainOrgName = org2 != null
                     ? org2.NameTh
                     : null,
-
-                ContactName = acc != null
+                ContactName = acc.Id != null
                     ? (acc.SalutationTh ?? "") +
                     (acc.FirstnameTh ?? "") + " " +
                     (acc.LastnameTh ?? "")
@@ -379,10 +368,14 @@ public class ReportController : ControllerBase
             ? new TimeSpan(23, 59, 59)
             : TimeSpan.Parse(request.P_Time_Finish);
 
-        var startDate = DateTime.Parse(request.P_Start);
-        var finishDate = DateTime.Parse(request.P_Finish);
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
         var startDateTime = startDate.Date.Add(startTime);
         var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
 
         // ============================================================
         // Query
@@ -455,8 +448,8 @@ public class ReportController : ControllerBase
                 && sr.CallBack == "Y"
 
                 // SR Code ตามวันที่
-                && string.Compare(sr.Created, startDateTime.ToString("MM/dd/yyyy HH:mm")) >= 0
-                && string.Compare(sr.Created, finishDateTime.ToString("MM/dd/yyyy HH:mm")) <= 0
+                && string.Compare(sr.Created, startStr) >= 0
+                && string.Compare(sr.Created, finishStr) <= 0
 
             select new SrCallbackResponse
             {
@@ -488,60 +481,49 @@ public class ReportController : ControllerBase
                     ? st.NameTh
                     : null,
 
-                CreatedUname = emp1 != null
+                CreatedUname = emp1.Id != null
                     ? emp1.UserName
                     : null,
-
-                CreatorName = emp1 != null
+                CreatorName = emp1.Id != null
                     ? (emp1.SalutationTh ?? "") +
                     (emp1.FirstnameTh ?? "") + " " +
                     (emp1.LastnameTh ?? "")
                     : null,
-
                 SkillAgentCreated =
-                    emp1 != null &&
+                    emp1.Id != null &&
                     EF.Functions.Like(
                         emp1.Position ?? "",
                         "%Claim%"
                     )
                         ? 1
                         : 2,
-
-                OwnerUname = emp2 != null
+                OwnerUname = emp2.Id != null
                     ? emp2.UserName
                     : null,
-
-                OwnerName = emp2 != null
+                OwnerName = emp2.Id != null
                     ? (emp2.SalutationTh ?? "") +
                     (emp2.FirstnameTh ?? "") + " " +
                     (emp2.LastnameTh ?? "")
                     : null,
-
-                LastUpdatedUname = emp3 != null
+                LastUpdatedUname = emp3.Id != null
                     ? emp3.UserName
                     : null,
-
-                UpdaterName = emp3 != null
+                UpdaterName = emp3.Id != null
                     ? (emp3.SalutationTh ?? "") +
                     (emp3.FirstnameTh ?? "") + " " +
                     (emp3.LastnameTh ?? "")
                     : null,
-
                 SubOrgId = sr.OrganizationId,
-
                 SubOrgName = org != null
                     ? org.NameTh
                     : null,
-
                 MainOrgId = org2 != null
                     ? org2.Id
                     : null,
-
                 MainOrgName = org2 != null
                     ? org2.NameTh
                     : null,
-
-                ContactName = acc != null
+                ContactName = acc.Id != null
                     ? (acc.SalutationTh ?? "") +
                     (acc.FirstnameTh ?? "") + " " +
                     (acc.LastnameTh ?? "")
