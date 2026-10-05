@@ -78,3 +78,28 @@ public class SrCallbackResponse
 
     public string? ContactName { get; set; }
 }
+
+ public class ServiceRequestReportContact
+    {
+        public DateTime ContactStart { get; set; }
+        // Kidding call
+        public int JitMaiPakati { get; set; }
+        public int DekThoLen { get; set; }
+        public int SiangNgiap { get; set; }
+        public int ThoDaYapKhai { get; set; }
+        public int NamThuam { get; set; }
+        // สัญญาณไม่ชัดเจน
+        public int SanyanMaiChatJen { get; set; }
+        // สายหลุด
+        public int SaiLut { get; set; }
+        // โทรผิด
+        public int UenUen { get; set; }
+        public int ThePizzaCompany { get; set; }
+        // Out of Scope
+        public int KhorKhamPrueksa { get; set; }
+        public int StressSocial { get; set; }
+        public int StressEconomy { get; set; }
+        public int StressPolitics { get; set; }
+        public int StressLaw { get; set; }
+        public int StressNaturalResource { get; set; }
+    }

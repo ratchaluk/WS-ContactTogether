@@ -537,6 +537,501 @@ public class ReportController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("GetReport04")]
+    public async Task<IActionResult> GetReport4([FromBody] ServiceRequestReportRequestMainOrganization request)
+    {
+        // -------------------------
+        // วันที่ + เวลา
+        // -------------------------
+        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
+            ? TimeSpan.Zero
+            : TimeSpan.Parse(request.P_Time_Start);
+
+        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
+            ? new TimeSpan(23, 59, 59)
+            : TimeSpan.Parse(request.P_Time_Finish);
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+
+        // ============================================================
+        // Query
+        // ============================================================
+
+        var result = await (
+            from sr in _db.TblServices
+
+            // Activity
+            join ac in _db.TblActivities
+                on sr.Id equals ac.ServiceId into acJoin
+            from ac in acJoin.DefaultIfEmpty()
+
+            // Contact
+            join c1 in _db.TblContacts
+                on ac.ContactId equals c1.Id into cJoin
+            from c1 in cJoin.DefaultIfEmpty()
+
+            // Creator
+            join emp1 in _db.TblEmployees
+                on sr.CreatedBy equals emp1.Id into emp1Join
+            from emp1 in emp1Join.DefaultIfEmpty()
+
+            // Owner
+            join emp2 in _db.TblEmployees
+                on sr.OwnerId equals emp2.Id into emp2Join
+            from emp2 in emp2Join.DefaultIfEmpty()
+
+            // Last Updated
+            join emp3 in _db.TblEmployees
+                on sr.UpdatedBy equals emp3.Id into emp3Join
+            from emp3 in emp3Join.DefaultIfEmpty()
+
+            // Channel
+            join ch in _db.TblChannels
+                on sr.ChannelIncomingId equals ch.Id into chJoin
+            from ch in chJoin.DefaultIfEmpty()
+
+            // Category
+            join cat in _db.TblCategories
+                on sr.CategoryId equals cat.Id into catJoin
+            from cat in catJoin.DefaultIfEmpty()
+
+            // Reference
+            join rf in _db.TblReferences
+                on sr.ServiceReference equals rf.Id into refJoin
+            from rf in refJoin.DefaultIfEmpty()
+
+            // Status
+            join st in _db.TblStatuses
+                on sr.StatusId equals st.Id into stJoin
+            from st in stJoin.DefaultIfEmpty()
+
+            // Organization
+            join org in _db.TblOrganizations
+                on sr.OrganizationId equals org.Id into orgJoin
+            from org in orgJoin.DefaultIfEmpty()
+
+            // Main Organization
+            join org2 in _db.TblOrganizations
+                on org.RefId equals org2.Id into org2Join
+            from org2 in org2Join.DefaultIfEmpty()
+
+            // Account
+            join acc in _db.TblAccounts
+                on sr.AccountId equals acc.Id into accJoin
+            from acc in accJoin.DefaultIfEmpty()
+
+            where sr.IsEnable == "T"
+                && org.Id == request.P_MainOrg
+
+               
+                && string.Compare(sr.Created, startStr) >= 0
+                && string.Compare(sr.Created, finishStr) <= 0
+
+            select new SrCallbackResponse
+            {
+            
+                Code = sr.Code,
+                Summary = sr.Summary,
+                Detail = sr.Detail,
+                SrReferenceLink = sr.ServiceReferenceLink,
+                SrOpened = sr.DateOpened,
+                SrClosed = sr.DateClosed,
+                SrRequireCallBack = sr.CallBack,
+                Created = sr.Created,
+
+                ANumber = c1.ContactDetail ?? "",
+
+                ChannelName = ch != null
+                    ? ch.NameTh
+                    : null,
+
+                SrTypeName = cat != null
+                    ? cat.NameTh
+                    : null,
+
+                SrReference = rf != null
+                    ? rf.NameTh
+                    : null,
+
+                SrStatusName = st != null
+                    ? st.NameTh
+                    : null,
+
+                CreatedUname = emp1.Id != null
+                    ? emp1.UserName
+                    : null,
+                CreatorName = emp1.Id != null
+                    ? (emp1.SalutationTh ?? "") +
+                    (emp1.FirstnameTh ?? "") + " " +
+                    (emp1.LastnameTh ?? "")
+                    : null,
+                SkillAgentCreated =
+                    emp1.Id != null &&
+                    EF.Functions.Like(
+                        emp1.Position ?? "",
+                        "%Claim%"
+                    )
+                        ? 1
+                        : 2,
+                OwnerUname = emp2.Id != null
+                    ? emp2.UserName
+                    : null,
+                OwnerName = emp2.Id != null
+                    ? (emp2.SalutationTh ?? "") +
+                    (emp2.FirstnameTh ?? "") + " " +
+                    (emp2.LastnameTh ?? "")
+                    : null,
+                LastUpdatedUname = emp3.Id != null
+                    ? emp3.UserName
+                    : null,
+                UpdaterName = emp3.Id != null
+                    ? (emp3.SalutationTh ?? "") +
+                    (emp3.FirstnameTh ?? "") + " " +
+                    (emp3.LastnameTh ?? "")
+                    : null,
+                MainOrgId = org2 != null
+                    ? org2.Id
+                    : null,
+                MainOrgName = org2 != null
+                    ? org2.NameTh
+                    : null,
+                ContactName = acc.Id != null
+                    ? (acc.SalutationTh ?? "") +
+                    (acc.FirstnameTh ?? "") + " " +
+                    (acc.LastnameTh ?? "")
+                    : null
+            })
+            .Distinct()
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+
+
+        return Ok(result);
+    }
+
+ [HttpPost("GetReport05")]
+    public async Task<IActionResult> GetReport5([FromBody] ServiceRequestReportRequest request)
+    {
+        // -------------------------
+        // วันที่ + เวลา
+        // -------------------------
+        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
+            ? TimeSpan.Zero
+            : TimeSpan.Parse(request.P_Time_Start);
+
+        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
+            ? new TimeSpan(23, 59, 59)
+            : TimeSpan.Parse(request.P_Time_Finish);
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+
+         // ============================================================
+    // Query
+    // ============================================================
+
+    var query =
+    from c in _db.TblContacts
+
+    // users_user_group (Left Join)
+    join uug in _db.TblEmployeeGroups
+        on c.CreatedBy equals uug.EmployeeId
+        into uugGroup
+    from uug in uugGroup.DefaultIfEmpty()
+
+    // user_group (Left Join)
+    join ug in _db.TblOrganizationGroups
+        on uug.GroupId equals ug.GroupId
+        into ugGroup
+    from ug in ugGroup.DefaultIfEmpty()
+
+    where
+        string.Compare(c.ContactStart, startStr) >= 0
+        && string.Compare(c.ContactStart, finishStr) <= 0
+        // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
+
+    // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
+    group new { c, ug } by c.ContactStart into g
+
+    select new
+    {
+
+        // ====================================================
+        // Kidding call
+        // ====================================================
+
+        // จิตไม่ปกติ (นับเฉพาะเมื่อเป็น Group 53 หรือ 77 และ Category ตรงกัน)
+        Insane = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
+
+        // เด็กโทรเล่น
+        Prankcall = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013"),
+
+        // เสียงเงียบ
+        Silence = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014"),
+
+        // โทรด่าหยาบคาย
+        Rude = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015"),
+
+        // น้ำท่วม
+        Flood = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018"),
+
+        // ====================================================
+        // สัญญาณไม่ชัดเจน
+        // ====================================================
+
+        // สัญญาณไม่ชัดเจน
+        Badline = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002"),
+
+        // ====================================================
+        // สายหลุด
+        // ====================================================
+
+        // สายหลุด
+        CutOff = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003"),
+
+        // ====================================================
+        // อื่น ๆ
+        // ====================================================
+
+        // อื่น ๆ
+        Other = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016"),
+
+        The_Pizza_Company = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017"),
+
+        // ====================================================
+        // Out of Scope
+        // ====================================================
+
+        //ขอคำปรึกษาเจ้าหน้าที่
+        Request = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006"),
+
+        //ระบายความเครียดด้านสังคม
+        RelievingSocial = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007"),
+
+        //ระบายความเครียดด้านเศรษฐกิจ 
+        RelievingEconomic = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008"),
+
+        //ระบายความเครียดด้านการเมือง
+        RelievingPolitical = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009"),
+
+        //ระบายความเครียดด้านกฏหมาย 
+        RelievingLegal = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010"),
+
+        //ระบายความเครียดด้านทรัพยากรธรรมชาติ
+        RelievingNatural = g.Count(x =>
+            (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
+    };
+
+    // ============================================================
+    // Execute
+    // ============================================================
+
+        var result = await query
+            .ToListAsync();
+
+        return Ok(result);
+    }
+
+[HttpPost("GetReport06")]
+    public async Task<IActionResult> GetReport6([FromBody] ServiceRequestReportRequest request)
+    {
+        // -------------------------
+        // วันที่ + เวลา
+        // -------------------------
+        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
+            ? TimeSpan.Zero
+            : TimeSpan.Parse(request.P_Time_Start);
+
+        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
+            ? new TimeSpan(23, 59, 59)
+            : TimeSpan.Parse(request.P_Time_Finish);
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+
+         // ============================================================
+    // Query
+    // ============================================================
+
+    var query =
+    from c in _db.TblContacts
+
+    // users_user_group (Left Join)
+    join uug in _db.TblEmployeeGroups
+        on c.CreatedBy equals uug.EmployeeId
+        into uugGroup
+    from uug in uugGroup.DefaultIfEmpty()
+
+    // user_group (Left Join)
+    join ug in _db.TblOrganizationGroups
+        on uug.GroupId equals ug.GroupId
+        into ugGroup
+    from ug in ugGroup.DefaultIfEmpty()
+
+    where
+        string.Compare(c.ContactStart, startStr) >= 0
+        && string.Compare(c.ContactStart, finishStr) <= 0
+        // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
+
+    // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
+    group new { c, ug } by c.ContactStart into g
+
+    select new
+    {
+
+        // ====================================================
+        // Kidding call
+        // ====================================================
+
+        // จิตไม่ปกติ (นับเฉพาะเมื่อเป็น Group 53 หรือ 77 และ Category ตรงกัน)
+        Insane = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
+
+        // เด็กโทรเล่น
+        Prankcall = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013"),
+
+        // เสียงเงียบ
+        Silence = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014"),
+
+        // โทรด่าหยาบคาย
+        Rude = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015"),
+
+        // น้ำท่วม
+        Flood = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018"),
+
+        // ====================================================
+        // สัญญาณไม่ชัดเจน
+        // ====================================================
+
+        // สัญญาณไม่ชัดเจน
+        Badline = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002"),
+
+        // ====================================================
+        // สายหลุด
+        // ====================================================
+
+        // สายหลุด
+        CutOff = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003"),
+
+        // ====================================================
+        // อื่น ๆ
+        // ====================================================
+
+        // อื่น ๆ
+        Other = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016"),
+
+        The_Pizza_Company = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017"),
+
+        // ====================================================
+        // Out of Scope
+        // ====================================================
+
+        //ขอคำปรึกษาเจ้าหน้าที่
+        Request = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006"),
+
+        //ระบายความเครียดด้านสังคม
+        RelievingSocial = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007"),
+
+        //ระบายความเครียดด้านเศรษฐกิจ 
+        RelievingEconomic = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008"),
+
+        //ระบายความเครียดด้านการเมือง
+        RelievingPolitical = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009"),
+
+        //ระบายความเครียดด้านกฏหมาย 
+        RelievingLegal = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010"),
+
+        //ระบายความเครียดด้านทรัพยากรธรรมชาติ
+        RelievingNatural = g.Count(x =>
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
+    };
+
+    // ============================================================
+    // Execute
+    // ============================================================
+
+        var result = await query
+            .ToListAsync();
+
+        return Ok(result);
+    }
+
 
 
 }
