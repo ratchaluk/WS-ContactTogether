@@ -27,11 +27,12 @@ public class JwtTokenService : ITokenService
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, employee.Id),
+            // TblEmployee has no NOT NULL constraints any more; Claim throws on a null value.
+            new(JwtRegisteredClaimNames.Sub, employee.Id ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, tokenId),
-            new(JwtRegisteredClaimNames.Name, employee.UserName),
-            new(AuthClaimTypes.Role, employee.RoleId),
-            new(AuthClaimTypes.Language, employee.DefaultLanguage),
+            new(JwtRegisteredClaimNames.Name, employee.UserName ?? string.Empty),
+            new(AuthClaimTypes.Role, employee.RoleId ?? string.Empty),
+            new(AuthClaimTypes.Language, employee.DefaultLanguage ?? string.Empty),
         };
 
         if (!string.IsNullOrEmpty(employee.OrganizationId))

@@ -5,29 +5,29 @@ namespace ContactTogetherApi.Models;
 
 public partial class TblService
 {
-    public string Id { get; set; } = null!;
+    public string? Id { get; set; }
 
-    public string Code { get; set; } = null!;
+    public string? Code { get; set; }
 
-    public string CategoryId { get; set; } = null!;
+    public string? CategoryId { get; set; }
 
-    public string StatusId { get; set; } = null!;
+    public string? StatusId { get; set; }
 
-    public string OwnerId { get; set; } = null!;
+    public string? OwnerId { get; set; }
 
-    public DateTime DateOpened { get; set; }
+    public string? DateOpened { get; set; }
 
-    public DateTime? DateClosed { get; set; }
+    public string? DateClosed { get; set; }
 
-    public string ChannelIncomingId { get; set; } = null!;
+    public string? ChannelIncomingId { get; set; }
 
-    public string CallBack { get; set; } = null!;
+    public string? CallBack { get; set; }
 
     public string? ChannelOutgoingId { get; set; }
 
     public string? AccountId { get; set; }
 
-    public string Summary { get; set; } = null!;
+    public string? Summary { get; set; }
 
     public string? Detail { get; set; }
 
@@ -35,7 +35,7 @@ public partial class TblService
 
     public string? OrganizationId { get; set; }
 
-    public DateTime? OnScene { get; set; }
+    public string? OnScene { get; set; }
 
     public string? ServiceReference { get; set; }
 
@@ -51,15 +51,13 @@ public partial class TblService
 
     public string? LevelSecretId { get; set; }
 
-    public string IsEnable { get; set; } = null!;
+    public string? IsEnable { get; set; }
 
-    public DateTime Created { get; set; }
+    public string? Created { get; set; }
 
-    public string CreatedBy { get; set; } = null!;
+    public string? CreatedBy { get; set; }
 
-    public DateTime Updated { get; set; }
+    public string? Updated { get; set; }
 
-    public string UpdatedBy { get; set; } = null!;
-
-    public virtual TblStatus Status { get; set; } = null!;
+    public string? UpdatedBy { get; set; }
 }

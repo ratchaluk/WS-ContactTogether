@@ -14,8 +14,6 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblAccount> TblAccounts { get; set; }
 
-    public virtual DbSet<TblAccount1> TblAccounts1 { get; set; }
-
     public virtual DbSet<TblAccountDetail> TblAccountDetails { get; set; }
 
     public virtual DbSet<TblAccountType> TblAccountTypes { get; set; }
@@ -38,6 +36,8 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblEmployee> TblEmployees { get; set; }
 
+    public virtual DbSet<TblEmployeeGroup> TblEmployeeGroups { get; set; }
+
     public virtual DbSet<TblErrorLog> TblErrorLogs { get; set; }
 
     public virtual DbSet<TblGender> TblGenders { get; set; }
@@ -47,6 +47,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TblLoginHistory> TblLoginHistories { get; set; }
 
     public virtual DbSet<TblOrganization> TblOrganizations { get; set; }
+
+    public virtual DbSet<TblOrganizationGroup> TblOrganizationGroups { get; set; }
 
     public virtual DbSet<TblPage> TblPages { get; set; }
 
@@ -72,15 +74,18 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblStatus> TblStatuses { get; set; }
 
+    public virtual DbSet<TblTmpSr> TblTmpSrs { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Thai_100_CS_AI");
 
         modelBuilder.Entity<TblAccount>(entity =>
         {
-            entity.ToTable("TblAccount");
+            entity
+                .HasNoKey()
+                .ToTable("TblAccount");
 
-            entity.Property(e => e.Id).HasMaxLength(50);
             entity.Property(e => e.AreaId).HasMaxLength(50);
             entity.Property(e => e.Birthdate).HasMaxLength(50);
             entity.Property(e => e.Created).HasMaxLength(50);
@@ -88,99 +93,16 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.FirstnameEn).HasMaxLength(200);
             entity.Property(e => e.FirstnameTh).HasMaxLength(200);
             entity.Property(e => e.GenderId).HasMaxLength(50);
-            entity.Property(e => e.IsEnable).HasMaxLength(10);
+            entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.IsEnable).HasMaxLength(50);
             entity.Property(e => e.IsScret).HasMaxLength(10);
             entity.Property(e => e.LastnameEn).HasMaxLength(200);
             entity.Property(e => e.LastnameTh).HasMaxLength(200);
             entity.Property(e => e.SalutationEn).HasMaxLength(100);
             entity.Property(e => e.SalutationTh).HasMaxLength(100);
             entity.Property(e => e.Updated).HasMaxLength(50);
-            entity.Property(e => e.UpdatedBy).HasMaxLength(50);
-            entity.Property(e => e.Zipcode).HasColumnType("decimal(18, 0)");
-        });
-
-        modelBuilder.Entity<TblAccount1>(entity =>
-        {
-            entity
-                .HasNoKey()
-                .ToTable("TblAccounts");
-
-            entity.Property(e => e.Column1Address)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Address");
-            entity.Property(e => e.Column1AreaId)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Area_ID");
-            entity.Property(e => e.Column1Birthdate)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Birthdate");
-            entity.Property(e => e.Column1Created)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Created");
-            entity.Property(e => e.Column1CreatedBy)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Created_By");
-            entity.Property(e => e.Column1FirstnameEn)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Firstname_EN");
-            entity.Property(e => e.Column1FirstnameTh)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Firstname_TH");
-            entity.Property(e => e.Column1GenderId)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Gender_ID");
-            entity.Property(e => e.Column1Id)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 ID");
-            entity.Property(e => e.Column1IsEnable)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Is_Enable");
-            entity.Property(e => e.Column1IsScret)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Is_Scret");
-            entity.Property(e => e.Column1LastnameEn)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Lastname_EN");
-            entity.Property(e => e.Column1LastnameTh)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Lastname_TH");
-            entity.Property(e => e.Column1Remark)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Remark");
-            entity.Property(e => e.Column1SalutationEn)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Salutation_EN");
-            entity.Property(e => e.Column1SalutationTh)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Salutation_TH");
-            entity.Property(e => e.Column1Updated)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Updated");
-            entity.Property(e => e.Column1UpdatedBy)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Updated_By");
-            entity.Property(e => e.Column1Zipcode)
-                .HasMaxLength(50)
-                .IsUnicode(false)
-                .HasColumnName("Column1 Zipcode");
+            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+            entity.Property(e => e.Zipcode).HasMaxLength(100);
         });
 
         modelBuilder.Entity<TblAccountDetail>(entity =>
@@ -189,12 +111,12 @@ public partial class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).HasMaxLength(50);
             entity.Property(e => e.AccountId).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(20);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.DetailType).HasMaxLength(50);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
+            entity.Property(e => e.Updated).HasMaxLength(20);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-
-            entity.HasOne(d => d.Account).WithMany(p => p.TblAccountDetails).HasForeignKey(d => d.AccountId);
         });
 
         modelBuilder.Entity<TblAccountType>(entity =>
@@ -202,11 +124,13 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblAccountType");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
         });
 
@@ -318,50 +242,145 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblChannel");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
-            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+            entity.Property(e => e.Updated).HasMaxLength(50);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(150);
         });
 
         modelBuilder.Entity<TblContact>(entity =>
         {
-            entity.ToTable("TblContact");
+            entity
+                .HasNoKey()
+                .ToTable("TblContact");
 
-            entity.Property(e => e.Id).HasMaxLength(50);
-            entity.Property(e => e.CategoryId).HasMaxLength(50);
-            entity.Property(e => e.ChannelId).HasMaxLength(50);
-            entity.Property(e => e.CreatedBy).HasMaxLength(100);
-            entity.Property(e => e.MenuIvr).HasMaxLength(100);
-
-            entity.HasOne(d => d.Channel).WithMany(p => p.TblContacts)
-                .HasForeignKey(d => d.ChannelId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
+            entity.Property(e => e.CategoryId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ChannelId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ContactDetail)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ContactEnd)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ContactStart)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Id)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("ID");
+            entity.Property(e => e.MenuIvr)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("MenuIVR");
         });
 
         modelBuilder.Entity<TblEmployee>(entity =>
         {
-            entity.ToTable("TblEmployee");
+            entity
+                .HasNoKey()
+                .ToTable("TblEmployee");
 
-            entity.Property(e => e.Id).HasMaxLength(50);
-            entity.Property(e => e.CreatedBy).HasMaxLength(100);
-            entity.Property(e => e.DefaultLanguage).HasMaxLength(10);
-            entity.Property(e => e.FirstnameEn).HasMaxLength(200);
-            entity.Property(e => e.FirstnameTh).HasMaxLength(200);
-            entity.Property(e => e.GenderId).HasMaxLength(50);
-            entity.Property(e => e.IsEnable).HasMaxLength(10);
-            entity.Property(e => e.LastnameEn).HasMaxLength(200);
-            entity.Property(e => e.LastnameTh).HasMaxLength(200);
-            entity.Property(e => e.OrganizationId).HasMaxLength(50);
-            entity.Property(e => e.Position).HasMaxLength(100);
-            entity.Property(e => e.RoleId).HasMaxLength(50);
-            entity.Property(e => e.SalutationEn).HasMaxLength(100);
-            entity.Property(e => e.SalutationTh).HasMaxLength(100);
-            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-            entity.Property(e => e.UserName).HasMaxLength(100);
-            entity.Property(e => e.UserPassword).HasMaxLength(255);
+            entity.Property(e => e.Birthdate)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ContactDetail)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.Created)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.DateExpire)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.DateHire)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.DefaultLanguage)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.DefaultRowPerPage)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.FirstnameEn)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.FirstnameTh)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.GenderId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Id)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.LastnameEn)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.LastnameTh)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.OrganizationId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PictureProfile)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Position)
+                .HasMaxLength(150)
+                .IsUnicode(false);
+            entity.Property(e => e.RoleId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.SalutationEn)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.SalutationTh)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Updated)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.UserName)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.UserPassword)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+        });
+
+        modelBuilder.Entity<TblEmployeeGroup>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("TblEmployeeGroup");
+
+            entity.Property(e => e.EmployeeId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.GroupId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
         });
 
         modelBuilder.Entity<TblErrorLog>(entity =>
@@ -380,11 +399,13 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblGender");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
         });
 
@@ -417,17 +438,54 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblOrganization");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
             entity.Property(e => e.RefId).HasMaxLength(50);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
 
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)
                 .HasForeignKey(d => d.RefId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<TblOrganizationGroup>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("TblOrganizationGroup");
+
+            entity.Property(e => e.Created)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.GroupId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.GroupName)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.IsDefault)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.RefGroupId)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Updated)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(50)
+                .IsUnicode(false);
         });
 
         modelBuilder.Entity<TblPage>(entity =>
@@ -524,6 +582,7 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblRole");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsAdmin).HasMaxLength(10);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
@@ -531,6 +590,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.LevelSecretId).HasMaxLength(50);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
         });
 
@@ -570,31 +630,108 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<TblService>(entity =>
         {
-            entity.ToTable("TblService");
+            entity
+                .HasNoKey()
+                .ToTable("TblService");
 
-            entity.Property(e => e.Id).HasMaxLength(50);
-            entity.Property(e => e.AccountId).HasMaxLength(50);
-            entity.Property(e => e.AreaId).HasMaxLength(50);
-            entity.Property(e => e.CallBack).HasMaxLength(50);
-            entity.Property(e => e.CategoryId).HasMaxLength(50);
-            entity.Property(e => e.ChannelIncomingId).HasMaxLength(50);
-            entity.Property(e => e.ChannelOutgoingId).HasMaxLength(50);
-            entity.Property(e => e.Code).HasMaxLength(50);
-            entity.Property(e => e.CreatedBy).HasMaxLength(100);
-            entity.Property(e => e.IsEnable).HasMaxLength(10);
-            entity.Property(e => e.LevelPriorityId).HasMaxLength(50);
-            entity.Property(e => e.LevelSecretId).HasMaxLength(50);
-            entity.Property(e => e.LevelSeverityId).HasMaxLength(50);
-            entity.Property(e => e.OrganizationId).HasMaxLength(50);
-            entity.Property(e => e.OwnerId).HasMaxLength(50);
-            entity.Property(e => e.ServiceArea).HasMaxLength(100);
-            entity.Property(e => e.ServiceReference).HasMaxLength(100);
-            entity.Property(e => e.StatusId).HasMaxLength(50);
-            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-
-            entity.HasOne(d => d.Status).WithMany(p => p.TblServices)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
+            entity.Property(e => e.AccountId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Account_ID");
+            entity.Property(e => e.AreaId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Area_ID");
+            entity.Property(e => e.CallBack)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Call_Back");
+            entity.Property(e => e.CategoryId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Category_ID");
+            entity.Property(e => e.ChannelIncomingId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Channel_Incoming_ID");
+            entity.Property(e => e.ChannelOutgoingId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Channel_Outgoing_ID");
+            entity.Property(e => e.Code)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.Created)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Created_By");
+            entity.Property(e => e.DateClosed)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("Date_Closed");
+            entity.Property(e => e.DateOpened)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("Date_Opened");
+            entity.Property(e => e.Detail).HasMaxLength(1000);
+            entity.Property(e => e.Id)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("Is_Enable");
+            entity.Property(e => e.LevelPriorityId)
+                .HasMaxLength(500)
+                .IsUnicode(false)
+                .HasColumnName("Level_Priority_ID");
+            entity.Property(e => e.LevelSecretId)
+                .HasMaxLength(500)
+                .IsUnicode(false)
+                .HasColumnName("Level_Secret_ID");
+            entity.Property(e => e.LevelSeverityId)
+                .HasMaxLength(500)
+                .IsUnicode(false)
+                .HasColumnName("Level_Severity_ID");
+            entity.Property(e => e.OnScene)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("On_Scene");
+            entity.Property(e => e.OrganizationId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Organization_ID");
+            entity.Property(e => e.OwnerId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Owner_ID");
+            entity.Property(e => e.Remark).HasMaxLength(500);
+            entity.Property(e => e.ServiceArea)
+                .HasMaxLength(2000)
+                .IsUnicode(false)
+                .HasColumnName("Service_Area");
+            entity.Property(e => e.ServiceReference)
+                .HasMaxLength(500)
+                .IsUnicode(false)
+                .HasColumnName("Service_Reference");
+            entity.Property(e => e.ServiceReferenceLink)
+                .HasMaxLength(500)
+                .HasColumnName("Service_Reference_Link");
+            entity.Property(e => e.StatusId)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Status_ID");
+            entity.Property(e => e.Summary).HasMaxLength(500);
+            entity.Property(e => e.Updated)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(200)
+                .IsUnicode(false)
+                .HasColumnName("Updated_By");
         });
 
         modelBuilder.Entity<TblSession>(entity =>
@@ -603,7 +740,12 @@ public partial class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).HasMaxLength(50);
             entity.Property(e => e.EmployeeId).HasMaxLength(50);
+            entity.Property(e => e.ExpiresAt).HasMaxLength(50);
+            entity.Property(e => e.IpAddress).HasMaxLength(50);
+            entity.Property(e => e.LastActiveAt).HasMaxLength(50);
             entity.Property(e => e.ServerName).HasMaxLength(100);
+            entity.Property(e => e.SessionTime).HasMaxLength(50);
+            entity.Property(e => e.TokenHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<TblStatus>(entity =>
@@ -611,6 +753,7 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblStatus");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
@@ -619,11 +762,21 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.NameTh).HasMaxLength(200);
             entity.Property(e => e.RefId).HasMaxLength(50);
             entity.Property(e => e.StatusType).HasMaxLength(50);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
 
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)
                 .HasForeignKey(d => d.RefId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<TblTmpSr>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("TblTmpSr");
+
+            entity.Property(e => e.SrId).HasMaxLength(50);
         });
 
         OnModelCreatingPartial(modelBuilder);

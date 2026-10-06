@@ -53,23 +53,6 @@ public class AccountController : ControllerBase
                 "Token has no sub claim; cannot attribute the new account."));
         }
 
-        decimal? zipcode = null;
-        if (!string.IsNullOrWhiteSpace(request.Zipcode))
-        {
-            // The model maps this column as decimal(18, 0) even though it is nvarchar(100) in the
-            // database, so anything that is not a plain number cannot round-trip.
-            if (!decimal.TryParse(request.Zipcode, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
-            {
-                ModelState.AddModelError(
-                    nameof(request.Zipcode),
-                    "Zipcode must be digits only; the scaffolded model maps this column as a number.");
-            }
-            else
-            {
-                zipcode = parsed;
-            }
-        }
-
         await ValidateLookupsAsync(request, cancellationToken);
         if (!ModelState.IsValid)
         {
@@ -91,7 +74,7 @@ public class AccountController : ControllerBase
             Birthdate = request.Birthdate,
             Address = request.Address,
             AreaId = request.AreaId,
-            Zipcode = zipcode,
+            Zipcode = request.Zipcode,
             Remark = request.Remark,
             IsScret = request.IsScret,
             IsEnable = request.IsEnable,
@@ -109,7 +92,7 @@ public class AccountController : ControllerBase
             account.Id,
             actingEmployeeId);
 
-        return StatusCode(StatusCodes.Status201Created, ToResponse(account, request.Zipcode));
+        return StatusCode(StatusCodes.Status201Created, ToResponse(account));
     }
 
     /// <summary>
@@ -130,8 +113,7 @@ public class AccountController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        // Only the listed columns are read: the scaffolded model types TblAccount.Zipcode as decimal
-        // while the column is nvarchar, so materialising whole entities from this table throws.
+        // Projected and untracked: TblAccount.Id has legacy duplicates, see ApplicationDbContext.Keys.cs.
         var matches = await (
             from detail in _db.TblAccountDetails.AsNoTracking()
             join account in _db.TblAccounts.AsNoTracking() on detail.AccountId equals account.Id
@@ -186,7 +168,7 @@ public class AccountController : ControllerBase
         string.Join(' ', new[] { salutation, firstname, lastname }
             .Where(part => !string.IsNullOrWhiteSpace(part)));
 
-    private static AccountResponse ToResponse(TblAccount account, string? zipcode) => new()
+    private static AccountResponse ToResponse(TblAccount account) => new()
     {
         StatusCode = StatusCodes.Status201Created,
         Id = account.Id,
@@ -200,7 +182,7 @@ public class AccountController : ControllerBase
         Birthdate = account.Birthdate,
         Address = account.Address,
         AreaId = account.AreaId,
-        Zipcode = zipcode,
+        Zipcode = account.Zipcode,
         Remark = account.Remark,
         IsScret = account.IsScret,
         IsEnable = account.IsEnable,

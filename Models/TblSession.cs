@@ -11,5 +11,13 @@ public partial class TblSession
 
     public string? ServerName { get; set; }
 
-    public DateTime SessionTime { get; set; }
+    public string? SessionTime { get; set; }
+
+    public string? TokenHash { get; set; }
+
+    public string? LastActiveAt { get; set; }
+
+    public string? ExpiresAt { get; set; }
+
+    public string? IpAddress { get; set; }
 }

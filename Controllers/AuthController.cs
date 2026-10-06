@@ -61,7 +61,7 @@ public class AuthController : ControllerBase
                 "This account is disabled."));
         }
 
-        if (employee.DateExpire is { } expiry && expiry < DateTime.Now)
+        if (IsExpired(employee.DateExpire))
         {
             return Unauthorized(new MessageResponse(
                 StatusCodes.Status401Unauthorized,
@@ -76,9 +76,9 @@ public class AuthController : ControllerBase
             StatusCode = StatusCodes.Status200OK,
             Token = token.Token,
             ExpiresAtUtc = token.ExpiresAtUtc,
-            EmployeeId = employee.Id,
-            UserName = employee.UserName,
-            RoleId = employee.RoleId,
+            EmployeeId = employee.Id ?? string.Empty,
+            UserName = employee.UserName ?? string.Empty,
+            RoleId = employee.RoleId ?? string.Empty,
         });
     }
 
@@ -118,6 +118,26 @@ public class AuthController : ControllerBase
         // Should not happen - every issued token carries exp - but never revoke for less than the
         // longest lifetime the API hands out.
         return DateTime.UtcNow.AddDays(1);
+    }
+
+    /// <summary>
+    /// <c>DateExpire</c> is <c>nvarchar</c>; empty means "never expires". A value that is set but
+    /// cannot be parsed is treated as expired, so bad data locks an account rather than opening it.
+    /// </summary>
+    private static bool IsExpired(string? dateExpire)
+    {
+        if (string.IsNullOrWhiteSpace(dateExpire))
+        {
+            return false;
+        }
+
+        return !DateTime.TryParseExact(
+                dateExpire.Trim(),
+                [UserManagementController.LegacyDateFormat, "M/d/yyyy H:mm", "M/d/yyyy"],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var expiry)
+            || expiry < DateTime.Now;
     }
 
     /// <summary>
