@@ -76,6 +76,109 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Report 01 - every response is wrapped in _0BaseReturn { callAPIStatus, callAPIStatusMessage, result }.
+# Dates are MM/dd/yyyy; P_Time_Start / P_Time_Finish are optional HH:mm:ss (default 00:00:00 / 23:59:59).
+# 200 - rows found, or an empty result with "ไม่พบข้อมูล"
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026",
+  "p_Time_Start": "08:00:00",
+  "p_Time_Finish": "17:00:00"
+}
+
+###
+
+# 400 - P_Start missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Finish": "01/31/2025"
+}
+
+###
+
+# 400 - wrong date format (must be MM/dd/yyyy)
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2025-01-01",
+  "p_Finish": "2025-01-31"
+}
+
+###
+
+# 400 - P_Start after P_Finish
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "02/01/2025",
+  "p_Finish": "01/01/2025"
+}
+
+###
+
+# Report 02 - service requests with CallBack = "D"; same request rules and _0BaseReturn envelope as Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport02
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
+}
+
+###
+
+# Report 03 - service requests with CallBack = "Y"
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport03
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
+}
+
+###
+
+# Report 04 - service requests of one organization; P_MainOrg is required (TblOrganization.Id)
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026",
+  "p_MainOrg": "0D26AFEE79DD44C680D3E2F606B5C52A"
+}
+
+###
+
+# Report 05 / 06 - contact counts per day from TblContact.ContactStart (date only, so
+# P_Time_Start / P_Time_Finish have no effect). 05 = groups 53/77, 06 = all other groups.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport05
+Content-Type: application/json
+
+{
+  "p_Start": "01/01/2014",
+  "p_Finish": "12/31/2014"
+}
+
+###
+
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport06
+Content-Type: application/json
+
+{
+  "p_Start": "01/01/2014",
+  "p_Finish": "12/31/2014"
+}
+
+###
+
 # Logout - revokes the presented token for the remainder of its lifetime
 POST {{ContactTogetherApi_HostAddress}}/Auth/logout
 Authorization: Bearer {{token}}
