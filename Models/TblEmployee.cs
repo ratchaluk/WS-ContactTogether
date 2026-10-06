@@ -5,53 +5,53 @@ namespace ContactTogetherApi.Models;
 
 public partial class TblEmployee
 {
-    public string Id { get; set; } = null!;
+    public string? Id { get; set; }
 
-    public string UserName { get; set; } = null!;
+    public string? UserName { get; set; }
 
-    public string UserPassword { get; set; } = null!;
+    public string? UserPassword { get; set; }
 
-    public string GenderId { get; set; } = null!;
+    public string? GenderId { get; set; }
 
     public string? SalutationTh { get; set; }
 
-    public string FirstnameTh { get; set; } = null!;
+    public string? FirstnameTh { get; set; }
 
     public string? LastnameTh { get; set; }
 
     public string? SalutationEn { get; set; }
 
-    public string FirstnameEn { get; set; } = null!;
+    public string? FirstnameEn { get; set; }
 
     public string? LastnameEn { get; set; }
 
-    public DateTime? Birthdate { get; set; }
+    public string? Birthdate { get; set; }
 
     public string? ContactDetail { get; set; }
 
     public string? Position { get; set; }
 
-    public DateTime? DateHire { get; set; }
+    public string? DateHire { get; set; }
 
-    public DateTime? DateExpire { get; set; }
+    public string? DateExpire { get; set; }
 
-    public string RoleId { get; set; } = null!;
+    public string? RoleId { get; set; }
 
     public string? OrganizationId { get; set; }
 
-    public string DefaultLanguage { get; set; } = null!;
+    public string? DefaultLanguage { get; set; }
 
-    public int DefaultRowPerPage { get; set; }
+    public string? DefaultRowPerPage { get; set; }
 
-    public byte[]? PictureProfile { get; set; }
+    public string? PictureProfile { get; set; }
 
-    public string IsEnable { get; set; } = null!;
+    public string? IsEnable { get; set; }
 
-    public DateTime Created { get; set; }
+    public string? Created { get; set; }
 
-    public string CreatedBy { get; set; } = null!;
+    public string? CreatedBy { get; set; }
 
-    public DateTime Updated { get; set; }
+    public string? Updated { get; set; }
 
-    public string UpdatedBy { get; set; } = null!;
+    public string? UpdatedBy { get; set; }
 }

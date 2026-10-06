@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
@@ -14,6 +16,12 @@ namespace ContactTogetherApi.Controllers;
 [Authorize]
 public class UserManagementController : ControllerBase
 {
+    /// <summary>
+    /// <c>TblEmployee</c>'s date columns are <c>nvarchar</c>, and existing rows use this format, so
+    /// new rows have to match it or the legacy application cannot parse them.
+    /// </summary>
+    internal const string LegacyDateFormat = "MM/dd/yyyy HH:mm";
+
     private readonly ApplicationDbContext _db;
     private readonly IPasswordVerifier _passwordVerifier;
     private readonly ILogger<UserManagementController> _logger;
@@ -66,7 +74,7 @@ public class UserManagementController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var now = DateTime.Now;
+        var now = FormatDate(DateTime.Now);
         var employee = new TblEmployee
         {
             // Keys elsewhere in this schema are 32-char upper-case GUIDs without dashes.
@@ -80,15 +88,15 @@ public class UserManagementController : ControllerBase
             SalutationEn = request.SalutationEn,
             FirstnameEn = request.FirstnameEn ?? string.Empty,
             LastnameEn = request.LastnameEn,
-            Birthdate = request.Birthdate,
+            Birthdate = FormatDate(request.Birthdate),
             ContactDetail = request.ContactDetail,
             Position = request.Position,
-            DateHire = request.DateHire ?? now,
-            DateExpire = request.DateExpire,
+            DateHire = FormatDate(request.DateHire) ?? now,
+            DateExpire = FormatDate(request.DateExpire),
             RoleId = request.RoleId,
             OrganizationId = request.OrganizationId,
             DefaultLanguage = request.DefaultLanguage,
-            DefaultRowPerPage = request.DefaultRowPerPage,
+            DefaultRowPerPage = request.DefaultRowPerPage.ToString(CultureInfo.InvariantCulture),
             IsEnable = request.IsEnable,
             Created = now,
             CreatedBy = actingEmployeeId,
@@ -133,6 +141,10 @@ public class UserManagementController : ControllerBase
                 $"No TblOrganization row with Id '{request.OrganizationId}'.");
         }
     }
+
+    [return: NotNullIfNotNull(nameof(value))]
+    private static string? FormatDate(DateTime? value) =>
+        value?.ToString(LegacyDateFormat, CultureInfo.InvariantCulture);
 
     private static EmployeeResponse ToResponse(TblEmployee employee) => new()
     {
