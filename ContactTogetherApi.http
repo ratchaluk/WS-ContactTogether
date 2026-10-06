@@ -123,6 +123,62 @@ Content-Type: application/json
 
 ###
 
+# Report 02 - service requests with CallBack = "D"; same request rules and _0BaseReturn envelope as Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport02
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
+}
+
+###
+
+# Report 03 - service requests with CallBack = "Y"
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport03
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
+}
+
+###
+
+# Report 04 - service requests of one organization; P_MainOrg is required (TblOrganization.Id)
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026",
+  "p_MainOrg": "0D26AFEE79DD44C680D3E2F606B5C52A"
+}
+
+###
+
+# Report 05 / 06 - contact counts per day from TblContact.ContactStart (date only, so
+# P_Time_Start / P_Time_Finish have no effect). 05 = groups 53/77, 06 = all other groups.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport05
+Content-Type: application/json
+
+{
+  "p_Start": "01/01/2014",
+  "p_Finish": "12/31/2014"
+}
+
+###
+
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport06
+Content-Type: application/json
+
+{
+  "p_Start": "01/01/2014",
+  "p_Finish": "12/31/2014"
+}
+
+###
+
 # Logout - revokes the presented token for the remainder of its lifetime
 POST {{ContactTogetherApi_HostAddress}}/Auth/logout
 Authorization: Bearer {{token}}

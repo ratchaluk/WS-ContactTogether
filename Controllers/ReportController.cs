@@ -247,573 +247,595 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport02")]
-    public async Task<IActionResult> GetReport2([FromBody] ServiceRequestReportRequest request)
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReport2(
+        [FromBody] ServiceRequestReportRequest request,
+        CancellationToken cancellationToken)
     {
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-            ? TimeSpan.Zero
-            : TimeSpan.Parse(request.P_Time_Start);
+        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        {
+            return BadRequest(_0BaseReturn.Fail(error));
+        }
 
-        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-            ? new TimeSpan(23, 59, 59)
-            : TimeSpan.Parse(request.P_Time_Finish);
-
-
-        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
-        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
-        var startDateTime = startDate.Date.Add(startTime);
-        var finishDateTime = finishDate.Date.Add(finishTime);
-
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
- 
         // ============================================================
         // Query
         // ============================================================
 
-        var result = await (
-            from sr in _db.TblServices
+        try
+        {
+            var result = await (
+                from sr in _db.TblServices
 
-            // Activity
-            join ac in _db.TblActivities
-                on sr.Id equals ac.ServiceId into acJoin
-            from ac in acJoin.DefaultIfEmpty()
+                // Activity
+                join ac in _db.TblActivities
+                    on sr.Id equals ac.ServiceId into acJoin
+                from ac in acJoin.DefaultIfEmpty()
 
-            // Contact
-            join c1 in _db.TblContacts
-                on ac.ContactId equals c1.Id into cJoin
-            from c1 in cJoin.DefaultIfEmpty()
+                // Contact
+                join c1 in _db.TblContacts
+                    on ac.ContactId equals c1.Id into cJoin
+                from c1 in cJoin.DefaultIfEmpty()
 
-            // Creator
-            join emp1 in _db.TblEmployees
-                on sr.CreatedBy equals emp1.Id into emp1Join
-            from emp1 in emp1Join.DefaultIfEmpty()
+                // Creator
+                join emp1 in _db.TblEmployees
+                    on sr.CreatedBy equals emp1.Id into emp1Join
+                from emp1 in emp1Join.DefaultIfEmpty()
 
-            // Owner
-            join emp2 in _db.TblEmployees
-                on sr.OwnerId equals emp2.Id into emp2Join
-            from emp2 in emp2Join.DefaultIfEmpty()
+                // Owner
+                join emp2 in _db.TblEmployees
+                    on sr.OwnerId equals emp2.Id into emp2Join
+                from emp2 in emp2Join.DefaultIfEmpty()
 
-            // Last Updated
-            join emp3 in _db.TblEmployees
-                on sr.UpdatedBy equals emp3.Id into emp3Join
-            from emp3 in emp3Join.DefaultIfEmpty()
+                // Last Updated
+                join emp3 in _db.TblEmployees
+                    on sr.UpdatedBy equals emp3.Id into emp3Join
+                from emp3 in emp3Join.DefaultIfEmpty()
 
-            // Channel
-            join ch in _db.TblChannels
-                on sr.ChannelIncomingId equals ch.Id into chJoin
-            from ch in chJoin.DefaultIfEmpty()
+                // Channel
+                join ch in _db.TblChannels
+                    on sr.ChannelIncomingId equals ch.Id into chJoin
+                from ch in chJoin.DefaultIfEmpty()
 
-            // Category
-            join cat in _db.TblCategories
-                on sr.CategoryId equals cat.Id into catJoin
-            from cat in catJoin.DefaultIfEmpty()
+                // Category
+                join cat in _db.TblCategories
+                    on sr.CategoryId equals cat.Id into catJoin
+                from cat in catJoin.DefaultIfEmpty()
 
-            // Reference
-            join rf in _db.TblReferences
-                on sr.ServiceReference equals rf.Id into refJoin
-            from rf in refJoin.DefaultIfEmpty()
+                // Reference
+                join rf in _db.TblReferences
+                    on sr.ServiceReference equals rf.Id into refJoin
+                from rf in refJoin.DefaultIfEmpty()
 
-            // Status
-            join st in _db.TblStatuses
-                on sr.StatusId equals st.Id into stJoin
-            from st in stJoin.DefaultIfEmpty()
+                // Status
+                join st in _db.TblStatuses
+                    on sr.StatusId equals st.Id into stJoin
+                from st in stJoin.DefaultIfEmpty()
 
-            // Organization
-            join org in _db.TblOrganizations
-                on sr.OrganizationId equals org.Id into orgJoin
-            from org in orgJoin.DefaultIfEmpty()
+                // Organization
+                join org in _db.TblOrganizations
+                    on sr.OrganizationId equals org.Id into orgJoin
+                from org in orgJoin.DefaultIfEmpty()
 
-            // Main Organization
-            join org2 in _db.TblOrganizations
-                on org.RefId equals org2.Id into org2Join
-            from org2 in org2Join.DefaultIfEmpty()
+                // Main Organization
+                join org2 in _db.TblOrganizations
+                    on org.RefId equals org2.Id into org2Join
+                from org2 in org2Join.DefaultIfEmpty()
 
-            // Account
-            join acc in _db.TblAccounts
-                on sr.AccountId equals acc.Id into accJoin
-            from acc in accJoin.DefaultIfEmpty()
+                // Account
+                join acc in _db.TblAccounts
+                    on sr.AccountId equals acc.Id into accJoin
+                from acc in accJoin.DefaultIfEmpty()
 
-            where sr.IsEnable == "T"
-                && sr.CallBack == "D"
+                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
+                let created = sr.Created!
+                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
+                    + created.Substring(11, 2) + created.Substring(14, 2)
 
+                where sr.IsEnable == "T"
+                    && sr.CallBack == "D"
+                    && string.Compare(createdKey, startKey) >= 0
+                    && string.Compare(createdKey, finishKey) <= 0
+
+                select new SrCallbackResponse
+                {
                 
-                && string.Compare(sr.Created, startStr) >= 0
-                && string.Compare(sr.Created, finishStr) <= 0
+                    Code = sr.Code,
+                    Summary = sr.Summary,
+                    Detail = sr.Detail,
+                    SrReferenceLink = sr.ServiceReferenceLink,
+                    SrOpened = sr.DateOpened,
+                    SrClosed = sr.DateClosed,
+                    SrRequireCallBack = sr.CallBack,
+                    Created = sr.Created,
 
-            select new SrCallbackResponse
-            {
-            
-                Code = sr.Code,
-                Summary = sr.Summary,
-                Detail = sr.Detail,
-                SrReferenceLink = sr.ServiceReferenceLink,
-                SrOpened = sr.DateOpened,
-                SrClosed = sr.DateClosed,
-                SrRequireCallBack = sr.CallBack,
-                Created = sr.Created,
+                    ANumber = c1.ContactDetail ?? "",
 
-                ANumber = c1.ContactDetail ?? "",
+                    ChannelName = ch != null
+                        ? ch.NameTh
+                        : null,
 
-                ChannelName = ch != null
-                    ? ch.NameTh
-                    : null,
+                    SrTypeName = cat != null
+                        ? cat.NameTh
+                        : null,
 
-                SrTypeName = cat != null
-                    ? cat.NameTh
-                    : null,
+                    SrReference = rf != null
+                        ? rf.NameTh
+                        : null,
 
-                SrReference = rf != null
-                    ? rf.NameTh
-                    : null,
+                    SrStatusName = st != null
+                        ? st.NameTh
+                        : null,
 
-                SrStatusName = st != null
-                    ? st.NameTh
-                    : null,
+                    CreatedUname = emp1.Id != null
+                        ? emp1.UserName
+                        : null,
+                    CreatorName = emp1.Id != null
+                        ? (emp1.SalutationTh ?? "") +
+                        (emp1.FirstnameTh ?? "") + " " +
+                        (emp1.LastnameTh ?? "")
+                        : null,
+                    SkillAgentCreated =
+                        emp1.Id != null &&
+                        EF.Functions.Like(
+                            emp1.Position ?? "",
+                            "%Claim%"
+                        )
+                            ? 1
+                            : 2,
+                    OwnerUname = emp2.Id != null
+                        ? emp2.UserName
+                        : null,
+                    OwnerName = emp2.Id != null
+                        ? (emp2.SalutationTh ?? "") +
+                        (emp2.FirstnameTh ?? "") + " " +
+                        (emp2.LastnameTh ?? "")
+                        : null,
+                    LastUpdatedUname = emp3.Id != null
+                        ? emp3.UserName
+                        : null,
+                    UpdaterName = emp3.Id != null
+                        ? (emp3.SalutationTh ?? "") +
+                        (emp3.FirstnameTh ?? "") + " " +
+                        (emp3.LastnameTh ?? "")
+                        : null,
+                    SubOrgId = sr.OrganizationId,
+                    SubOrgName = org != null
+                        ? org.NameTh
+                        : null,
+                    MainOrgId = org2 != null
+                        ? org2.Id
+                        : null,
+                    MainOrgName = org2 != null
+                        ? org2.NameTh
+                        : null,
+                    ContactName = acc.Id != null
+                        ? (acc.SalutationTh ?? "") +
+                        (acc.FirstnameTh ?? "") + " " +
+                        (acc.LastnameTh ?? "")
+                        : null
+                })
+                .Distinct()
+                .OrderBy(x => x.Code)
+                .ToListAsync(cancellationToken);
 
-                CreatedUname = emp1.Id != null
-                    ? emp1.UserName
-                    : null,
-                CreatorName = emp1.Id != null
-                    ? (emp1.SalutationTh ?? "") +
-                    (emp1.FirstnameTh ?? "") + " " +
-                    (emp1.LastnameTh ?? "")
-                    : null,
-                SkillAgentCreated =
-                    emp1.Id != null &&
-                    EF.Functions.Like(
-                        emp1.Position ?? "",
-                        "%Claim%"
-                    )
-                        ? 1
-                        : 2,
-                OwnerUname = emp2.Id != null
-                    ? emp2.UserName
-                    : null,
-                OwnerName = emp2.Id != null
-                    ? (emp2.SalutationTh ?? "") +
-                    (emp2.FirstnameTh ?? "") + " " +
-                    (emp2.LastnameTh ?? "")
-                    : null,
-                LastUpdatedUname = emp3.Id != null
-                    ? emp3.UserName
-                    : null,
-                UpdaterName = emp3.Id != null
-                    ? (emp3.SalutationTh ?? "") +
-                    (emp3.FirstnameTh ?? "") + " " +
-                    (emp3.LastnameTh ?? "")
-                    : null,
-                SubOrgId = sr.OrganizationId,
-                SubOrgName = org != null
-                    ? org.NameTh
-                    : null,
-                MainOrgId = org2 != null
-                    ? org2.Id
-                    : null,
-                MainOrgName = org2 != null
-                    ? org2.NameTh
-                    : null,
-                ContactName = acc.Id != null
-                    ? (acc.SalutationTh ?? "") +
-                    (acc.FirstnameTh ?? "") + " " +
-                    (acc.LastnameTh ?? "")
-                    : null
-            })
-            .Distinct()
-            .OrderBy(x => x.Code)
-            .ToListAsync();
-
-
-        return Ok(result);
+            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
+            return Ok(_0BaseReturn.Success(result, message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "GetReport02 failed for {Start} - {Finish}.", startKey, finishKey);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+        }
     }
 
     [HttpPost("GetReport03")]
-    public async Task<IActionResult> GetReport3([FromBody] ServiceRequestReportRequest request)
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReport3(
+        [FromBody] ServiceRequestReportRequest request,
+        CancellationToken cancellationToken)
     {
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-            ? TimeSpan.Zero
-            : TimeSpan.Parse(request.P_Time_Start);
-
-        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-            ? new TimeSpan(23, 59, 59)
-            : TimeSpan.Parse(request.P_Time_Finish);
-
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
-        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
-        var startDateTime = startDate.Date.Add(startTime);
-        var finishDateTime = finishDate.Date.Add(finishTime);
-
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        {
+            return BadRequest(_0BaseReturn.Fail(error));
+        }
 
         // ============================================================
         // Query
         // ============================================================
 
-        var result = await (
-            from sr in _db.TblServices
+        try
+        {
+            var result = await (
+                from sr in _db.TblServices
 
-            // Activity
-            join ac in _db.TblActivities
-                on sr.Id equals ac.ServiceId into acJoin
-            from ac in acJoin.DefaultIfEmpty()
+                // Activity
+                join ac in _db.TblActivities
+                    on sr.Id equals ac.ServiceId into acJoin
+                from ac in acJoin.DefaultIfEmpty()
 
-            // Contact
-            join c1 in _db.TblContacts
-                on ac.ContactId equals c1.Id into cJoin
-            from c1 in cJoin.DefaultIfEmpty()
+                // Contact
+                join c1 in _db.TblContacts
+                    on ac.ContactId equals c1.Id into cJoin
+                from c1 in cJoin.DefaultIfEmpty()
 
-            // Creator
-            join emp1 in _db.TblEmployees
-                on sr.CreatedBy equals emp1.Id into emp1Join
-            from emp1 in emp1Join.DefaultIfEmpty()
+                // Creator
+                join emp1 in _db.TblEmployees
+                    on sr.CreatedBy equals emp1.Id into emp1Join
+                from emp1 in emp1Join.DefaultIfEmpty()
 
-            // Owner
-            join emp2 in _db.TblEmployees
-                on sr.OwnerId equals emp2.Id into emp2Join
-            from emp2 in emp2Join.DefaultIfEmpty()
+                // Owner
+                join emp2 in _db.TblEmployees
+                    on sr.OwnerId equals emp2.Id into emp2Join
+                from emp2 in emp2Join.DefaultIfEmpty()
 
-            // Last Updated
-            join emp3 in _db.TblEmployees
-                on sr.UpdatedBy equals emp3.Id into emp3Join
-            from emp3 in emp3Join.DefaultIfEmpty()
+                // Last Updated
+                join emp3 in _db.TblEmployees
+                    on sr.UpdatedBy equals emp3.Id into emp3Join
+                from emp3 in emp3Join.DefaultIfEmpty()
 
-            // Channel
-            join ch in _db.TblChannels
-                on sr.ChannelIncomingId equals ch.Id into chJoin
-            from ch in chJoin.DefaultIfEmpty()
+                // Channel
+                join ch in _db.TblChannels
+                    on sr.ChannelIncomingId equals ch.Id into chJoin
+                from ch in chJoin.DefaultIfEmpty()
 
-            // Category
-            join cat in _db.TblCategories
-                on sr.CategoryId equals cat.Id into catJoin
-            from cat in catJoin.DefaultIfEmpty()
+                // Category
+                join cat in _db.TblCategories
+                    on sr.CategoryId equals cat.Id into catJoin
+                from cat in catJoin.DefaultIfEmpty()
 
-            // Reference
-            join rf in _db.TblReferences
-                on sr.ServiceReference equals rf.Id into refJoin
-            from rf in refJoin.DefaultIfEmpty()
+                // Reference
+                join rf in _db.TblReferences
+                    on sr.ServiceReference equals rf.Id into refJoin
+                from rf in refJoin.DefaultIfEmpty()
 
-            // Status
-            join st in _db.TblStatuses
-                on sr.StatusId equals st.Id into stJoin
-            from st in stJoin.DefaultIfEmpty()
+                // Status
+                join st in _db.TblStatuses
+                    on sr.StatusId equals st.Id into stJoin
+                from st in stJoin.DefaultIfEmpty()
 
-            // Organization
-            join org in _db.TblOrganizations
-                on sr.OrganizationId equals org.Id into orgJoin
-            from org in orgJoin.DefaultIfEmpty()
+                // Organization
+                join org in _db.TblOrganizations
+                    on sr.OrganizationId equals org.Id into orgJoin
+                from org in orgJoin.DefaultIfEmpty()
 
-            // Main Organization
-            join org2 in _db.TblOrganizations
-                on org.RefId equals org2.Id into org2Join
-            from org2 in org2Join.DefaultIfEmpty()
+                // Main Organization
+                join org2 in _db.TblOrganizations
+                    on org.RefId equals org2.Id into org2Join
+                from org2 in org2Join.DefaultIfEmpty()
 
-            // Account
-            join acc in _db.TblAccounts
-                on sr.AccountId equals acc.Id into accJoin
-            from acc in accJoin.DefaultIfEmpty()
+                // Account
+                join acc in _db.TblAccounts
+                    on sr.AccountId equals acc.Id into accJoin
+                from acc in accJoin.DefaultIfEmpty()
 
-            where sr.IsEnable == "T"
-                && sr.CallBack == "Y"
+                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
+                let created = sr.Created!
+                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
+                    + created.Substring(11, 2) + created.Substring(14, 2)
 
-                // SR Code ตามวันที่
-                && string.Compare(sr.Created, startStr) >= 0
-                && string.Compare(sr.Created, finishStr) <= 0
+                where sr.IsEnable == "T"
+                    && sr.CallBack == "Y"
 
-            select new SrCallbackResponse
-            {
-            
-                Code = sr.Code,
-                Summary = sr.Summary,
-                Detail = sr.Detail,
-                SrReferenceLink = sr.ServiceReferenceLink,
-                SrOpened = sr.DateOpened,
-                SrClosed = sr.DateClosed,
-                SrRequireCallBack = sr.CallBack,
-                Created = sr.Created,
+                    // SR Code ตามวันที่
+                    && string.Compare(createdKey, startKey) >= 0
+                    && string.Compare(createdKey, finishKey) <= 0
 
-                ANumber = c1.ContactDetail ?? "",
+                select new SrCallbackResponse
+                {
+                
+                    Code = sr.Code,
+                    Summary = sr.Summary,
+                    Detail = sr.Detail,
+                    SrReferenceLink = sr.ServiceReferenceLink,
+                    SrOpened = sr.DateOpened,
+                    SrClosed = sr.DateClosed,
+                    SrRequireCallBack = sr.CallBack,
+                    Created = sr.Created,
 
-                ChannelName = ch != null
-                    ? ch.NameTh
-                    : null,
+                    ANumber = c1.ContactDetail ?? "",
 
-                SrTypeName = cat != null
-                    ? cat.NameTh
-                    : null,
+                    ChannelName = ch != null
+                        ? ch.NameTh
+                        : null,
 
-                SrReference = rf != null
-                    ? rf.NameTh
-                    : null,
+                    SrTypeName = cat != null
+                        ? cat.NameTh
+                        : null,
 
-                SrStatusName = st != null
-                    ? st.NameTh
-                    : null,
+                    SrReference = rf != null
+                        ? rf.NameTh
+                        : null,
 
-                CreatedUname = emp1.Id != null
-                    ? emp1.UserName
-                    : null,
-                CreatorName = emp1.Id != null
-                    ? (emp1.SalutationTh ?? "") +
-                    (emp1.FirstnameTh ?? "") + " " +
-                    (emp1.LastnameTh ?? "")
-                    : null,
-                SkillAgentCreated =
-                    emp1.Id != null &&
-                    EF.Functions.Like(
-                        emp1.Position ?? "",
-                        "%Claim%"
-                    )
-                        ? 1
-                        : 2,
-                OwnerUname = emp2.Id != null
-                    ? emp2.UserName
-                    : null,
-                OwnerName = emp2.Id != null
-                    ? (emp2.SalutationTh ?? "") +
-                    (emp2.FirstnameTh ?? "") + " " +
-                    (emp2.LastnameTh ?? "")
-                    : null,
-                LastUpdatedUname = emp3.Id != null
-                    ? emp3.UserName
-                    : null,
-                UpdaterName = emp3.Id != null
-                    ? (emp3.SalutationTh ?? "") +
-                    (emp3.FirstnameTh ?? "") + " " +
-                    (emp3.LastnameTh ?? "")
-                    : null,
-                SubOrgId = sr.OrganizationId,
-                SubOrgName = org != null
-                    ? org.NameTh
-                    : null,
-                MainOrgId = org2 != null
-                    ? org2.Id
-                    : null,
-                MainOrgName = org2 != null
-                    ? org2.NameTh
-                    : null,
-                ContactName = acc.Id != null
-                    ? (acc.SalutationTh ?? "") +
-                    (acc.FirstnameTh ?? "") + " " +
-                    (acc.LastnameTh ?? "")
-                    : null
-            })
-            .Distinct()
-            .OrderBy(x => x.Code)
-            .ToListAsync();
+                    SrStatusName = st != null
+                        ? st.NameTh
+                        : null,
 
+                    CreatedUname = emp1.Id != null
+                        ? emp1.UserName
+                        : null,
+                    CreatorName = emp1.Id != null
+                        ? (emp1.SalutationTh ?? "") +
+                        (emp1.FirstnameTh ?? "") + " " +
+                        (emp1.LastnameTh ?? "")
+                        : null,
+                    SkillAgentCreated =
+                        emp1.Id != null &&
+                        EF.Functions.Like(
+                            emp1.Position ?? "",
+                            "%Claim%"
+                        )
+                            ? 1
+                            : 2,
+                    OwnerUname = emp2.Id != null
+                        ? emp2.UserName
+                        : null,
+                    OwnerName = emp2.Id != null
+                        ? (emp2.SalutationTh ?? "") +
+                        (emp2.FirstnameTh ?? "") + " " +
+                        (emp2.LastnameTh ?? "")
+                        : null,
+                    LastUpdatedUname = emp3.Id != null
+                        ? emp3.UserName
+                        : null,
+                    UpdaterName = emp3.Id != null
+                        ? (emp3.SalutationTh ?? "") +
+                        (emp3.FirstnameTh ?? "") + " " +
+                        (emp3.LastnameTh ?? "")
+                        : null,
+                    SubOrgId = sr.OrganizationId,
+                    SubOrgName = org != null
+                        ? org.NameTh
+                        : null,
+                    MainOrgId = org2 != null
+                        ? org2.Id
+                        : null,
+                    MainOrgName = org2 != null
+                        ? org2.NameTh
+                        : null,
+                    ContactName = acc.Id != null
+                        ? (acc.SalutationTh ?? "") +
+                        (acc.FirstnameTh ?? "") + " " +
+                        (acc.LastnameTh ?? "")
+                        : null
+                })
+                .Distinct()
+                .OrderBy(x => x.Code)
+                .ToListAsync(cancellationToken);
 
-        return Ok(result);
+            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
+            return Ok(_0BaseReturn.Success(result, message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "GetReport03 failed for {Start} - {Finish}.", startKey, finishKey);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+        }
     }
 
     [HttpPost("GetReport04")]
-    public async Task<IActionResult> GetReport4([FromBody] ServiceRequestReportRequestMainOrganization request)
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReport4(
+        [FromBody] ServiceRequestReportRequestMainOrganization request,
+        CancellationToken cancellationToken)
     {
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-            ? TimeSpan.Zero
-            : TimeSpan.Parse(request.P_Time_Start);
+        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        {
+            return BadRequest(_0BaseReturn.Fail(error));
+        }
 
-        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-            ? new TimeSpan(23, 59, 59)
-            : TimeSpan.Parse(request.P_Time_Finish);
-
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
-        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
-        var startDateTime = startDate.Date.Add(startTime);
-        var finishDateTime = finishDate.Date.Add(finishTime);
-
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        if (string.IsNullOrWhiteSpace(request.P_MainOrg))
+        {
+            return BadRequest(_0BaseReturn.Fail("กรุณาระบุ P_MainOrg"));
+        }
 
         // ============================================================
         // Query
         // ============================================================
 
-        var result = await (
-            from sr in _db.TblServices
+        try
+        {
+            var result = await (
+                from sr in _db.TblServices
 
-            // Activity
-            join ac in _db.TblActivities
-                on sr.Id equals ac.ServiceId into acJoin
-            from ac in acJoin.DefaultIfEmpty()
+                // Activity
+                join ac in _db.TblActivities
+                    on sr.Id equals ac.ServiceId into acJoin
+                from ac in acJoin.DefaultIfEmpty()
 
-            // Contact
-            join c1 in _db.TblContacts
-                on ac.ContactId equals c1.Id into cJoin
-            from c1 in cJoin.DefaultIfEmpty()
+                // Contact
+                join c1 in _db.TblContacts
+                    on ac.ContactId equals c1.Id into cJoin
+                from c1 in cJoin.DefaultIfEmpty()
 
-            // Creator
-            join emp1 in _db.TblEmployees
-                on sr.CreatedBy equals emp1.Id into emp1Join
-            from emp1 in emp1Join.DefaultIfEmpty()
+                // Creator
+                join emp1 in _db.TblEmployees
+                    on sr.CreatedBy equals emp1.Id into emp1Join
+                from emp1 in emp1Join.DefaultIfEmpty()
 
-            // Owner
-            join emp2 in _db.TblEmployees
-                on sr.OwnerId equals emp2.Id into emp2Join
-            from emp2 in emp2Join.DefaultIfEmpty()
+                // Owner
+                join emp2 in _db.TblEmployees
+                    on sr.OwnerId equals emp2.Id into emp2Join
+                from emp2 in emp2Join.DefaultIfEmpty()
 
-            // Last Updated
-            join emp3 in _db.TblEmployees
-                on sr.UpdatedBy equals emp3.Id into emp3Join
-            from emp3 in emp3Join.DefaultIfEmpty()
+                // Last Updated
+                join emp3 in _db.TblEmployees
+                    on sr.UpdatedBy equals emp3.Id into emp3Join
+                from emp3 in emp3Join.DefaultIfEmpty()
 
-            // Channel
-            join ch in _db.TblChannels
-                on sr.ChannelIncomingId equals ch.Id into chJoin
-            from ch in chJoin.DefaultIfEmpty()
+                // Channel
+                join ch in _db.TblChannels
+                    on sr.ChannelIncomingId equals ch.Id into chJoin
+                from ch in chJoin.DefaultIfEmpty()
 
-            // Category
-            join cat in _db.TblCategories
-                on sr.CategoryId equals cat.Id into catJoin
-            from cat in catJoin.DefaultIfEmpty()
+                // Category
+                join cat in _db.TblCategories
+                    on sr.CategoryId equals cat.Id into catJoin
+                from cat in catJoin.DefaultIfEmpty()
 
-            // Reference
-            join rf in _db.TblReferences
-                on sr.ServiceReference equals rf.Id into refJoin
-            from rf in refJoin.DefaultIfEmpty()
+                // Reference
+                join rf in _db.TblReferences
+                    on sr.ServiceReference equals rf.Id into refJoin
+                from rf in refJoin.DefaultIfEmpty()
 
-            // Status
-            join st in _db.TblStatuses
-                on sr.StatusId equals st.Id into stJoin
-            from st in stJoin.DefaultIfEmpty()
+                // Status
+                join st in _db.TblStatuses
+                    on sr.StatusId equals st.Id into stJoin
+                from st in stJoin.DefaultIfEmpty()
 
-            // Organization
-            join org in _db.TblOrganizations
-                on sr.OrganizationId equals org.Id into orgJoin
-            from org in orgJoin.DefaultIfEmpty()
+                // Organization
+                join org in _db.TblOrganizations
+                    on sr.OrganizationId equals org.Id into orgJoin
+                from org in orgJoin.DefaultIfEmpty()
 
-            // Main Organization
-            join org2 in _db.TblOrganizations
-                on org.RefId equals org2.Id into org2Join
-            from org2 in org2Join.DefaultIfEmpty()
+                // Main Organization
+                join org2 in _db.TblOrganizations
+                    on org.RefId equals org2.Id into org2Join
+                from org2 in org2Join.DefaultIfEmpty()
 
-            // Account
-            join acc in _db.TblAccounts
-                on sr.AccountId equals acc.Id into accJoin
-            from acc in accJoin.DefaultIfEmpty()
+                // Account
+                join acc in _db.TblAccounts
+                    on sr.AccountId equals acc.Id into accJoin
+                from acc in accJoin.DefaultIfEmpty()
 
-            where sr.IsEnable == "T"
-                && org.Id == request.P_MainOrg
+                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
+                let created = sr.Created!
+                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
+                    + created.Substring(11, 2) + created.Substring(14, 2)
 
-               
-                && string.Compare(sr.Created, startStr) >= 0
-                && string.Compare(sr.Created, finishStr) <= 0
+                where sr.IsEnable == "T"
+                    && org.Id == request.P_MainOrg
+                    && string.Compare(createdKey, startKey) >= 0
+                    && string.Compare(createdKey, finishKey) <= 0
 
-            select new SrCallbackResponse
-            {
-            
-                Code = sr.Code,
-                Summary = sr.Summary,
-                Detail = sr.Detail,
-                SrReferenceLink = sr.ServiceReferenceLink,
-                SrOpened = sr.DateOpened,
-                SrClosed = sr.DateClosed,
-                SrRequireCallBack = sr.CallBack,
-                Created = sr.Created,
+                select new SrCallbackResponse
+                {
+                
+                    Code = sr.Code,
+                    Summary = sr.Summary,
+                    Detail = sr.Detail,
+                    SrReferenceLink = sr.ServiceReferenceLink,
+                    SrOpened = sr.DateOpened,
+                    SrClosed = sr.DateClosed,
+                    SrRequireCallBack = sr.CallBack,
+                    Created = sr.Created,
 
-                ANumber = c1.ContactDetail ?? "",
+                    ANumber = c1.ContactDetail ?? "",
 
-                ChannelName = ch != null
-                    ? ch.NameTh
-                    : null,
+                    ChannelName = ch != null
+                        ? ch.NameTh
+                        : null,
 
-                SrTypeName = cat != null
-                    ? cat.NameTh
-                    : null,
+                    SrTypeName = cat != null
+                        ? cat.NameTh
+                        : null,
 
-                SrReference = rf != null
-                    ? rf.NameTh
-                    : null,
+                    SrReference = rf != null
+                        ? rf.NameTh
+                        : null,
 
-                SrStatusName = st != null
-                    ? st.NameTh
-                    : null,
+                    SrStatusName = st != null
+                        ? st.NameTh
+                        : null,
 
-                CreatedUname = emp1.Id != null
-                    ? emp1.UserName
-                    : null,
-                CreatorName = emp1.Id != null
-                    ? (emp1.SalutationTh ?? "") +
-                    (emp1.FirstnameTh ?? "") + " " +
-                    (emp1.LastnameTh ?? "")
-                    : null,
-                SkillAgentCreated =
-                    emp1.Id != null &&
-                    EF.Functions.Like(
-                        emp1.Position ?? "",
-                        "%Claim%"
-                    )
-                        ? 1
-                        : 2,
-                OwnerUname = emp2.Id != null
-                    ? emp2.UserName
-                    : null,
-                OwnerName = emp2.Id != null
-                    ? (emp2.SalutationTh ?? "") +
-                    (emp2.FirstnameTh ?? "") + " " +
-                    (emp2.LastnameTh ?? "")
-                    : null,
-                LastUpdatedUname = emp3.Id != null
-                    ? emp3.UserName
-                    : null,
-                UpdaterName = emp3.Id != null
-                    ? (emp3.SalutationTh ?? "") +
-                    (emp3.FirstnameTh ?? "") + " " +
-                    (emp3.LastnameTh ?? "")
-                    : null,
-                MainOrgId = org2 != null
-                    ? org2.Id
-                    : null,
-                MainOrgName = org2 != null
-                    ? org2.NameTh
-                    : null,
-                ContactName = acc.Id != null
-                    ? (acc.SalutationTh ?? "") +
-                    (acc.FirstnameTh ?? "") + " " +
-                    (acc.LastnameTh ?? "")
-                    : null
-            })
-            .Distinct()
-            .OrderBy(x => x.Code)
-            .ToListAsync();
+                    CreatedUname = emp1.Id != null
+                        ? emp1.UserName
+                        : null,
+                    CreatorName = emp1.Id != null
+                        ? (emp1.SalutationTh ?? "") +
+                        (emp1.FirstnameTh ?? "") + " " +
+                        (emp1.LastnameTh ?? "")
+                        : null,
+                    SkillAgentCreated =
+                        emp1.Id != null &&
+                        EF.Functions.Like(
+                            emp1.Position ?? "",
+                            "%Claim%"
+                        )
+                            ? 1
+                            : 2,
+                    OwnerUname = emp2.Id != null
+                        ? emp2.UserName
+                        : null,
+                    OwnerName = emp2.Id != null
+                        ? (emp2.SalutationTh ?? "") +
+                        (emp2.FirstnameTh ?? "") + " " +
+                        (emp2.LastnameTh ?? "")
+                        : null,
+                    LastUpdatedUname = emp3.Id != null
+                        ? emp3.UserName
+                        : null,
+                    UpdaterName = emp3.Id != null
+                        ? (emp3.SalutationTh ?? "") +
+                        (emp3.FirstnameTh ?? "") + " " +
+                        (emp3.LastnameTh ?? "")
+                        : null,
+                    MainOrgId = org2 != null
+                        ? org2.Id
+                        : null,
+                    MainOrgName = org2 != null
+                        ? org2.NameTh
+                        : null,
+                    ContactName = acc.Id != null
+                        ? (acc.SalutationTh ?? "") +
+                        (acc.FirstnameTh ?? "") + " " +
+                        (acc.LastnameTh ?? "")
+                        : null
+                })
+                .Distinct()
+                .OrderBy(x => x.Code)
+                .ToListAsync(cancellationToken);
 
-
-        return Ok(result);
+            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
+            return Ok(_0BaseReturn.Success(result, message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(
+                ex, "GetReport04 failed for {Start} - {Finish}, org {MainOrg}.", startKey, finishKey, request.P_MainOrg);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+        }
     }
 
  [HttpPost("GetReport05")]
-    public async Task<IActionResult> GetReport5([FromBody] ServiceRequestReportRequest request)
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReport5(
+        [FromBody] ServiceRequestReportRequest request,
+        CancellationToken cancellationToken)
     {
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-            ? TimeSpan.Zero
-            : TimeSpan.Parse(request.P_Time_Start);
+        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        {
+            return BadRequest(_0BaseReturn.Fail(error));
+        }
 
-        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-            ? new TimeSpan(23, 59, 59)
-            : TimeSpan.Parse(request.P_Time_Finish);
-
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
-        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
-        var startDateTime = startDate.Date.Add(startTime);
-        var finishDateTime = finishDate.Date.Add(finishTime);
-
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        // ContactStart has no time part, so only the yyyyMMdd prefix of the range applies.
+        var startDay = startKey[..8];
+        var finishDay = finishKey[..8];
 
          // ============================================================
     // Query
@@ -834,9 +856,13 @@ public class ReportController : ControllerBase
         into ugGroup
     from ug in ugGroup.DefaultIfEmpty()
 
+    // "MM/dd/yyyy" -> "yyyyMMdd" so the string comparison is chronological.
+    let contactStart = c.ContactStart!
+    let contactKey = contactStart.Substring(6, 4) + contactStart.Substring(0, 2) + contactStart.Substring(3, 2)
+
     where
-        string.Compare(c.ContactStart, startStr) >= 0
-        && string.Compare(c.ContactStart, finishStr) <= 0
+        string.Compare(contactKey, startDay) >= 0
+        && string.Compare(contactKey, finishDay) <= 0
         // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
 
     // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
@@ -944,34 +970,42 @@ public class ReportController : ControllerBase
     // Execute
     // ============================================================
 
-        var result = await query
-            .ToListAsync();
+        try
+        {
+            var result = await query
+                .ToListAsync(cancellationToken);
 
-        return Ok(result);
+            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
+            return Ok(_0BaseReturn.Success(result, message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "GetReport05 failed for {Start} - {Finish}.", startDay, finishDay);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+        }
     }
 
 [HttpPost("GetReport06")]
-    public async Task<IActionResult> GetReport6([FromBody] ServiceRequestReportRequest request)
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReport6(
+        [FromBody] ServiceRequestReportRequest request,
+        CancellationToken cancellationToken)
     {
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
-            ? TimeSpan.Zero
-            : TimeSpan.Parse(request.P_Time_Start);
+        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        {
+            return BadRequest(_0BaseReturn.Fail(error));
+        }
 
-        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
-            ? new TimeSpan(23, 59, 59)
-            : TimeSpan.Parse(request.P_Time_Finish);
-
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
-        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
-        var startDateTime = startDate.Date.Add(startTime);
-        var finishDateTime = finishDate.Date.Add(finishTime);
-
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        // ContactStart has no time part, so only the yyyyMMdd prefix of the range applies.
+        var startDay = startKey[..8];
+        var finishDay = finishKey[..8];
 
          // ============================================================
     // Query
@@ -992,9 +1026,13 @@ public class ReportController : ControllerBase
         into ugGroup
     from ug in ugGroup.DefaultIfEmpty()
 
+    // "MM/dd/yyyy" -> "yyyyMMdd" so the string comparison is chronological.
+    let contactStart = c.ContactStart!
+    let contactKey = contactStart.Substring(6, 4) + contactStart.Substring(0, 2) + contactStart.Substring(3, 2)
+
     where
-        string.Compare(c.ContactStart, startStr) >= 0
-        && string.Compare(c.ContactStart, finishStr) <= 0
+        string.Compare(contactKey, startDay) >= 0
+        && string.Compare(contactKey, finishDay) <= 0
         // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
 
     // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
@@ -1102,10 +1140,21 @@ public class ReportController : ControllerBase
     // Execute
     // ============================================================
 
-        var result = await query
-            .ToListAsync();
+        try
+        {
+            var result = await query
+                .ToListAsync(cancellationToken);
 
-        return Ok(result);
+            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
+            return Ok(_0BaseReturn.Success(result, message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "GetReport06 failed for {Start} - {Finish}.", startDay, finishDay);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+        }
     }
 
 
