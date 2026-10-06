@@ -76,6 +76,53 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Report 01 - every response is wrapped in _0BaseReturn { callAPIStatus, callAPIStatusMessage, result }.
+# Dates are MM/dd/yyyy; P_Time_Start / P_Time_Finish are optional HH:mm:ss (default 00:00:00 / 23:59:59).
+# 200 - rows found, or an empty result with "ไม่พบข้อมูล"
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026",
+  "p_Time_Start": "08:00:00",
+  "p_Time_Finish": "17:00:00"
+}
+
+###
+
+# 400 - P_Start missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Finish": "01/31/2025"
+}
+
+###
+
+# 400 - wrong date format (must be MM/dd/yyyy)
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2025-01-01",
+  "p_Finish": "2025-01-31"
+}
+
+###
+
+# 400 - P_Start after P_Finish
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "02/01/2025",
+  "p_Finish": "01/01/2025"
+}
+
+###
+
 # Logout - revokes the presented token for the remainder of its lifetime
 POST {{ContactTogetherApi_HostAddress}}/Auth/logout
 Authorization: Bearer {{token}}
