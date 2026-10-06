@@ -5,10 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 ASP.NET Core Web API (`net10.0`, controller-based) over an existing SQL Server database for a
-contact-center / service-request ("Contact Together") system. The project is at an early stage: the
-EF Core data layer has been scaffolded from the database, but the only controller so far is the
-template `WeatherForecastController`. There is no solution file, no test project, and the directory
-is not a git repository.
+contact-center / service-request ("Contact Together") system. The EF Core data layer is scaffolded
+from the database (database-first); endpoints are hand-written controllers on top of it. There is
+no solution file and no test project (`FilesTest/` is a placeholder, not tests).
 
 ## Commands
 
@@ -22,28 +21,19 @@ dotnet watch run                    # hot reload
 Swagger UI (`/swagger`) is only mapped when `ASPNETCORE_ENVIRONMENT=Development`; both launch
 profiles set it.
 
-[ContactTogetherApi.http](ContactTogetherApi.http) holds request samples runnable from VS / VS Code
-REST clients.
+[ContactTogetherApi.http](ContactTogetherApi.http) holds runnable request samples (VS / VS Code REST
+clients). Its `login` request captures the token into `@token` for the requests after it; keep new
+endpoint samples in that file.
 
-### Connection string
+### Secrets
 
-`ConnectionStrings:DefaultConnection` is intentionally empty in
-[appsettings.json](appsettings.json). The real value lives in user secrets
-(`UserSecretsId` `5bd7ea0f-c854-4557-bbae-52312de693be`):
+`ConnectionStrings:DefaultConnection` and `Jwt:Key` are intentionally empty in
+[appsettings.json](appsettings.json); the real values live in user secrets (`UserSecretsId`
+`5bd7ea0f-c854-4557-bbae-52312de693be`). Startup throws if `Jwt:Key` is shorter than 32 characters.
 
 ```powershell
 dotnet user-secrets list
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<value>"
-```
-
-Keep the committed `appsettings*.json` free of credentials.
-
-### JWT signing key
-
-`Jwt:Key` is likewise empty in [appsettings.json](appsettings.json) and must come from user secrets.
-Startup throws if it is shorter than 32 characters:
-
-```powershell
 dotnet user-secrets set "Jwt:Key" "<random value, 32+ chars>"
 ```
 
@@ -52,92 +42,120 @@ The rest of the `Jwt` section (`Issuer`, `Audience`, `ExpiresMinutes`) is safe t
 
 ### Regenerating the data layer
 
-Models and `ApplicationDbContext` are **scaffolded output** — do not hand-edit them; changes are
-lost on the next scaffold. Re-scaffold after a schema change:
+Models and `ApplicationDbContext` are **scaffolded output**. Do not hand-edit them, because the
+next scaffold overwrites the changes. Re-scaffold after a schema change:
 
 ```powershell
 dotnet ef dbcontext scaffold "Name=ConnectionStrings:DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer `
   --context ApplicationDbContext --context-dir Data --output-dir Models --no-onconfiguring --force
 ```
 
-There are no EF migrations and none should be added — the database is the source of truth
-(database-first). `dotnet ef` (10.0.11) is installed.
+There are no EF migrations and none should be added; the database is the source of truth.
+
+## Git workflow
+
+From [README.md](README.md): work on a new branch per task, push it, open a pull request on GitHub,
+and wait for approval. Delete the branch (remote and local `git branch -D`) after it is merged.
+[.github/workflows/telegram-pr.yml](.github/workflows/telegram-pr.yml) posts PR and review events to
+Telegram. It is the only CI and does not build or test anything.
+
+The project skill `.claude/skills/git-commit-guide` (`<type>(<scope>): <subject>`, English subject,
+72 chars or fewer, present tense) was copied from a Next.js project. Its type list applies here, but
+its scopes, `.env`/Prisma gotchas and `npm run lint` checklist do not. Use scopes that match this
+repo (e.g. `auth`, `account`, `report`, `user-management`, `lov`, `data`). Existing history mixes
+these with free-form Thai messages.
 
 ## Architecture
 
-- [Program.cs](Program.cs) — minimal top-level setup: controllers, `ApplicationDbContext` on SQL
-  Server, JWT bearer authentication, Swagger (with a bearer security scheme) in Development, HTTPS
-  redirection, `UseAuthentication()` → `UseAuthorization()`.
-- [Auth/](Auth/) — hand-written authentication services, all registered in `Program.cs`:
-  `JwtTokenService` issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
-  `MemoryTokenRevocationStore` holds logged-out `jti` values. See "Authentication" below.
-- [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs) — single `partial` DbContext, ~30
-  `DbSet`s, all mapping configured in `OnModelCreating`. It calls `partial void
-  OnModelCreatingPartial(ModelBuilder)`: **put hand-written model configuration in a separate
-  partial class implementing that method**, so re-scaffolding does not clobber it.
-- [Models/](Models/) — one `partial` POCO per table, no data annotations (all configuration is
-  fluent, in the context).
-- [Dtos/](Dtos/) — hand-written request/response shapes. Never put these in `Models/`, which is
-  scaffolded output.
-- [Controllers/](Controllers/) — `[ApiController]` + `[Route("[controller]")]` convention.
+- [Program.cs](Program.cs): controllers, `ApplicationDbContext` on SQL Server, JWT bearer auth,
+  Swagger (with a bearer scheme) in Development, `UseAuthentication()` → `UseAuthorization()`.
+- [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
+  issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
+  `MemoryTokenRevocationStore` holds logged-out `jti` values.
+- [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs): a single `partial` DbContext with
+  all mapping in `OnModelCreating`. **Put hand-written model configuration in a separate partial
+  class implementing `OnModelCreatingPartial`** so re-scaffolding does not clobber it.
+- [Models/](Models/): one scaffolded `partial` POCO per table, no data annotations.
+- [Dtos/](Dtos/): hand-written request/response shapes. Never put these in `Models/`.
+- [Controllers/](Controllers/): `[ApiController]` + `[Route("[controller]")]`. Controllers
+  inject `ApplicationDbContext` directly and query with LINQ. There is no service or repository
+  layer.
+
+### Controllers
+
+- `AuthController`: `POST /Auth/login`, `POST /Auth/logout`.
+- `UserManagementController` (`POST employees`), `AccountController` (`POST accounts`,
+  `GET by-phone`), and `ListOfValuesController` (`GET channels`, lookup lists for UI drop-downs).
+  These set the house style: namespaced DTOs in `Dtos/`, `[ProducesResponseType]`, a
+  `CancellationToken`, `AsNoTracking()` for reads, `ValidationProblem(ModelState)` for bad input,
+  and `MessageResponse` for other errors. Because the schema has no FKs, these controllers check
+  lookup ids (`GenderId`, `RoleId`, `AreaId`, …) against their tables in a `ValidateLookupsAsync`
+  helper before inserting.
+- `ReportController`: `POST /Report/GetReport01`…`GetReport06`, each a large multi-join LINQ query
+  over `TblService`. It is **anonymous at the moment** (`[Authorize]` is commented out). Its DTOs
+  (`ServiceRequestReportRequest*`, `ServiceRequestReportDto`, …) live in
+  [Dtos/RequestModel.cs](Dtos/RequestModel.cs) and [Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)
+  in the **global namespace**. Request dates are `P_Start`/`P_Finish` as `MM/dd/yyyy` plus optional
+  `P_Time_Start`/`P_Time_Finish` (`HH:mm:ss`).
+- `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
+  are leftover template code and can be deleted.
+
+When inserting rows, follow the existing conventions. Generate ids as
+`Guid.NewGuid().ToString("N").ToUpperInvariant()`, and take `CreatedBy`/`UpdatedBy` from the
+token's `sub` claim, never from the request body.
 
 ### Authentication
 
-[Controllers/AuthController.cs](Controllers/AuthController.cs) exposes `POST /Auth/login` (user name
-+ password against `TblEmployee`, returns a JWT) and `POST /Auth/logout` (`[Authorize]`, revokes the
-presented token). Endpoints opt in to protection with `[Authorize]`; everything else stays anonymous.
+Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 
-- **Passwords** — `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)`.
-  [Auth/PasswordVerifier.cs](Auth/PasswordVerifier.cs) treats a value that decodes to the ASP.NET
-  Core PBKDF2 layout as a hash and everything else as plain text. That fallback is on by default;
-  set `Auth:AllowLegacyPlaintextPasswords` to `false` once all rows are hashed. New passwords should
-  be stored via `IPasswordVerifier.Hash`.
-- **Logout** — JWTs are stateless, so logout records the token's `jti` in
-  [Auth/MemoryTokenRevocationStore.cs](Auth/MemoryTokenRevocationStore.cs) until its `exp`, and the
-  `OnTokenValidated` event in `Program.cs` rejects it from then on. The store is per-process: scaling
-  out to more than one instance requires a shared store (Redis or a table).
-- **Claims** — `sub` = `TblEmployee.Id`, `name` = `UserName`, `role` = `RoleId`, `org` =
+- **Passwords**: `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)`.
+  `PasswordVerifier` treats a value that decodes to the ASP.NET Core PBKDF2 layout as a hash and
+  anything else as plain text. That plain-text fallback is on by default; set
+  `Auth:AllowLegacyPlaintextPasswords` to `false` once every row is hashed. Store new passwords via
+  `IPasswordVerifier.Hash`.
+- **Logout**: JWTs are stateless, so logout records the token's `jti` until its `exp`, and
+  `OnTokenValidated` in `Program.cs` rejects it from then on. The store is per-process, so running
+  more than one instance requires a shared store (Redis or a table).
+- **Claims**: `sub` = `TblEmployee.Id`, `name` = `UserName`, `role` = `RoleId`, `org` =
   `OrganizationId`, `lang` = `DefaultLanguage`. Inbound claim mapping is disabled, so these arrive
-  under exactly those names; constants live in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs).
-  `role` carries the raw `RoleId`, so `[Authorize(Roles = ...)]` matches on ids, not role names —
-  per-page rights still have to be read from `TblRolePage`.
+  under exactly those names (constants are in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs)).
+  `role` is the raw `RoleId`, so `[Authorize(Roles = ...)]` matches ids, not names. Per-page rights
+  must be read from `TblRolePage`.
 
 ### Domain shape
 
-`TblService` is the central service-request entity (opened/closed dates, channel in/out, owner,
-category, status, severity/priority/secrecy levels, area, organization), with `TblActivity` as its
-per-request work log (composite key `ServiceId` + `Line`) and `TblReopenedLog` tracking reopenings
-(composite key `SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side;
-`TblEmployee` + `TblRole` + `TblRolePage` is the agent side and per-page permission matrix
-(`IsInsert`/`IsUpdate`/`IsDelete`/`IsSearch`/`IsDownload`/`IsPrint`/`IsOpen`/`IsAdmin`).
-`TblRunning` drives formatted running numbers (`RunningFormat`, `RunningNext`) for codes such as
-service-request numbers.
+`TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
+channel, owner, category, status, severity/priority/secrecy levels, area, organization).
+`TblActivity` is its per-request work log (composite key `ServiceId` + `Line`; `ContactId` →
+`TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
+`SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+`DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
+the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
+codes such as service-request numbers. Reports resolve the "main organization" by joining
+`TblOrganization` twice (`org.RefId` → parent).
 
 ### Conventions inherited from the database
 
-These are quirks of the existing schema, not choices to "clean up" in the models:
+These are quirks of the existing schema. Do not "clean them up" in the models:
 
-- **Flags are `string`, not `bool`** — `IsEnable`, `IsDefault`, `IsAdmin`, `TblAccount.IsScret` (sic), etc. are
-  `nvarchar(10)`. Compare/assign them as strings; do not change the property types.
-- **Keys are `string`** (`nvarchar(50)`), not `int`/`Guid`, across nearly every table.
-- **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`:
-  `TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`. The root/parent convention matters when
-  querying these.
-- **Bilingual columns** — most reference data carries `NameTh` / `NameEn` (and
-  `SalutationTh`/`FirstnameTh`/… on people). The DB collation is `Thai_100_CS_AI` (case-sensitive,
-  accent-insensitive), so string comparisons executed in SQL are case-sensitive.
-- Most navigation properties were **not** scaffolded because the schema lacks the corresponding FK
-  constraints — only a handful exist (`TblAccountDetail→TblAccount`, `TblActivity→TblCategory`,
-  `TblService→TblStatus`, `TblRolePage→TblRole`, `TblReportParameter→TblReport`,
-  `TblBroadcastGroup→TblBroadcast`, plus the self-references). Expect to join on ID columns
-  manually rather than assuming a navigation exists.
+- **Flags are `string`, not `bool`.** `IsEnable`, `IsDefault`, `IsAdmin`, `TblAccount.IsScret`
+  (sic), etc. are `nvarchar(10)` holding `"T"`/`"F"`.
+- **Keys are `string`** (`nvarchar(50)`), in practice 32-char upper-case dashless GUIDs.
+- **Dates are mixed**: some tables have `DateTime` columns, and many have `string` columns with
+  **different formats per table**. Match the format already in the table, because the legacy
+  application parses these:
+  - `TblAccount.Created`/`Updated`: `M/d/yyyy H:mm`
+  - `TblEmployee.Created`/`Updated`: `yyyy-MM-dd HH:mm:ss`; `Birthdate`/`DateHire`: `yyyy-MM-dd`
+  - `TblService.Created`/`DateOpened`: `MM/dd/yyyy HH:mm`
+
+  The reports filter `TblService.Created` with `string.Compare`, which is lexical. In
+  `MM/dd/yyyy` order that comparison is not chronological across years.
+- **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`
+  (`TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`). Reports exclude service requests whose
+  status's `RefId` is a specific parent id.
+- **Bilingual columns**: `NameTh`/`NameEn`, `SalutationTh`/`FirstnameTh`/…. The DB collation
+  is `Thai_100_CS_AI`, so string comparisons run in SQL are **case-sensitive**.
+- **Few navigation properties exist** because the schema lacks most FK constraints. Join on id
+  columns manually; left joins use `join … into g from x in g.DefaultIfEmpty()`.
 - `TblAccount1` maps the keyless legacy import table `TblAccounts` (columns literally named
-  `Column1 Address`, etc.) — an import staging artifact, distinct from `TblAccount`. Likewise
-  `TblAccount.Created`/`Updated`/`Birthdate` are `string` there while other tables use `DateTime`.
-
-## Cleanup left from the template
-
-[WeatherForecast.cs](WeatherForecast.cs),
-[Controllers/WeatherForecastController.cs](Controllers/WeatherForecastController.cs), and the
-sample request in the `.http` file are scaffolding from `dotnet new webapi` and can be deleted once
-real endpoints exist.
+  `Column1 Address`, etc.). It is a staging artifact, distinct from `TblAccount`.
