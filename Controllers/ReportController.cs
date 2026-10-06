@@ -716,7 +716,7 @@ public class ReportController : ControllerBase
         return Ok(result);
     }
 
- [HttpPost("GetReport05")]
+    [HttpPost("GetReport05")]
     public async Task<IActionResult> GetReport5([FromBody] ServiceRequestReportRequest request)
     {
         // -------------------------
@@ -768,6 +768,7 @@ public class ReportController : ControllerBase
 
     select new
     {
+        Contact_Start = g.Key,
 
         // ====================================================
         // Kidding call
@@ -777,7 +778,7 @@ public class ReportController : ControllerBase
         Insane = g.Count(x =>
             (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
-
+                                  
         // เด็กโทรเล่น
         Prankcall = g.Count(x =>
             (x.ug.RefGroupId == "53" || x.ug.RefGroupId == "77")
@@ -869,12 +870,13 @@ public class ReportController : ControllerBase
     // ============================================================
 
         var result = await query
-            .ToListAsync();
+        .OrderBy(x => x.Contact_Start)
+        .ToListAsync();
 
         return Ok(result);
     }
 
-[HttpPost("GetReport06")]
+    [HttpPost("GetReport06")]
     public async Task<IActionResult> GetReport6([FromBody] ServiceRequestReportRequest request)
     {
         // -------------------------
@@ -927,33 +929,34 @@ public class ReportController : ControllerBase
     select new
     {
 
+        Contact_Start = g.Key,
         // ====================================================
         // Kidding call
         // ====================================================
 
         // จิตไม่ปกติ (นับเฉพาะเมื่อเป็น Group 53 หรือ 77 และ Category ตรงกัน)
         Insane = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
 
         // เด็กโทรเล่น
         Prankcall = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013"),
 
         // เสียงเงียบ
         Silence = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014"),
 
         // โทรด่าหยาบคาย
         Rude = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015"),
 
         // น้ำท่วม
         Flood = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018"),
 
         // ====================================================
@@ -962,7 +965,7 @@ public class ReportController : ControllerBase
 
         // สัญญาณไม่ชัดเจน
         Badline = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002"),
 
         // ====================================================
@@ -971,7 +974,7 @@ public class ReportController : ControllerBase
 
         // สายหลุด
         CutOff = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003"),
 
         // ====================================================
@@ -980,11 +983,11 @@ public class ReportController : ControllerBase
 
         // อื่น ๆ
         Other = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016"),
 
         The_Pizza_Company = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017"),
 
         // ====================================================
@@ -993,32 +996,32 @@ public class ReportController : ControllerBase
 
         //ขอคำปรึกษาเจ้าหน้าที่
         Request = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006"),
 
         //ระบายความเครียดด้านสังคม
         RelievingSocial = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007"),
 
         //ระบายความเครียดด้านเศรษฐกิจ 
         RelievingEconomic = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008"),
 
         //ระบายความเครียดด้านการเมือง
         RelievingPolitical = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009"),
 
         //ระบายความเครียดด้านกฏหมาย 
         RelievingLegal = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010"),
 
         //ระบายความเครียดด้านทรัพยากรธรรมชาติ
         RelievingNatural = g.Count(x =>
-            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79")
+            (x.ug.RefGroupId != "53" && x.ug.RefGroupId != "77" && x.ug.RefGroupId != "79" && x.ug.RefGroupId != "68" )
             && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
     };
 
@@ -1027,11 +1030,161 @@ public class ReportController : ControllerBase
     // ============================================================
 
         var result = await query
-            .ToListAsync();
+        .OrderBy(x => x.Contact_Start)
+        .ToListAsync();
 
         return Ok(result);
     }
 
+
+    [HttpPost("GetReport07")]
+    public async Task<IActionResult> GetReport07([FromBody] ServiceRequestReportRequestService request)
+    {
+        // -------------------------
+        // วันที่ + เวลา
+        // -------------------------
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var startTime = string.IsNullOrWhiteSpace(request.P_Time_Start)
+            ? TimeSpan.Zero
+            : TimeSpan.Parse(request.P_Time_Start);
+
+        var finishTime = string.IsNullOrWhiteSpace(request.P_Time_Finish)
+            ? new TimeSpan(23, 59, 59)
+            : TimeSpan.Parse(request.P_Time_Finish);
+
+
+        var startDate = DateTime.ParseExact(request.P_Start, "MM/dd/yyyy", culture);
+        var finishDate = DateTime.ParseExact(request.P_Finish, "MM/dd/yyyy", culture);
+        var startDateTime = startDate.Date.Add(startTime);
+        var finishDateTime = finishDate.Date.Add(finishTime);
+
+        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
+
+        var result = await (
+            from sr in _db.TblServices.AsNoTracking()
+
+            join st in _db.TblStatuses.AsNoTracking()
+                on sr.StatusId equals st.Id
+
+            // Activity
+            join ac in _db.TblActivities.AsNoTracking()
+                on sr.Id equals ac.ServiceId into acGroup
+            from ac in acGroup.DefaultIfEmpty()
+
+            // Contact
+            join c1 in _db.TblContacts.AsNoTracking()
+                on ac.ContactId equals c1.Id into cGroup
+            from c1 in cGroup.DefaultIfEmpty()
+
+            // Channel
+            join ch in _db.TblChannels.AsNoTracking()
+                on sr.ChannelIncomingId equals ch.Id into chGroup
+            from ch in chGroup.DefaultIfEmpty()
+
+            // Category
+            join cat in _db.TblCategories.AsNoTracking()
+                on sr.CategoryId equals cat.Id into catGroup
+            from cat in catGroup.DefaultIfEmpty()
+
+            // Reference
+            join rf in _db.TblReferences.AsNoTracking()
+                on sr.ServiceReference equals rf.Id into refGroup
+            from rf in refGroup.DefaultIfEmpty()
+
+            // Organization
+            join org in _db.TblOrganizations.AsNoTracking()
+                on sr.OrganizationId equals org.Id into orgGroup
+            from org in orgGroup.DefaultIfEmpty()
+
+            join org2 in _db.TblOrganizations.AsNoTracking()
+                on org.RefId equals org2.Id into org2Group
+            from org2 in org2Group.DefaultIfEmpty()
+
+            // Account
+            join acc in _db.TblAccounts.AsNoTracking()
+                on sr.AccountId equals acc.Id into accGroup
+            from acc in accGroup.DefaultIfEmpty()
+
+            // Gender
+            join gen in _db.TblGenders.AsNoTracking()
+                on acc.GenderId equals gen.Id into genGroup
+            from gen in genGroup.DefaultIfEmpty()
+
+            // Employee (Created)
+            join emp1 in _db.TblEmployees.AsNoTracking()
+                on sr.CreatedBy equals emp1.Id into emp1Group
+            from emp1 in emp1Group.DefaultIfEmpty()
+
+            // Employee (Owner)
+            join emp2 in _db.TblEmployees.AsNoTracking()
+                on sr.OwnerId equals emp2.Id into emp2Group
+            from emp2 in emp2Group.DefaultIfEmpty()
+
+            // Employee (Updated)
+            join emp3 in _db.TblEmployees.AsNoTracking()
+                on sr.UpdatedBy equals emp3.Id into emp3Group
+            from emp3 in emp3Group.DefaultIfEmpty()
+
+            where sr.IsEnable == "T"
+              && sr.CategoryId == request.P_Service
+              && string.Compare(sr.Created, startStr) >= 0
+              && string.Compare(sr.Created, finishStr) <= 0
+
+            orderby sr.Code
+
+            select new ServiceRequestReportDto
+            {
+                Code = sr.Code,
+                Summary = sr.Summary,
+                Detail = sr.Detail,
+                SrReferenceLink = sr.ServiceReferenceLink,
+                SrOpened = sr.DateOpened,
+                SrClosed = sr.DateClosed,
+                SrRequireCallBack = sr.CallBack,
+                Created = sr.Created,
+
+                ANumber = c1.ContactDetail ?? "",
+
+                ChannelName = ch != null ? ch.NameTh : "",
+                SrTypeName = cat != null ? cat.NameTh : "",
+                SrReference = rf != null ? rf.NameTh : "",
+                SrStatusName = st.NameTh,
+
+                CreatedUName = emp1.UserName ?? "",
+                CreaterName = emp1.Id == null
+                    ? ""
+                    : $"{emp1.SalutationTh}{emp1.FirstnameTh} {emp1.LastnameTh}",
+                SkillAgentCreated =
+                    emp1.Id != null && EF.Functions.Like(emp1.Position ?? "", "%Claim%")
+                        ? 1 // ใส่ข้อมูลแสดง Info
+                        : 2,// ปล่อยว่าง
+                OwnerUName = emp2.UserName ?? "",
+                OwnerName = emp2.Id == null
+                    ? ""
+                    : $"{emp2.SalutationTh}{emp2.FirstnameTh} {emp2.LastnameTh}",
+                LastUpdatedUName = emp3.UserName ?? "",
+                UpdateName = emp3.Id == null
+                    ? ""
+                    : $"{emp3.SalutationTh}{emp3.FirstnameTh} {emp3.LastnameTh}",
+                SubOrgId = sr.OrganizationId,
+                SubOrgName = org != null ? org.NameTh : "",
+                MainOrgId = org2 != null ? org2.Id : null,
+                MainOrgName = org2 != null ? org2.NameTh : "",
+                ContactName = acc.Id == null
+                    ? ""
+                    : $"{acc.SalutationTh}{acc.FirstnameTh} {acc.LastnameTh}",
+
+                Gender = gen != null ? gen.NameTh : "",
+
+                Remark = sr.Remark
+            })
+            .Distinct()
+            .ToListAsync();
+            
+
+        return Ok(result);
+    }
 
 
 }
