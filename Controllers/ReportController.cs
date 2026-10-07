@@ -262,6 +262,9 @@ public class ReportController : ControllerBase
             return BadRequest(_0BaseReturn.Fail(error));
         }
 
+        _logger.LogInformation(
+            "GetReport02 range: startKey = {StartKey}, finishKey = {FinishKey}", startKey, finishKey);
+
         // ============================================================
         // Query
         // ============================================================
@@ -422,6 +425,19 @@ public class ReportController : ControllerBase
                 .Distinct()
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
+
+            // created / createdKey live inside the SQL query, so rebuild the key here to log it.
+            foreach (var row in result)
+            {
+                var created = row.Created ?? "";
+                var createdKey = created.Length >= 16
+                    ? created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
+                        + created.Substring(11, 2) + created.Substring(14, 2)
+                    : "(invalid length)";
+                _logger.LogInformation(
+                    "GetReport02 {Code}: created = {Created}, createdKey = {CreatedKey}",
+                    row.Code, created, createdKey);
+            }
 
             var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
             return Ok(_0BaseReturn.Success(result, message));
