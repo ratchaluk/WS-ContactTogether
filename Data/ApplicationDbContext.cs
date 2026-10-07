@@ -365,7 +365,7 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false);
             entity.Property(e => e.UserPassword)
-                .HasMaxLength(50)
+                .HasMaxLength(255)
                 .IsUnicode(false);
         });
 
