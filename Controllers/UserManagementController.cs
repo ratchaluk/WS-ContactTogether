@@ -77,8 +77,7 @@ public class UserManagementController : ControllerBase
         var now = FormatDate(DateTime.Now);
         var employee = new TblEmployee
         {
-            // Keys elsewhere in this schema are 32-char upper-case GUIDs without dashes.
-            Id = Guid.NewGuid().ToString("N").ToUpperInvariant(),
+            // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
             UserName = request.UserName,
             UserPassword = _passwordVerifier.Hash(request.Password),
             GenderId = request.GenderId,

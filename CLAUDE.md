@@ -120,6 +120,9 @@ These are quirks of the existing schema, not choices to "clean up" in the models
 - **Flags are `string`, not `bool`** — `IsEnable`, `IsDefault`, `IsAdmin`, `TblAccount.IsScret` (sic), etc. are
   `nvarchar(10)`. Compare/assign them as strings; do not change the property types.
 - **Keys are `string`** (`nvarchar(50)`), not `int`/`Guid`, across nearly every table.
+  New rows get a UUID key automatically (32 upper-case hex chars, no dashes): `ApplicationDbContext.Keys.cs`
+  attaches `GuidStringValueGenerator` to every single-string primary key, so leave `Id` unset when
+  inserting. Use `GuidStringValueGenerator.NewId()` if you need an id before `Add()`.
 - **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`:
   `TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`. The root/parent convention matters when
   querying these.
