@@ -87,7 +87,8 @@ There are no EF migrations and none should be added — the database is the sour
 + password against `TblEmployee`, returns a JWT) and `POST /Auth/logout` (`[Authorize]`, revokes the
 presented token). Endpoints opt in to protection with `[Authorize]`; everything else stays anonymous.
 
-- **Passwords** — `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)`.
+- **Passwords** — `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)` (widened from
+  `varchar(50)` on 2026-10-07 — the 84-char PBKDF2 hash did not fit).
   [Auth/PasswordVerifier.cs](Auth/PasswordVerifier.cs) treats a value that decodes to the ASP.NET
   Core PBKDF2 layout as a hash and everything else as plain text. That fallback is on by default;
   set `Auth:AllowLegacyPlaintextPasswords` to `false` once all rows are hashed. New passwords should
