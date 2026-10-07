@@ -146,10 +146,11 @@ These are quirks of the existing schema. Do not "clean them up" in the models:
   application parses these:
   - `TblAccount.Created`/`Updated`: `M/d/yyyy H:mm`
   - `TblEmployee.Created`/`Updated`: `yyyy-MM-dd HH:mm:ss`; `Birthdate`/`DateHire`: `yyyy-MM-dd`
-  - `TblService.Created`/`DateOpened`: `MM/dd/yyyy HH:mm`
+  - `TblService.DateOpened`: `MM/dd/yyyy HH:mm`
 
-  The reports filter `TblService.Created` with `string.Compare`, which is lexical. In
-  `MM/dd/yyyy` order that comparison is not chronological across years.
+  `TblService.Created`/`Updated` and `TblContact.ContactStart`/`ContactEnd` are `datetime2`, so the
+  reports filter them with plain `DateTime` comparisons. They used to be `MM/dd/yyyy` text, and
+  older code that compares them with `string.Compare` was wrong across years.
 - **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`
   (`TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`). Reports exclude service requests whose
   status's `RefId` is a specific parent id.

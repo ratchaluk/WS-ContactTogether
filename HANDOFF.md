@@ -8,6 +8,23 @@
 `_0BaseReturn` และแยก HTTP status ตามกรณี และแก้บั๊กกรองช่วงวันที่ที่ทำให้ช่วงปี 1999 ยังได้ข้อมูลปี 2026
 ทุกรายงานทดสอบกับฐานข้อมูลจริงแล้ว **commit ครบทั้ง 01–06 แล้ว ยังไม่ได้ push และยังไม่ได้เปิด PR**
 
+## อัปเดต 2026-10-07: คอลัมน์วันที่เปลี่ยนเป็น `datetime2`
+
+ฐานข้อมูลเปลี่ยน `TblService.Created`/`Updated` และ `TblContact.ContactStart`/`ContactEnd` จากข้อความเป็น
+`datetime2` แล้ว re-scaffold model ตามนั้น วิธีเทียบด้วย key `yyyyMMddHHmm` ที่อธิบายในหัวข้อ
+"บั๊กกรองช่วงวันที่ที่แก้ไป" ด้านล่าง**ถูกแทนที่แล้ว** ตอนนี้ทุกรายงานเทียบ `DateTime` ตรง ๆ
+
+- `TryBuildDateRange` คืน `DateTime start/finish` (validation และข้อความ 400 เหมือนเดิม)
+- 01–04, 07: `sr.Created >= start && sr.Created <= finish`
+- 05/06: `ContactStart >= start.Date && ContactStart < finish.Date + 1 วัน` (ยังไม่สนเวลา)
+- GetReport07 แก้แค่ส่วนเทียบวันที่ ยังไม่ได้ใช้ `_0BaseReturn` และยังไม่ validate input
+- ตัด log รายแถวที่สร้าง `createdKey` ใน GetReport02 ออก (key ไม่มีแล้ว) เหลือ log ช่วงวันที่
+- **response เปลี่ยน:** `created` (01–04, 07) และ `contact_Start` (05/06) เป็น ISO เช่น
+  `2026-07-01T09:28:00` แทนข้อความ `MM/dd/yyyy HH:mm` เดิม ควรแจ้งฝั่ง client
+
+ทดสอบกับฐานข้อมูลจริงแล้ว จำนวนแถวตรงกับตารางผลทดสอบด้านล่างทุกรายงาน และ GetReport07 (category ที่มีข้อมูลมากสุด)
+ปี 2026 ได้ 147 รายการ ปี 1999 ไม่พบข้อมูล
+
 ## สถานะไฟล์
 
 ทุกอย่าง commit อยู่บน branch `indy` (ยังไม่ push) เหลือแค่ไฟล์ `HANDOFF.md` นี้ที่ยังไม่ได้ commit
