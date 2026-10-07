@@ -9,7 +9,7 @@ public class ServiceRequestReportDto
     public  string? SrClosed { get; set; }
 
     public string? SrRequireCallBack { get; set; }
-    public  string? Created { get; set; }
+    public DateTime? Created { get; set; }
 
     public string? ANumber { get; set; }
 
@@ -51,7 +51,7 @@ public class SrCallbackResponse
     public  string? SrClosed { get; set; }
 
     public string? SrRequireCallBack { get; set; }
-    public  string? Created { get; set; }
+    public DateTime? Created { get; set; }
 
     public string? ANumber { get; set; }
 

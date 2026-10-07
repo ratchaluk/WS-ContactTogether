@@ -132,13 +132,13 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblAccountType");
 
             entity.Property(e => e.Id).HasMaxLength(50);
-            entity.Property(e => e.Created).HasMaxLength(15);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.NameEn).HasMaxLength(200);
             entity.Property(e => e.NameTh).HasMaxLength(200);
-            entity.Property(e => e.Updated).HasMaxLength(15);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
         });
 
@@ -275,12 +275,8 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.ContactDetail)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.ContactEnd)
-                .HasMaxLength(50)
-                .IsUnicode(false);
-            entity.Property(e => e.ContactStart)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+            entity.Property(e => e.ContactEnd).HasPrecision(0);
+            entity.Property(e => e.ContactStart).HasPrecision(0);
             entity.Property(e => e.CreatedBy)
                 .HasMaxLength(50)
                 .IsUnicode(false);
@@ -373,7 +369,7 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false);
             entity.Property(e => e.UserPassword)
-                .HasMaxLength(50)
+                .HasMaxLength(255)
                 .IsUnicode(false);
         });
 
@@ -669,9 +665,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.Code)
                 .HasMaxLength(200)
                 .IsUnicode(false);
-            entity.Property(e => e.Created)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+            entity.Property(e => e.Created).HasPrecision(0);
             entity.Property(e => e.CreatedBy)
                 .HasMaxLength(200)
                 .IsUnicode(false)
@@ -733,9 +727,7 @@ public partial class ApplicationDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("Status_ID");
             entity.Property(e => e.Summary).HasMaxLength(500);
-            entity.Property(e => e.Updated)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+            entity.Property(e => e.Updated).HasPrecision(0);
             entity.Property(e => e.UpdatedBy)
                 .HasMaxLength(200)
                 .IsUnicode(false)
@@ -748,7 +740,12 @@ public partial class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).HasMaxLength(50);
             entity.Property(e => e.EmployeeId).HasMaxLength(50);
+            entity.Property(e => e.ExpiresAt).HasMaxLength(50);
+            entity.Property(e => e.IpAddress).HasMaxLength(50);
+            entity.Property(e => e.LastActiveAt).HasMaxLength(50);
             entity.Property(e => e.ServerName).HasMaxLength(100);
+            entity.Property(e => e.SessionTime).HasMaxLength(50);
+            entity.Property(e => e.TokenHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<TblStatus>(entity =>
@@ -756,6 +753,7 @@ public partial class ApplicationDbContext : DbContext
             entity.ToTable("TblStatus");
 
             entity.Property(e => e.Id).HasMaxLength(50);
+            entity.Property(e => e.Created).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.IsDefault).HasMaxLength(10);
             entity.Property(e => e.IsEnable).HasMaxLength(10);
@@ -764,6 +762,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.NameTh).HasMaxLength(200);
             entity.Property(e => e.RefId).HasMaxLength(50);
             entity.Property(e => e.StatusType).HasMaxLength(50);
+            entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
 
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)

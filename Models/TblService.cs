@@ -53,11 +53,11 @@ public partial class TblService
 
     public string? IsEnable { get; set; }
 
-    public string? Created { get; set; }
-
     public string? CreatedBy { get; set; }
 
-    public string? Updated { get; set; }
-
     public string? UpdatedBy { get; set; }
+
+    public DateTime? Created { get; set; }
+
+    public DateTime? Updated { get; set; }
 }

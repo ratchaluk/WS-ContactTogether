@@ -33,7 +33,7 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
@@ -107,14 +107,9 @@ public class ReportController : ControllerBase
                     on sr.UpdatedBy equals emp3.Id into emp3Group
                 from emp3 in emp3Group.DefaultIfEmpty()
 
-                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
-                let created = sr.Created!
-                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
-                    + created.Substring(11, 2) + created.Substring(14, 2)
-
                 where sr.IsEnable == "T"
-                  && string.Compare(createdKey, startKey) >= 0
-                  && string.Compare(createdKey, finishKey) <= 0
+                  && sr.Created >= start
+                  && sr.Created <= finish
 
                 orderby sr.Code
 
@@ -172,7 +167,7 @@ public class ReportController : ControllerBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "GetReport01 failed for {Start} - {Finish}.", startKey, finishKey);
+            _logger.LogError(ex, "GetReport01 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
@@ -180,18 +175,17 @@ public class ReportController : ControllerBase
     }
 
     /// <summary>
-    /// Parses the report's <c>MM/dd/yyyy</c> dates and optional <c>HH:mm:ss</c> times into
-    /// <c>yyyyMMddHHmm</c> keys. <c>TblService.Created</c> is text in <c>MM/dd/yyyy HH:mm</c>, which
-    /// does not sort chronologically (month comes before year), so the query rebuilds it into the
-    /// same key before comparing.
+    /// Parses the report's <c>MM/dd/yyyy</c> dates and optional <c>HH:mm:ss</c> times into an
+    /// inclusive <c>DateTime</c> range. <c>TblService.Created</c> and <c>TblContact.ContactStart</c>
+    /// are <c>datetime2</c>, so the queries compare against these values directly.
     /// </summary>
     private static bool TryBuildDateRange(
         ServiceRequestReportRequest request,
-        out string startKey,
-        out string finishKey,
+        out DateTime start,
+        out DateTime finish,
         out string error)
     {
-        startKey = finishKey = string.Empty;
+        start = finish = default;
         var culture = CultureInfo.InvariantCulture;
 
         if (string.IsNullOrWhiteSpace(request.P_Start) || string.IsNullOrWhiteSpace(request.P_Finish))
@@ -240,8 +234,8 @@ public class ReportController : ControllerBase
             return false;
         }
 
-        startKey = startDateTime.ToString("yyyyMMddHHmm", culture);
-        finishKey = finishDateTime.ToString("yyyyMMddHHmm", culture);
+        start = startDateTime;
+        finish = finishDateTime;
         error = string.Empty;
         return true;
     }
@@ -257,13 +251,12 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
 
-        _logger.LogInformation(
-            "GetReport02 range: startKey = {StartKey}, finishKey = {FinishKey}", startKey, finishKey);
+        _logger.LogInformation("GetReport02 range: {Start} - {Finish}", start, finish);
 
         // ============================================================
         // Query
@@ -334,15 +327,10 @@ public class ReportController : ControllerBase
                     on sr.AccountId equals acc.Id into accJoin
                 from acc in accJoin.DefaultIfEmpty()
 
-                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
-                let created = sr.Created!
-                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
-                    + created.Substring(11, 2) + created.Substring(14, 2)
-
                 where sr.IsEnable == "T"
                     && sr.CallBack == "D"
-                    && string.Compare(createdKey, startKey) >= 0
-                    && string.Compare(createdKey, finishKey) <= 0
+                    && sr.Created >= start
+                    && sr.Created <= finish
 
                 select new SrCallbackResponse
                 {
@@ -426,25 +414,12 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            // created / createdKey live inside the SQL query, so rebuild the key here to log it.
-            foreach (var row in result)
-            {
-                var created = row.Created ?? "";
-                var createdKey = created.Length >= 16
-                    ? created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
-                        + created.Substring(11, 2) + created.Substring(14, 2)
-                    : "(invalid length)";
-                _logger.LogInformation(
-                    "GetReport02 {Code}: created = {Created}, createdKey = {CreatedKey}",
-                    row.Code, created, createdKey);
-            }
-
             var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
             return Ok(_0BaseReturn.Success(result, message));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "GetReport02 failed for {Start} - {Finish}.", startKey, finishKey);
+            _logger.LogError(ex, "GetReport02 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
@@ -462,7 +437,7 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
@@ -536,17 +511,12 @@ public class ReportController : ControllerBase
                     on sr.AccountId equals acc.Id into accJoin
                 from acc in accJoin.DefaultIfEmpty()
 
-                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
-                let created = sr.Created!
-                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
-                    + created.Substring(11, 2) + created.Substring(14, 2)
-
                 where sr.IsEnable == "T"
                     && sr.CallBack == "Y"
 
                     // SR Code ตามวันที่
-                    && string.Compare(createdKey, startKey) >= 0
-                    && string.Compare(createdKey, finishKey) <= 0
+                    && sr.Created >= start
+                    && sr.Created <= finish
 
                 select new SrCallbackResponse
                 {
@@ -635,7 +605,7 @@ public class ReportController : ControllerBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "GetReport03 failed for {Start} - {Finish}.", startKey, finishKey);
+            _logger.LogError(ex, "GetReport03 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
@@ -653,7 +623,7 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
@@ -732,15 +702,10 @@ public class ReportController : ControllerBase
                     on sr.AccountId equals acc.Id into accJoin
                 from acc in accJoin.DefaultIfEmpty()
 
-                // "MM/dd/yyyy HH:mm" -> "yyyyMMddHHmm" so the string comparison is chronological.
-                let created = sr.Created!
-                let createdKey = created.Substring(6, 4) + created.Substring(0, 2) + created.Substring(3, 2)
-                    + created.Substring(11, 2) + created.Substring(14, 2)
-
                 where sr.IsEnable == "T"
                     && org.Id == request.P_MainOrg
-                    && string.Compare(createdKey, startKey) >= 0
-                    && string.Compare(createdKey, finishKey) <= 0
+                    && sr.Created >= start
+                    && sr.Created <= finish
 
                 select new SrCallbackResponse
                 {
@@ -826,7 +791,7 @@ public class ReportController : ControllerBase
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(
-                ex, "GetReport04 failed for {Start} - {Finish}, org {MainOrg}.", startKey, finishKey, request.P_MainOrg);
+                ex, "GetReport04 failed for {Start} - {Finish}, org {MainOrg}.", start, finish, request.P_MainOrg);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
                 _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
@@ -844,14 +809,15 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
 
-        // ContactStart has no time part, so only the yyyyMMdd prefix of the range applies.
-        var startDay = startKey[..8];
-        var finishDay = finishKey[..8];
+        // This report counts whole days, so P_Time_Start / P_Time_Finish do not apply.
+        var startDay = start.Date;
+        var finishDay = finish.Date;
+        var dayAfterFinish = finishDay.AddDays(1);
 
          // ============================================================
     // Query
@@ -872,13 +838,9 @@ public class ReportController : ControllerBase
         into ugGroup
     from ug in ugGroup.DefaultIfEmpty()
 
-    // "MM/dd/yyyy" -> "yyyyMMdd" so the string comparison is chronological.
-    let contactStart = c.ContactStart!
-    let contactKey = contactStart.Substring(6, 4) + contactStart.Substring(0, 2) + contactStart.Substring(3, 2)
-
     where
-        string.Compare(contactKey, startDay) >= 0
-        && string.Compare(contactKey, finishDay) <= 0
+        c.ContactStart >= startDay
+        && c.ContactStart < dayAfterFinish
         // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
 
     // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
@@ -1016,14 +978,15 @@ public class ReportController : ControllerBase
         // -------------------------
         // วันที่ + เวลา
         // -------------------------
-        if (!TryBuildDateRange(request, out var startKey, out var finishKey, out var error))
+        if (!TryBuildDateRange(request, out var start, out var finish, out var error))
         {
             return BadRequest(_0BaseReturn.Fail(error));
         }
 
-        // ContactStart has no time part, so only the yyyyMMdd prefix of the range applies.
-        var startDay = startKey[..8];
-        var finishDay = finishKey[..8];
+        // This report counts whole days, so P_Time_Start / P_Time_Finish do not apply.
+        var startDay = start.Date;
+        var finishDay = finish.Date;
+        var dayAfterFinish = finishDay.AddDays(1);
 
          // ============================================================
     // Query
@@ -1044,13 +1007,9 @@ public class ReportController : ControllerBase
         into ugGroup
     from ug in ugGroup.DefaultIfEmpty()
 
-    // "MM/dd/yyyy" -> "yyyyMMdd" so the string comparison is chronological.
-    let contactStart = c.ContactStart!
-    let contactKey = contactStart.Substring(6, 4) + contactStart.Substring(0, 2) + contactStart.Substring(3, 2)
-
     where
-        string.Compare(contactKey, startDay) >= 0
-        && string.Compare(contactKey, finishDay) <= 0
+        c.ContactStart >= startDay
+        && c.ContactStart < dayAfterFinish
         // *** เอาเงื่อนไข ug.RefGroupId ออกจากตรงนี้ เพื่อไม่ให้แถวถูกตัดทิ้ง ***
 
     // รวม c และ ug เข้าไปด้วยกันเพื่อให้ดึง ug มาเช็คใน Count ได้
@@ -1199,9 +1158,6 @@ public class ReportController : ControllerBase
         var startDateTime = startDate.Date.Add(startTime);
         var finishDateTime = finishDate.Date.Add(finishTime);
 
-        var startStr = startDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-        var finishStr = finishDateTime.ToString("MM/dd/yyyy HH:mm", culture);
-
         var result = await (
             from sr in _db.TblServices.AsNoTracking()
 
@@ -1269,8 +1225,8 @@ public class ReportController : ControllerBase
 
             where sr.IsEnable == "T"
               && sr.CategoryId == request.P_Service
-              && string.Compare(sr.Created, startStr) >= 0
-              && string.Compare(sr.Created, finishStr) <= 0
+              && sr.Created >= startDateTime
+              && sr.Created <= finishDateTime
 
             orderby sr.Code
 
