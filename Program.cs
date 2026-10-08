@@ -1,6 +1,7 @@
 using System.Text;
 using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
+using ContactTogetherApi.Helper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -100,6 +101,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.OpenSwaggerOnStart();
 }
 
 app.UseHttpsRedirection();
