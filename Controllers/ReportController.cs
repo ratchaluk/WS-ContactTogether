@@ -843,63 +843,107 @@ public class ReportController : ControllerBase
                 // ====================================================
 
                 // จิตไม่ปกติ
-                Insane = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
+                Insane =g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012")
+                        .Select(x => x.c.Id)
+                        .Distinct()
+                        .Count(),
 
                 // เด็กโทรเล่น
-                Prankcall = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013"),
+                Prankcall = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // เสียงเงียบ
-                Silence = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014"),
-
+                Silence = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
                 // โทรด่าหยาบคาย
-                Rude = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015"),
+                Rude = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // น้ำท่วม
-                Flood = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018"),
+                Flood = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // ====================================================
                 // สัญญาณไม่ชัดเจน
                 // ====================================================
 
-                Badline = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002"),
+                Badline = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // ====================================================
                 // สายหลุด
                 // ====================================================
 
-                CutOff = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003"),
+                CutOff = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // ====================================================
                 // โทรผิด
                 // ====================================================
 
                 // อื่น ๆ
-                Other = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016"),
+                Other = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // The Pizza Company
-                The_Pizza_Company = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017"),
+                The_Pizza_Company = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // ====================================================
                 // Out of Scope
                 // ====================================================
 
                 // ขอคำปรึกษาเจ้าหน้าที่
-                Request = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006"),
+                Request = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006")
+                            .Select(x => x.c.Id)
+                            .Distinct()
+                            .Count(),
 
                 // ระบายความเครียดด้านสังคม
-                RelievingSocial = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007"),
+                RelievingSocial = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007")
+                                    .Select(x => x.c.Id)
+                                    .Distinct()
+                                    .Count(),
 
                 // ระบายความเครียดด้านเศรษฐกิจ
-                RelievingEconomic = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008"),
+                RelievingEconomic = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008")
+                                       .Select(x => x.c.Id)
+                                       .Distinct()
+                                       .Count(),
 
                 // ระบายความเครียดด้านการเมือง
-                RelievingPolitical = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009"),
+                RelievingPolitical = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009")
+                                        .Select(x => x.c.Id)
+                                        .Distinct()
+                                        .Count(),
 
                 // ระบายความเครียดด้านกฏหมาย
-                RelievingLegal = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010"),
+                RelievingLegal = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010")
+                                    .Select(x => x.c.Id)
+                                    .Distinct()
+                                    .Count(),
 
                 // ระบายความเครียดด้านทรัพยากรธรรมชาติ
-                RelievingNatural = g.Count(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011"),
+                RelievingNatural = g.Where(x => x.m != null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
+                                      .Select(x => x.c.Id)
+                                      .Distinct()
+                                      .Count(),
             };
 
         // ============================================================
@@ -984,63 +1028,108 @@ public class ReportController : ControllerBase
                 // ====================================================
 
                 // จิตไม่ปกติ
-                Insane = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012"),
+                Insane = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012")
+                          .Select(x => x.c.Id)
+                          .Distinct()
+                          .Count(),
 
                 // เด็กโทรเล่น
-                Prankcall = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013"),
+                Prankcall = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013")
+                             .Select(x => x.c.Id)
+                             .Distinct()
+                             .Count(),
 
                 // เสียงเงียบ
-                Silence = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014"),
+                Silence = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014")
+                           .Select(x => x.c.Id)
+                           .Distinct()
+                           .Count(),
 
                 // โทรด่าหยาบคาย
-                Rude = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015"),
+                Rude = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015")
+                        .Select(x => x.c.Id)
+                        .Distinct()
+                        .Count(),   
 
                 // น้ำท่วม
-                Flood = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018"),
+                Flood = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018")
+                         .Select(x => x.c.Id)
+                         .Distinct()
+                         .Count(),
 
                 // ====================================================
                 // สัญญาณไม่ชัดเจน
                 // ====================================================
 
-                Badline = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002"),
+                Badline = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002")
+                           .Select(x => x.c.Id)
+                           .Distinct()
+                           .Count(),
 
                 // ====================================================
                 // สายหลุด
                 // ====================================================
 
-                CutOff = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003"),
+                CutOff = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003")
+                          .Select(x => x.c.Id)
+                          .Distinct()
+                          .Count(),
 
                 // ====================================================
                 // โทรผิด
                 // ====================================================
 
                 // อื่น ๆ
-                Other = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016"),
+                Other = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016")
+                         .Select(x => x.c.Id)
+                         .Distinct()
+                         .Count(),
 
                 // The Pizza Company
-                The_Pizza_Company = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017"),
+                The_Pizza_Company = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017")
+                                      .Select(x => x.c.Id)
+                                      .Distinct()
+                                      .Count(),
 
                 // ====================================================
                 // Out of Scope
                 // ====================================================
 
                 // ขอคำปรึกษาเจ้าหน้าที่
-                Request = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006"),
+                Request = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006")
+                           .Select(x => x.c.Id)
+                           .Distinct()
+                           .Count(),
 
                 // ระบายความเครียดด้านสังคม
-                RelievingSocial = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007"),
+                RelievingSocial = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007")
+                                    .Select(x => x.c.Id)
+                                    .Distinct()
+                                    .Count(),
 
                 // ระบายความเครียดด้านเศรษฐกิจ
-                RelievingEconomic = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008"),
+                RelievingEconomic = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008")
+                                       .Select(x => x.c.Id)
+                                       .Distinct()
+                                       .Count(),
 
                 // ระบายความเครียดด้านการเมือง
-                RelievingPolitical = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009"),
+                RelievingPolitical = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009")
+                                        .Select(x => x.c.Id)
+                                        .Distinct()
+                                        .Count(),
 
                 // ระบายความเครียดด้านกฏหมาย
-                RelievingLegal = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010"),
+                RelievingLegal = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010")
+                                   .Select(x => x.c.Id)
+                                   .Distinct()
+                                   .Count(),
 
                 // ระบายความเครียดด้านทรัพยากรธรรมชาติ
-                RelievingNatural = g.Count(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011"),
+                RelievingNatural = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
+                                     .Select(x => x.c.Id)
+                                     .Distinct()
+                                     .Count(),
             };
 
         // ============================================================
