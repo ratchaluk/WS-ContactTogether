@@ -77,16 +77,15 @@ Authorization: Bearer {{token}}
 ###
 
 # Report 01 - every response is wrapped in _0BaseReturn { callAPIStatus, callAPIStatusMessage, result }.
-# Dates are MM/dd/yyyy; P_Time_Start / P_Time_Finish are optional HH:mm:ss (default 00:00:00 / 23:59:59).
+# P_Start / P_Finish are ISO 8601 Thai local date-times, yyyy-MM-ddTHH:mm:ss (seconds optional,
+# no offset or Z). Both ends are inclusive.
 # 200 - rows found, or an empty result with "ไม่พบข้อมูล"
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
 Content-Type: application/json
 
 {
-  "p_Start": "07/01/2026",
-  "p_Finish": "07/31/2026",
-  "p_Time_Start": "08:00:00",
-  "p_Time_Finish": "17:00:00"
+  "p_Start": "2026-07-01T08:00:00",
+  "p_Finish": "2026-07-31T17:00:00"
 }
 
 ###
@@ -96,18 +95,29 @@ POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
 Content-Type: application/json
 
 {
-  "p_Finish": "01/31/2025"
+  "p_Finish": "2026-07-31T23:59:59"
 }
 
 ###
 
-# 400 - wrong date format (must be MM/dd/yyyy)
+# 400 - no time part (the time is required)
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
 Content-Type: application/json
 
 {
-  "p_Start": "2025-01-01",
-  "p_Finish": "2025-01-31"
+  "p_Start": "2026-07-01",
+  "p_Finish": "2026-07-31"
+}
+
+###
+
+# 400 - old MM/dd/yyyy format is no longer accepted by Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
 }
 
 ###
@@ -117,64 +127,112 @@ POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
 Content-Type: application/json
 
 {
-  "p_Start": "02/01/2025",
-  "p_Finish": "01/01/2025"
+  "p_Start": "2026-08-01T00:00:00",
+  "p_Finish": "2026-07-01T00:00:00"
 }
 
 ###
 
-# Report 02 - service requests with CallBack = "D"; same request rules and _0BaseReturn envelope as Report 01
+# 400 - malformed JSON still answers with _0BaseReturn, not ProblemDetails
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+
+###
+
+# Report 02 - service requests with CallBack = "D"; same ISO 8601 request rules and _0BaseReturn
+# envelope as Report 01
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport02
 Content-Type: application/json
 
 {
-  "p_Start": "07/01/2026",
-  "p_Finish": "07/31/2026"
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
 }
 
 ###
 
-# Report 03 - service requests with CallBack = "Y"
+# Report 03 - service requests with CallBack = "Y"; same ISO 8601 request rules as Report 01
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport03
 Content-Type: application/json
 
 {
-  "p_Start": "07/01/2026",
-  "p_Finish": "07/31/2026"
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
 }
 
 ###
 
-# Report 04 - service requests of one organization; P_MainOrg is required (TblOrganization.Id)
+# Report 04 - service requests of a main organization and all of its sub-organizations.
+# Same ISO 8601 date rules as Report 01; P_MainOrg (TblOrganization.Id) is required.
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
 Content-Type: application/json
 
 {
-  "p_Start": "07/01/2026",
-  "p_Finish": "07/31/2026",
-  "p_MainOrg": "0D26AFEE79DD44C680D3E2F606B5C52A"
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "p_MainOrg": "00D1DA8C956043D5AD9B38299566A7F0"
 }
 
 ###
 
-# Report 05 / 06 - contact counts per day from TblContact.ContactStart (date only, so
-# P_Time_Start / P_Time_Finish have no effect). 05 = groups 53/77, 06 = all other groups.
+# 400 - P_MainOrg missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
+}
+
+###
+
+# Report 05 - contact counts per day by the claim teams (groups 53/77), from TblContact.ContactStart.
+# Same ISO 8601 request as Report 01, but only the date part is used (ContactStart holds dates only).
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport05
 Content-Type: application/json
 
 {
-  "p_Start": "01/01/2014",
-  "p_Finish": "12/31/2014"
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59"
 }
 
 ###
 
+# Report 06 - contact counts per day by creators in none of the groups 53/77 (claim, Report 05),
+# 79 (1212) or 68 (training). Same request as Report 05; only the date part is used.
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport06
 Content-Type: application/json
 
 {
-  "p_Start": "01/01/2014",
-  "p_Finish": "12/31/2014"
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59"
+}
+
+###
+
+# Report 07 - service requests of one service type. Same ISO 8601 date rules as Report 01;
+# P_Service (top-level TblCategory.Id, e.g. Q&A below) is required.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport07
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5"
+}
+
+###
+
+# 400 - P_Service missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport07
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
 }
 
 ###
