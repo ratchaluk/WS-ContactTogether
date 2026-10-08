@@ -15,11 +15,13 @@ no solution file and no test project (`FilesTest/` is a placeholder, not tests).
 dotnet build
 dotnet run                          # uses the "http" launch profile -> http://localhost:5018
 dotnet run --launch-profile https   # https://localhost:7066
-dotnet watch run                    # hot reload
+dotnet run watch                    # same as dotnet run (the app ignores "watch"); no hot reload
 ```
 
 Swagger UI (`/swagger`) is only mapped when `ASPNETCORE_ENVIRONMENT=Development`; both launch
-profiles set it.
+profiles set it. In Development, [Helper/SwaggerBrowserLauncher.cs](Helper/SwaggerBrowserLauncher.cs)
+logs the Swagger URL and opens it in the browser on startup. Turn that off with
+`Swagger:OpenBrowser=false` (e.g. `dotnet run -- --Swagger:OpenBrowser=false`).
 
 [ContactTogetherApi.http](ContactTogetherApi.http) holds runnable request samples (VS / VS Code REST
 clients). Its `login` request captures the token into `@token` for the requests after it; keep new
@@ -49,6 +51,14 @@ next scaffold overwrites the changes. Re-scaffold after a schema change:
 dotnet ef dbcontext scaffold "Name=ConnectionStrings:DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer `
   --context ApplicationDbContext --context-dir Data --output-dir Models --no-onconfiguring --force
 ```
+
+Keep both the `Name=` connection argument and `--no-onconfiguring`. Without them the scaffolder
+writes an `OnConfiguring` override into `ApplicationDbContext` that hard-codes the connection
+string, password included, and emits a `CS1030` `#warning`. That override runs after the options
+from `AddDbContext` in `Program.cs`, so it silently replaces the user-secrets connection string. It
+also puts the password into git. If it ever shows up, delete the whole `OnConfiguring` method
+before committing. `Program.cs` already configures the context, and nothing calls the
+parameterless constructor.
 
 There are no EF migrations and none should be added; the database is the source of truth.
 
@@ -91,12 +101,53 @@ these with free-form Thai messages.
   and `MessageResponse` for other errors. Because the schema has no FKs, these controllers check
   lookup ids (`GenderId`, `RoleId`, `AreaId`, …) against their tables in a `ValidateLookupsAsync`
   helper before inserting.
-- `ReportController`: `POST /Report/GetReport01`…`GetReport06`, each a large multi-join LINQ query
+- `ReportController`: `POST /Report/GetReport01`…`GetReport07`, each a large multi-join LINQ query
   over `TblService`. It is **anonymous at the moment** (`[Authorize]` is commented out). Its DTOs
   (`ServiceRequestReportRequest*`, `ServiceRequestReportDto`, …) live in
   [Dtos/RequestModel.cs](Dtos/RequestModel.cs) and [Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)
-  in the **global namespace**. Request dates are `P_Start`/`P_Finish` as `MM/dd/yyyy` plus optional
-  `P_Time_Start`/`P_Time_Finish` (`HH:mm:ss`).
+  in the **global namespace**. Every report takes `ServiceRequestReportDateTimeRequest` (04 and 07
+  take its subclasses `ServiceRequestReportRequestMainOrganization` and
+  `ServiceRequestReportRequestService`): `P_Start`/`P_Finish` as ISO 8601 Thai
+  local date-times, `yyyy-MM-ddTHH:mm:ss` (seconds optional, no offset or `Z`), parsed by
+  `TryBuildDateTimeRange`. It uses `InvariantCulture` and does no time-zone conversion, so the
+  server's locale and time zone do not affect it. The range includes the end value.
+  - 01–04 and 07 filter `TblService.Created` by the full date-time.
+  - 07 also requires `P_Service`, a top-level `TblCategory.Id` (Q&A, Claim, …), compared with
+    `TblService.CategoryId`. Those top-level categories point `RefId` at themselves.
+  - 04 also requires `P_MainOrg` and returns SRs whose organization is that main organization or
+    one of its direct sub-organizations (`org.Id` or `org2.Id`).
+  - 05/06 count contacts per day and use only the date part, because `TblContact.ContactStart`
+    holds dates only. 05 counts contacts whose creator is in a claim team (`RefGroupId` 53/77). 06
+    counts contacts whose creator is in none of 53/77/79/68. Both left-join a `DISTINCT` list of
+    employee ids rather than joining the keyless `TblEmployeeGroup`/`TblOrganizationGroup` rows
+    directly. An employee can sit in several groups, so the direct join counts a contact more than
+    once and can put it in both reports.
+
+#### Response envelope and status codes
+
+`ReportController` wraps every response in `_0BaseReturn` ([Helper/0BaseReturn.cs](Helper/0BaseReturn.cs)):
+`{ callAPIStatus, callAPIStatusMessage, result }`. The HTTP status carries the outcome, and the body
+has no status-code field. `callAPIStatus` is `true` only for 2xx. `callAPIStatusMessage` is Thai
+text that can be shown to users. Never put `ex.Message` in it. `[BaseReturnModelStateFilter]`
+([Helper/BaseReturnModelStateFilter.cs](Helper/BaseReturnModelStateFilter.cs)) turns the automatic
+`[ApiController]` 400 (malformed JSON, missing body) into a `_0BaseReturn` too. Apply it per
+controller rather than changing `InvalidModelStateResponseFactory`, because that would also change
+`ValidationProblem()` in the ProblemDetails-style controllers.
+
+| HTTP | When | `callAPIStatus` | `result` |
+|---|---|---|---|
+| 200 | Success, **including a search or report with no rows** | `true` | data, or `[]` |
+| 201 | A POST created a row | `true` | the created item |
+| 400 | Bad input: missing field, wrong format, start after finish, malformed JSON | `false` | `null` |
+| 401 | No token, an expired token, or a logged-out token | `false` | `null` |
+| 403 | Signed in but lacks the page right (`TblRolePage`) | `false` | `null` |
+| 404 | A specific resource by id does not exist (never for an empty report) | `false` | `null` |
+| 409 | Duplicate or conflicting data, e.g. a username that already exists | `false` | `null` |
+| 500 | Unexpected failure. Log it and answer `เกิดข้อผิดพลาดภายในระบบ` | `false` | `null` |
+
+401/403 currently come from JwtBearer with an empty body. To return `_0BaseReturn` for them, handle
+`OnChallenge`/`OnForbidden` in `JwtBearerEvents` when `[Authorize]` is turned on. A request the
+client cancels (`OperationCanceledException`) is not caught and gets no envelope.
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
