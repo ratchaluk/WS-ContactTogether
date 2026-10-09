@@ -13,8 +13,10 @@ public class ServiceRequestReportDateTimeRequest
 public class ServiceRequestReportRequestMainOrganization : ServiceRequestReportDateTimeRequest
 {
     // TblOrganization.Id ของหน่วยงานหลัก ได้ SR ของหน่วยงานหลักและทุกหน่วยงานย่อยใต้มัน
-    [DefaultValue("00D1DA8C956043D5AD9B38299566A7F0")]
+    [DefaultValue("00E071487E1343B987C548DEDAE71113")]
     public string? P_MainOrg { get; set; }
+    [DefaultValue("00E071487E1343B987C548DEDAE71267")]
+    public string? P_SubOrg { get; set; }
 }
 
 public class ServiceRequestReportRequestService : ServiceRequestReportDateTimeRequest

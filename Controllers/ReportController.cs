@@ -108,10 +108,12 @@ public class ReportController : ControllerBase
                     on sr.UpdatedBy equals emp3.Id into emp3Group
                 from emp3 in emp3Group.DefaultIfEmpty()
 
+               
+
                 where sr.IsEnable == "T"
                   && sr.Created >= start
                   && sr.Created <= finish
-
+                
                 orderby sr.Code
 
                 select new ServiceRequestReportDto
@@ -615,6 +617,7 @@ public class ReportController : ControllerBase
         // Ids are upper-case and the collation is case-sensitive.
         var mainOrgId = request.P_MainOrg.Trim().ToUpperInvariant();
 
+        var subOrgId =  request.P_SubOrg.Trim().ToUpperInvariant();
         // ============================================================
         // Query
         // ============================================================
@@ -686,7 +689,8 @@ public class ReportController : ControllerBase
 
                 // The SR's organization is the main organization itself or one of its sub-organizations.
                 where sr.IsEnable == "T"
-                    && (org.Id == mainOrgId || org2.Id == mainOrgId)
+                    
+                    && (org.Id == subOrgId && org2.Id == mainOrgId)
                     && sr.Created >= start
                     && sr.Created <= finish
 
@@ -810,6 +814,26 @@ public class ReportController : ControllerBase
         // ============================================================
         // Query
         // ============================================================
+         var targetCategories = new[]
+        {
+            "0168B738100C4CBAB9AA45906A200012", // จิตไม่ปกติ
+            "0168B738100C4CBAB9AA45906A200013", // เด็กโทรเล่น
+            "0168B738100C4CBAB9AA45906A200014", // เสียงเงียบ
+            "0168B738100C4CBAB9AA45906A200015", // โทรด่าหยาบคาย
+            "0168B738100C4CBAB9AA45906A200018", // น้ำท่วม
+            "0168B738100C4CBAB9AA45906A200002", // สัญญาณไม่ชัดเจน
+            "0168B738100C4CBAB9AA45906A200003", // สายหลุด
+            "0168B738100C4CBAB9AA45906A200016", // อื่น ๆ
+            "0168B738100C4CBAB9AA45906A200017", // The Pizza Company
+            "0168B738100C4CBAB9AA45906A200006", // ขอคำปรึกษาเจ้าหน้าที่
+            "0168B738100C4CBAB9AA45906A200007", // ระบายความเครียดด้านสังคม
+            "0168B738100C4CBAB9AA45906A200008", // ระบายความเครียดด้านเศรษฐกิจ
+            "0168B738100C4CBAB9AA45906A200009", // ระบายความเครียดด้านการเมือง
+            "0168B738100C4CBAB9AA45906A200010", // ระบายความเครียดด้านกฏหมาย
+            "0168B738100C4CBAB9AA45906A200011"  // ระบายความเครียดด้านทรัพยากรธรรมชาติ
+        };
+
+
 
         // Employees in the claim teams (TblOrganizationGroup.RefGroupId 53 or 77). Distinct, because an
         // employee can belong to more than one of these groups and must not count a contact twice.
@@ -825,15 +849,20 @@ public class ReportController : ControllerBase
             from c in _db.TblContacts
 
             // Left join keeps days that have contacts but none by the claim teams.
+            //join m in claimMembers
+            //    on c.CreatedBy equals m into mGroup
+            //from m in mGroup.DefaultIfEmpty()
+
             join m in claimMembers
-                on c.CreatedBy equals m into mGroup
-            from m in mGroup.DefaultIfEmpty()
+                on c.CreatedBy equals m
 
             where c.ContactStart >= startDay
                 && c.ContactStart < dayAfterFinish
+                //กรองเฉพาะสายที่อยู่ใน 15 หมวดหมู่นี้เท่านั้น
+                && targetCategories.Contains(c.CategoryId)
 
-            group new { c, m } by c.ContactStart!.Value.Date into g
-
+            //group new { c, m } by c.ContactStart!.Value.Date into g
+            group new { c, m } by DateOnly.FromDateTime(c.ContactStart!.Value) into g
             select new
             {
                 Contact_Start = g.Key,
@@ -956,6 +985,7 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Contact_Start)
                 .ToListAsync(cancellationToken);
 
+
             var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
             return Ok(_0BaseReturn.Success(result, message));
         }
@@ -993,6 +1023,26 @@ public class ReportController : ControllerBase
         // ============================================================
         // Query
         // ============================================================
+        
+         var targetCategoryIds = new[]
+        {
+            "0168B738100C4CBAB9AA45906A200012", // จิตไม่ปกติ
+            "0168B738100C4CBAB9AA45906A200013", // เด็กโทรเล่น
+            "0168B738100C4CBAB9AA45906A200014", // เสียงเงียบ
+            "0168B738100C4CBAB9AA45906A200015", // โทรด่าหยาบคาย
+            "0168B738100C4CBAB9AA45906A200018", // น้ำท่วม
+            "0168B738100C4CBAB9AA45906A200002", // สัญญาณไม่ชัดเจน
+            "0168B738100C4CBAB9AA45906A200003", // สายหลุด
+            "0168B738100C4CBAB9AA45906A200016", // อื่น ๆ
+            "0168B738100C4CBAB9AA45906A200017", // The Pizza Company
+            "0168B738100C4CBAB9AA45906A200006", // ขอคำปรึกษาเจ้าหน้าที่
+            "0168B738100C4CBAB9AA45906A200007", // ระบายความเครียดด้านสังคม
+            "0168B738100C4CBAB9AA45906A200008", // ระบายความเครียดด้านเศรษฐกิจ
+            "0168B738100C4CBAB9AA45906A200009", // ระบายความเครียดด้านการเมือง
+            "0168B738100C4CBAB9AA45906A200010", // ระบายความเครียดด้านกฏหมาย
+            "0168B738100C4CBAB9AA45906A200011"  // ระบายความเครียดด้านทรัพยากรธรรมชาติ
+        };
+
 
         // Employees in the teams this report leaves out: the claim teams counted by GetReport05
         // (RefGroupId 53, 77), 1212 (79) and training (68). A contact counts here only when its creator
@@ -1010,50 +1060,54 @@ public class ReportController : ControllerBase
         var query =
             from c in _db.TblContacts
 
-            join m in excludedMembers
-                on c.CreatedBy equals m into mGroup
-            from m in mGroup.DefaultIfEmpty()
+            //join m in excludedMembers
+            //    on c.CreatedBy equals m into mGroup
+            //from m in mGroup.DefaultIfEmpty()
 
             where c.ContactStart >= startDay
                 && c.ContactStart < dayAfterFinish
+                && !excludedMembers.Contains(c.CreatedBy)
+                && targetCategoryIds.Contains(c.CategoryId)
 
-            group new { c, m } by c.ContactStart!.Value.Date into g
+
+            group c by c.ContactStart!.Value.Date into g
+            orderby g.Key
 
             select new
             {
-                Contact_Start = g.Key,
+                 Contact_Start = DateOnly.FromDateTime(g.Key),
 
                 // ====================================================
                 // Kidding call
                 // ====================================================
 
                 // จิตไม่ปกติ
-                Insane = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200012")
-                          .Select(x => x.c.Id)
+                Insane = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200012")
+                          .Select(x => x.Id)
                           .Distinct()
                           .Count(),
 
                 // เด็กโทรเล่น
-                Prankcall = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200013")
-                             .Select(x => x.c.Id)
+                Prankcall = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200013")
+                             .Select(x => x.Id)
                              .Distinct()
                              .Count(),
 
                 // เสียงเงียบ
-                Silence = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200014")
-                           .Select(x => x.c.Id)
+                Silence = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200014")
+                           .Select(x => x.Id)
                            .Distinct()
                            .Count(),
 
                 // โทรด่าหยาบคาย
-                Rude = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200015")
-                        .Select(x => x.c.Id)
+                Rude = g.Where(x =>x.CategoryId == "0168B738100C4CBAB9AA45906A200015")
+                        .Select(x => x.Id)
                         .Distinct()
                         .Count(),   
 
                 // น้ำท่วม
-                Flood = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200018")
-                         .Select(x => x.c.Id)
+                Flood = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200018")
+                         .Select(x => x.Id)
                          .Distinct()
                          .Count(),
 
@@ -1061,8 +1115,8 @@ public class ReportController : ControllerBase
                 // สัญญาณไม่ชัดเจน
                 // ====================================================
 
-                Badline = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200002")
-                           .Select(x => x.c.Id)
+                Badline = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200002")
+                           .Select(x => x.Id)
                            .Distinct()
                            .Count(),
 
@@ -1070,8 +1124,8 @@ public class ReportController : ControllerBase
                 // สายหลุด
                 // ====================================================
 
-                CutOff = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200003")
-                          .Select(x => x.c.Id)
+                CutOff = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200003")
+                          .Select(x => x.Id)
                           .Distinct()
                           .Count(),
 
@@ -1080,14 +1134,14 @@ public class ReportController : ControllerBase
                 // ====================================================
 
                 // อื่น ๆ
-                Other = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200016")
-                         .Select(x => x.c.Id)
+                Other = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200016")
+                         .Select(x => x.Id)
                          .Distinct()
                          .Count(),
 
                 // The Pizza Company
-                The_Pizza_Company = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200017")
-                                      .Select(x => x.c.Id)
+                The_Pizza_Company = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200017")
+                                      .Select(x => x.Id)
                                       .Distinct()
                                       .Count(),
 
@@ -1096,38 +1150,38 @@ public class ReportController : ControllerBase
                 // ====================================================
 
                 // ขอคำปรึกษาเจ้าหน้าที่
-                Request = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200006")
-                           .Select(x => x.c.Id)
+                Request = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200006")
+                           .Select(x => x.Id)
                            .Distinct()
                            .Count(),
 
                 // ระบายความเครียดด้านสังคม
-                RelievingSocial = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200007")
-                                    .Select(x => x.c.Id)
+                RelievingSocial = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200007")
+                                    .Select(x => x.Id)
                                     .Distinct()
                                     .Count(),
 
                 // ระบายความเครียดด้านเศรษฐกิจ
-                RelievingEconomic = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200008")
-                                       .Select(x => x.c.Id)
+                RelievingEconomic = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200008")
+                                       .Select(x => x.Id)
                                        .Distinct()
                                        .Count(),
 
                 // ระบายความเครียดด้านการเมือง
-                RelievingPolitical = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200009")
-                                        .Select(x => x.c.Id)
+                RelievingPolitical = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200009")
+                                        .Select(x => x.Id)
                                         .Distinct()
                                         .Count(),
 
                 // ระบายความเครียดด้านกฏหมาย
-                RelievingLegal = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200010")
-                                   .Select(x => x.c.Id)
+                RelievingLegal = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200010")
+                                   .Select(x => x.Id)
                                    .Distinct()
                                    .Count(),
 
                 // ระบายความเครียดด้านทรัพยากรธรรมชาติ
-                RelievingNatural = g.Where(x => x.m == null && x.c.CategoryId == "0168B738100C4CBAB9AA45906A200011")
-                                     .Select(x => x.c.Id)
+                RelievingNatural = g.Where(x => x.CategoryId == "0168B738100C4CBAB9AA45906A200011")
+                                     .Select(x => x.Id)
                                      .Distinct()
                                      .Count(),
             };
