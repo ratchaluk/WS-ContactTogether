@@ -805,7 +805,7 @@ public class ReportController : ControllerBase
             return BadRequest(_0BaseReturn.Fail(error));
         }
 
-        // The report counts whole days (TblContact.ContactStart holds dates only), so the time part
+               // The report counts whole days (TblContact.ContactStart holds dates only), so the time part
         // of P_Start / P_Finish is ignored.
         var startDay = start.Date;
         var finishDay = finish.Date;
@@ -814,7 +814,7 @@ public class ReportController : ControllerBase
         // ============================================================
         // Query
         // ============================================================
-                // กรองเฉพาะ cat.Ref_ID ทั้ง 4 หมวดหลักตาม SQL
+        // กรองเฉพาะ cat.Ref_ID ทั้ง 4 หมวดหลักตาม SQL
         var targetRefCategories = new[]
         {
             "0168B738100C4CBAB9AA45906A100002",
@@ -829,63 +829,49 @@ public class ReportController : ControllerBase
             join uug in _db.TblEmployeeGroups
                 on emp.Id equals uug.EmployeeId
             where EF.Functions.Like(emp.Position, "%Claim%")
-                && uug.GroupId != "39" // *หมายเหตุ: ถ้า GroupId เป็น int ให้แก้เป็น != 39
+             //   && uug.GroupId != "39" // *ถ้าใน Entity GroupId เป็น int ให้แก้เป็น != 39
             select emp.Id)
             .Distinct();
 
         var query =
             from c in _db.TblContacts
-
-            // JOIN tbl_category cat ON c1.Category_ID = cat.ID
             join cat in _db.TblCategories
                 on c.CategoryId equals cat.Id
-
-            // Left join keeps days that have contacts but none by the claim teams.
-            //join m in claimMembers
-            //    on c.CreatedBy equals m into mGroup
-            //from m in mGroup.DefaultIfEmpty()
-
             join m in claimMembers
                 on c.CreatedBy equals m
-
             where c.ContactStart >= startDay
                 && c.ContactStart < dayAfterFinish
-                // cat.Ref_ID IN (...)
                 && targetRefCategories.Contains(cat.RefId)
-
-            //group new { c, cat, m } by c.ContactStart!.Value.Date into g
-            group new { c, cat, m } by DateOnly.FromDateTime(c.ContactStart!.Value) into g
+            group new { c, cat } by c.ContactStart!.Value.Date into g
             select new
             {
                 contact_date = g.Key,
-                bad_signal = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200002").Select(x => x.c.Id).Distinct().Count(),
-                kidding_abnormal = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200012").Select(x => x.c.Id).Distinct().Count(),
-                kidding_child = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200013").Select(x => x.c.Id).Distinct().Count(),
-                kidding_rude = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200015").Select(x => x.c.Id).Distinct().Count(),
-                kidding_silent = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200014").Select(x => x.c.Id).Distinct().Count(),
-                flood = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200018").Select(x => x.c.Id).Distinct().Count(),
-                lost_connection = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200003").Select(x => x.c.Id).Distinct().Count(),
-                wrong_number_pizza = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200017").Select(x => x.c.Id).Distinct().Count(),
-                wrong_number_other = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200016").Select(x => x.c.Id).Distinct().Count(),
-                stress_social = g.Where(x => x.m != null && x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%สังคม%")).Select(x => x.c.Id).Distinct().Count(),
-                stress_economic = g.Where(x => x.m != null && x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%เศรษฐกิจ%")).Select(x => x.c.Id).Distinct().Count(),
-                stress_political = g.Where(x => x.m != null && x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%การเมือง%")).Select(x => x.c.Id).Distinct().Count(),
-                stress_legal = g.Where(x => x.m != null && x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%กฎหมาย%")).Select(x => x.c.Id).Distinct().Count(),
-                stress_natural_resources = g.Where(x => x.m != null && x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%ทรัพยากร%")).Select(x => x.c.Id).Distinct().Count(),
-                consult_officer = g.Where(x => x.m != null && x.cat.Id == "0168B738100C4CBAB9AA45906A200006").Select(x => x.c.Id).Distinct().Count(),
-                total = g.Where(x => x.m != null).Select(x => x.c.Id).Distinct().Count()
+                bad_signal = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200002"),
+                kidding_abnormal = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200012"),
+                kidding_child = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200013"),
+                kidding_rude = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200015"),
+                kidding_silent = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200014"),
+                flood = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200018"),
+                lost_connection = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200003"),
+                wrong_number_pizza = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200017"),
+                wrong_number_other = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200016"),
+                stress_social = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%สังคม%")),
+                stress_economic = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%เศรษฐกิจ%")),
+                stress_political = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%การเมือง%")),
+                stress_legal = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%กฎหมาย%")),
+                stress_natural_resources = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005" && EF.Functions.Like(x.cat.NameTh, "%ทรัพยากร%")),
+                consult_officer = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200006"),
+                total = g.Count()
             };
+
         // ============================================================
         // Execute
         // ============================================================
-
         try
         {
             var result = await query
                 .OrderBy(x => x.contact_date)
                 .ToListAsync(cancellationToken);
-
-
 
             var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
             return Ok(_0BaseReturn.Success(result, message));
@@ -917,127 +903,107 @@ public class ReportController : ControllerBase
 
         // The report counts whole days (TblContact.ContactStart holds dates only), so the time part
         // of P_Start / P_Finish is ignored.
-        var startDay = start.Date;
+                var startDay = start.Date;
         var finishDay = finish.Date;
         var dayAfterFinish = finishDay.AddDays(1);
 
         // ============================================================
         // Query
         // ============================================================
-        
         var targetRefCategories = new[]
         {
-        "0168B738100C4CBAB9AA45906A100002",
-        "0168B738100C4CBAB9AA45906A200005",
-        "0168B738100C4CBAB9AA45906A200001",
-        "0168B738100C4CBAB9AA45906A200004"
+            "0168B738100C4CBAB9AA45906A100002",
+            "0168B738100C4CBAB9AA45906A200005",
+            "0168B738100C4CBAB9AA45906A200001",
+            "0168B738100C4CBAB9AA45906A200004"
         };
+
         var query =
             from c in _db.TblContacts
             // JOIN tbl_category cat ON c1.Category_ID = cat.ID
             join cat in _db.TblCategories
                 on c.CategoryId equals cat.Id
-            // JOIN tbl_employee emp1 ON c1.Created_By = emp1.ID
+            // LEFT JOIN tbl_employee emp1 ON c1.Created_By = emp1.ID
             join emp in _db.TblEmployees
-                on c.CreatedBy equals emp.Id
+                on c.CreatedBy equals emp.Id into empGroup
+            from emp in empGroup.DefaultIfEmpty()
             where c.ContactStart >= startDay
                 && c.ContactStart < dayAfterFinish
-                // emp1.Position LIKE '%Claim%'
-                && EF.Functions.Like(emp.Position, "%Claim%")
+                // IF(emp1.Position LIKE '%Claim%', 1, 2) = 2 (ตัด Claim ออก รวมกรณี NULL)
+                && (emp.Position == null || !EF.Functions.Like(emp.Position, "%Claim%"))
                 // cat.Ref_ID IN (...)
                 && targetRefCategories.Contains(cat.RefId)
                 // EXISTS (SELECT 1 FROM users_user_group g WHERE g.user_id = c1.Created_By AND g.group_id <> 39)
                 && _db.TblEmployeeGroups.Any(g => g.EmployeeId == c.CreatedBy && g.GroupId != "39")
-            // GROUP BY contact_date
-            group new { c, cat } by DateOnly.FromDateTime(c.ContactStart!.Value) into g
-        select new{
-            Contact_Date = g.Key,
-            // bad_signal (สัญญาณไม่ชัดเจน)
-            Bad_Signal = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200002")
-                        .Select(x => x.c.Id).Distinct().Count(),
-            // kidding_abnormal (จิตไม่ปกติ)
-            Kidding_Abnormal = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200012")
-                                .Select(x => x.c.Id).Distinct().Count(),
-            // kidding_child (เด็กโทรเล่น)
-            Kidding_Child = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200013")
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // kidding_rude (โทรด่าหยาบคาย)
-            Kidding_Rude = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200015")
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // kidding_silent (เสียงเงียบ)
-            Kidding_Silent = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200014")
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // flood (น้ำท่วม)
-            Flood = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200018")
-                    .Select(x => x.c.Id).Distinct().Count(),
-            // lost_connection (สายหลุด)
-            Lost_Connection = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200003")
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // wrong_number_pizza (The Pizza Company)
-            Wrong_Number_Pizza = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200017")
-                                .Select(x => x.c.Id).Distinct().Count(),
-            // wrong_number_other (อื่น ๆ)
-            Wrong_Number_Other = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200016")
-                                .Select(x => x.c.Id).Distinct().Count(),
-            // stress_social (ระบายความเครียดด้านสังคม)
-            Stress_Social = g.Where(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
-                                        && EF.Functions.Like(x.cat.NameTh, "%สังคม%"))
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // stress_economic (ระบายความเครียดด้านเศรษฐกิจ)
-            Stress_Economic = g.Where(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
-                                        && EF.Functions.Like(x.cat.NameTh, "%เศรษฐกิจ%"))
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // stress_political (ระบายความเครียดด้านการเมือง)
-            Stress_Political = g.Where(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
-                                            && EF.Functions.Like(x.cat.NameTh, "%การเมือง%"))
-                                .Select(x => x.c.Id).Distinct().Count(),
-            // stress_legal (ระบายความเครียดด้านกฎหมาย)
-            Stress_Legal = g.Where(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
-                                        && EF.Functions.Like(x.cat.NameTh, "%กฎหมาย%"))
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // stress_natural_resources (ระบายความเครียดด้านทรัพยากรธรรมชาติ)
-            Stress_Natural_Resources = g.Where(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
-                                                && EF.Functions.Like(x.cat.NameTh, "%ทรัพยากร%"))
-                                        .Select(x => x.c.Id).Distinct().Count(),
-            // consult_officer (ขอคำปรึกษาเจ้าหน้าที่)
-            Consult_Officer = g.Where(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200006")
-                            .Select(x => x.c.Id).Distinct().Count(),
-            // total
-            Total = g.Select(x => x.c.Id).Distinct().Count()
-        };
+            // GROUP BY contact_date (ใช้ .Date เพื่อให้ EF Core แปลเป็น SQL ได้)
+            group new { c, cat } by c.ContactStart!.Value.Date into g
+            select new
+            {
+                Contact_Date = g.Key,
+                // 1. Kidding Call
+                Kidding_Abnormal = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200012"),
+                Kidding_Child = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200013"),
+                Kidding_Rude = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200015"),
+                Kidding_Silent = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200014"),
+                Flood = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200018"),
+                Kidding_Total = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200001"),
+                // 2. Bad Signal / 3. Lost Connection
+                Bad_Signal = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200002"),
+                Lost_Connection = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200003"),
+                // 4. Wrong Number
+                Wrong_Number_Pizza = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200017"),
+                Wrong_Number_Other = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200016"),
+                // 5. Out of Scope
+                Consult_Officer = g.Count(x => x.cat.Id == "0168B738100C4CBAB9AA45906A200006"),
+                Stress_Social = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
+                                            && EF.Functions.Like(x.cat.NameTh, "%สังคม%")),
+                Stress_Economic = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
+                                            && EF.Functions.Like(x.cat.NameTh, "%เศรษฐกิจ%")),
+                Stress_Political = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
+                                            && EF.Functions.Like(x.cat.NameTh, "%การเมือง%")),
+                Stress_Legal = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
+                                            && EF.Functions.Like(x.cat.NameTh, "%กฎหมาย%")),
+                Stress_Natural_Resources = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"
+                                            && EF.Functions.Like(x.cat.NameTh, "%ทรัพยากร%")),
+                Out_Of_Scope_Total = g.Count(x => x.cat.RefId == "0168B738100C4CBAB9AA45906A200005"),
+                // รวม Nonservice
+                Total = g.Count()
+            };
+
         // ============================================================
         // Execute
         // ============================================================
-
         try
         {
-           var result = await query
-            .OrderBy(x => x.Contact_Date)
-            .ToListAsync(cancellationToken);
+            var rawResult = await query
+                .OrderBy(x => x.Contact_Date)
+                .ToListAsync(cancellationToken);
 
-           var grandTotal = new
+            // แปลง Contact_Date เป็น DateOnly? หลังจากดึงข้อมูลมาแล้ว
+            var result = rawResult.Select(x => new
             {
-                Contact_Date = (DateOnly?)null,
-                Bad_Signal = result.Sum(x => x.Bad_Signal),
-                Kidding_Abnormal = result.Sum(x => x.Kidding_Abnormal),
-                Kidding_Child = result.Sum(x => x.Kidding_Child),
-                Kidding_Rude = result.Sum(x => x.Kidding_Rude),
-                Kidding_Silent = result.Sum(x => x.Kidding_Silent),
-                Flood = result.Sum(x => x.Flood),
-                Lost_Connection = result.Sum(x => x.Lost_Connection),
-                Wrong_Number_Pizza = result.Sum(x => x.Wrong_Number_Pizza),
-                Wrong_Number_Other = result.Sum(x => x.Wrong_Number_Other),
-                Stress_Social = result.Sum(x => x.Stress_Social),
-                Stress_Economic = result.Sum(x => x.Stress_Economic),
-                Stress_Political = result.Sum(x => x.Stress_Political),
-                Stress_Legal = result.Sum(x => x.Stress_Legal),
-                Stress_Natural_Resources = result.Sum(x => x.Stress_Natural_Resources),
-                Consult_Officer = result.Sum(x => x.Consult_Officer),
-                Total = result.Sum(x => x.Total)
-            };
+                Contact_Date = (DateOnly?)DateOnly.FromDateTime(x.Contact_Date),
+                x.Kidding_Abnormal,
+                x.Kidding_Child,
+                x.Kidding_Rude,
+                x.Kidding_Silent,
+                x.Flood,
+                x.Kidding_Total,
+                x.Bad_Signal,
+                x.Lost_Connection,
+                x.Wrong_Number_Pizza,
+                x.Wrong_Number_Other,
+                x.Consult_Officer,
+                x.Stress_Social,
+                x.Stress_Economic,
+                x.Stress_Political,
+                x.Stress_Legal,
+                x.Stress_Natural_Resources,
+                x.Out_Of_Scope_Total,
+                x.Total
+            }).ToList();
 
-
-
+           
             var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
             return Ok(_0BaseReturn.Success(result, message));
         }
