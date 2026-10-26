@@ -122,8 +122,12 @@ public class ReportController : ControllerBase
                     Summary = sr.Summary,
                     Detail = sr.Detail,
                     SrReferenceLink = sr.ServiceReferenceLink,
-                    SrOpened = sr.DateOpened,
-                    SrClosed = sr.DateClosed,
+                   SrOpened = sr.DateOpened.HasValue
+                        ? sr.DateOpened.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
+                    SrClosed = sr.DateClosed.HasValue
+                        ? sr.DateClosed.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
                     SrRequireCallBack = sr.CallBack,
                     Created = sr.Created,
 
@@ -320,8 +324,12 @@ public class ReportController : ControllerBase
                     Summary = sr.Summary,
                     Detail = sr.Detail,
                     SrReferenceLink = sr.ServiceReferenceLink,
-                    SrOpened = sr.DateOpened,
-                    SrClosed = sr.DateClosed,
+                   SrOpened = sr.DateOpened.HasValue
+                        ? sr.DateOpened.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
+                    SrClosed = sr.DateClosed.HasValue
+                        ? sr.DateClosed.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
                     SrRequireCallBack = sr.CallBack,
                     Created = sr.Created,
 
@@ -506,8 +514,12 @@ public class ReportController : ControllerBase
                     Summary = sr.Summary,
                     Detail = sr.Detail,
                     SrReferenceLink = sr.ServiceReferenceLink,
-                    SrOpened = sr.DateOpened,
-                    SrClosed = sr.DateClosed,
+                    SrOpened = sr.DateOpened.HasValue
+                        ? sr.DateOpened.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
+                    SrClosed = sr.DateClosed.HasValue
+                        ? sr.DateClosed.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
                     SrRequireCallBack = sr.CallBack,
                     Created = sr.Created,
 
@@ -701,8 +713,12 @@ public class ReportController : ControllerBase
                     Summary = sr.Summary,
                     Detail = sr.Detail,
                     SrReferenceLink = sr.ServiceReferenceLink,
-                    SrOpened = sr.DateOpened,
-                    SrClosed = sr.DateClosed,
+                   SrOpened = sr.DateOpened.HasValue
+                        ? sr.DateOpened.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
+                    SrClosed = sr.DateClosed.HasValue
+                        ? sr.DateClosed.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
                     SrRequireCallBack = sr.CallBack,
                     Created = sr.Created,
 
@@ -1121,8 +1137,12 @@ public class ReportController : ControllerBase
                     Summary = sr.Summary,
                     Detail = sr.Detail,
                     SrReferenceLink = sr.ServiceReferenceLink,
-                    SrOpened = sr.DateOpened,
-                    SrClosed = sr.DateClosed,
+                    SrOpened = sr.DateOpened.HasValue
+                        ? sr.DateOpened.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
+                    SrClosed = sr.DateClosed.HasValue
+                        ? sr.DateClosed.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+                        : "",
                     SrRequireCallBack = sr.CallBack,
                     Created = sr.Created,
 

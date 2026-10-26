@@ -15,9 +15,9 @@ public partial class TblService
 
     public string? OwnerId { get; set; }
 
-    public string? DateOpened { get; set; }
+    public DateTime? DateOpened { get; set; }
 
-    public string? DateClosed { get; set; }
+    public DateTime? DateClosed { get; set; }
 
     public string? ChannelIncomingId { get; set; }
 
