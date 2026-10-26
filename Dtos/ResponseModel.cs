@@ -1,3 +1,30 @@
+using System.Text.Json.Serialization;
+
+/// <summary>
+/// Paged response envelope per APICOREPRINCIPLES.md: <c>{ status, message, data, meta.pagination }</c>.
+/// The pagination keys are snake_case by spec, so they need explicit <see cref="JsonPropertyNameAttribute"/>.
+/// </summary>
+public class PagedEnvelope<T>
+{
+    [JsonPropertyName("status")] public string Status { get; set; } = "success";
+    [JsonPropertyName("message")] public string Message { get; set; } = string.Empty;
+    [JsonPropertyName("data")] public IEnumerable<T> Data { get; set; } = Array.Empty<T>();
+    [JsonPropertyName("meta")] public PagedMeta Meta { get; set; } = new();
+}
+
+public class PagedMeta
+{
+    [JsonPropertyName("pagination")] public PaginationMeta Pagination { get; set; } = new();
+}
+
+public class PaginationMeta
+{
+    [JsonPropertyName("current_page")] public int CurrentPage { get; set; }
+    [JsonPropertyName("per_page")] public int PerPage { get; set; }
+    [JsonPropertyName("total")] public int Total { get; set; }
+    [JsonPropertyName("total_pages")] public int TotalPages { get; set; }
+}
+
 public class ServiceRequestReportDto
 {
     public string? Code { get; set; }

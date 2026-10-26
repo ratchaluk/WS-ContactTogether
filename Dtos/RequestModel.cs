@@ -24,4 +24,12 @@ public class ServiceRequestReportRequestService : ServiceRequestReportDateTimeRe
     // TblCategory.Id ของประเภทบริการระดับบนสุด (Q&A, Claim, Literature, Contact Info, …) เทียบกับ TblService.CategoryId
     [DefaultValue("0168B738100C4CBAB9AA45906AD4D8E5")]
     public string? P_Service { get; set; }
+
+    // แบ่งหน้า: หน้าเริ่มที่ 1
+    [DefaultValue(1)]
+    public int PageNumber { get; set; } = 1;
+
+    // จำนวนรายการต่อหน้า
+    [DefaultValue(20)]
+    public int PageSize { get; set; } = 20;
 }

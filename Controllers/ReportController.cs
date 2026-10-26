@@ -12,6 +12,9 @@ namespace ContactTogetherApi.Controllers;
 //[Authorize]
 public class ReportController : ControllerBase
 {
+    /// <summary>Upper bound on <c>PageSize</c> so a single page cannot pull the whole table.</summary>
+    private const int MaxPageSize = 200;
+
     private readonly ApplicationDbContext _db;
     private readonly ILogger<ReportController> _logger;
 
@@ -1034,7 +1037,7 @@ public class ReportController : ControllerBase
 
 
     [HttpPost("GetReport07")]
-    [ProducesResponseType(typeof(IEnumerable<ServiceRequestReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<ServiceRequestReportDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport07(
@@ -1056,12 +1059,27 @@ public class ReportController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
         // Ids are upper-case and the collation is case-sensitive.
         var serviceId = request.P_Service.Trim().ToUpperInvariant();
 
         try
         {
-            var result = await (
+            var baseQuery = (
                 from sr in _db.TblServices.AsNoTracking()
 
                 join st in _db.TblStatuses.AsNoTracking()
@@ -1131,8 +1149,6 @@ public class ReportController : ControllerBase
                   && sr.Created >= start
                   && sr.Created <= finish
 
-                orderby sr.Code
-
                 select new ServiceRequestReportDto
                 {
                     Code = sr.Code,
@@ -1183,10 +1199,40 @@ public class ReportController : ControllerBase
 
                     Remark = sr.Remark
                 })
-                .Distinct()
-                .ToListAsync(cancellationToken);
+                .Distinct();
 
-            return Ok(result);
+            // EF Core 10 cannot translate Count()/OFFSET over a Distinct() of this projection (it has
+            // constant/computed members and throws in the shaper). The proven .Distinct().ToListAsync()
+            // shape works, so materialise it and page in memory. DB cost matches the pre-paging
+            // behaviour; only the response payload is paged.
+            var allRows = await baseQuery.ToListAsync(cancellationToken);
+
+            var total = allRows.Count;
+
+            var data = allRows
+                .OrderBy(x => x.Code)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<ServiceRequestReportDto>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

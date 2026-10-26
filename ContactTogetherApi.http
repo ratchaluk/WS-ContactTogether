@@ -214,14 +214,17 @@ Content-Type: application/json
 ###
 
 # Report 07 - service requests of one service type. Same ISO 8601 date rules as Report 01;
-# P_Service (top-level TblCategory.Id, e.g. Q&A below) is required.
+# P_Service (top-level TblCategory.Id, e.g. Q&A below) is required. Paged: pageNumber (>=1) and
+# pageSize (1..200) default to 1 and 20. The 200 response is a { status, message, data, meta.pagination } envelope.
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport07
 Content-Type: application/json
 
 {
   "p_Start": "2026-01-01T00:00:00",
   "p_Finish": "2026-12-31T23:59:59",
-  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5"
+  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5",
+  "pageNumber": 1,
+  "pageSize": 20
 }
 
 ###
