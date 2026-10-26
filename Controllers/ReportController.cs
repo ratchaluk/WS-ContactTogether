@@ -1,6 +1,6 @@
 using System.Globalization;
 using ContactTogetherApi.Data;
-using ContactTogetherApi.Helper;
+using ContactTogetherApi.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +9,6 @@ namespace ContactTogetherApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-[BaseReturnModelStateFilter]
 //[Authorize]
 public class ReportController : ControllerBase
 {
@@ -24,9 +23,9 @@ public class ReportController : ControllerBase
 
 
     [HttpPost("GetReport01")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(IEnumerable<ServiceRequestReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport01(
         [FromBody] ServiceRequestReportDateTimeRequest request,
         CancellationToken cancellationToken)
@@ -36,7 +35,8 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         try
@@ -165,15 +165,14 @@ public class ReportController : ControllerBase
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "GetReport01 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
@@ -222,9 +221,9 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport02")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport2(
         [FromBody] ServiceRequestReportDateTimeRequest request,
         CancellationToken cancellationToken)
@@ -234,7 +233,8 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         _logger.LogInformation("GetReport02 range: {Start} - {Finish}", start, finish);
@@ -395,22 +395,21 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "GetReport02 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
     [HttpPost("GetReport03")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport3(
         [FromBody] ServiceRequestReportDateTimeRequest request,
         CancellationToken cancellationToken)
@@ -420,7 +419,8 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         // ============================================================
@@ -581,22 +581,21 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "GetReport03 failed for {Start} - {Finish}.", start, finish);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
     [HttpPost("GetReport04")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport4(
         [FromBody] ServiceRequestReportRequestMainOrganization request,
         CancellationToken cancellationToken)
@@ -606,12 +605,14 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         if (string.IsNullOrWhiteSpace(request.P_MainOrg))
         {
-            return BadRequest(_0BaseReturn.Fail("กรุณาระบุ P_MainOrg"));
+            ModelState.AddModelError(nameof(request.P_MainOrg), "กรุณาระบุ P_MainOrg");
+            return ValidationProblem(ModelState);
         }
 
         // Ids are upper-case and the collation is case-sensitive.
@@ -776,8 +777,7 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -785,14 +785,14 @@ public class ReportController : ControllerBase
                 ex, "GetReport04 failed for {Start} - {Finish}, org {MainOrg}.", start, finish, mainOrgId);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
     [HttpPost("GetReport05")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport5(
         [FromBody] ServiceRequestReportDateTimeRequest request,
         CancellationToken cancellationToken)
@@ -802,7 +802,8 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
                // The report counts whole days (TblContact.ContactStart holds dates only), so the time part
@@ -873,22 +874,21 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.contact_date)
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "GetReport05 failed for {Start} - {Finish}.", startDay, finishDay);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
     [HttpPost("GetReport06")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport6(
         [FromBody] ServiceRequestReportDateTimeRequest request,
         CancellationToken cancellationToken)
@@ -898,7 +898,8 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         // The report counts whole days (TblContact.ContactStart holds dates only), so the time part
@@ -1004,23 +1005,22 @@ public class ReportController : ControllerBase
             }).ToList();
 
            
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "GetReport06 failed for {Start} - {Finish}.", startDay, finishDay);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
 
     [HttpPost("GetReport07")]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(_0BaseReturn), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(IEnumerable<ServiceRequestReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport07(
         [FromBody] ServiceRequestReportRequestService request,
         CancellationToken cancellationToken)
@@ -1030,12 +1030,14 @@ public class ReportController : ControllerBase
         // -------------------------
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
-            return BadRequest(_0BaseReturn.Fail(error));
+            ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
         }
 
         if (string.IsNullOrWhiteSpace(request.P_Service))
         {
-            return BadRequest(_0BaseReturn.Fail("กรุณาระบุ P_Service"));
+            ModelState.AddModelError(nameof(request.P_Service), "กรุณาระบุ P_Service");
+            return ValidationProblem(ModelState);
         }
 
         // Ids are upper-case and the collation is case-sensitive.
@@ -1164,8 +1166,7 @@ public class ReportController : ControllerBase
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            var message = result.Count == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {result.Count} รายการ";
-            return Ok(_0BaseReturn.Success(result, message));
+            return Ok(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1173,7 +1174,7 @@ public class ReportController : ControllerBase
                 ex, "GetReport07 failed for {Start} - {Finish}, service {Service}.", start, finish, serviceId);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
-                _0BaseReturn.Fail("เกิดข้อผิดพลาดภายในระบบ"));
+                new MessageResponse(StatusCodes.Status500InternalServerError, "เกิดข้อผิดพลาดภายในระบบ"));
         }
     }
 
