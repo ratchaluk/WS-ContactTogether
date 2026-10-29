@@ -26,11 +26,11 @@ public class ReportController : ControllerBase
 
 
     [HttpPost("GetReport01")]
-    [ProducesResponseType(typeof(IEnumerable<ServiceRequestReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<ServiceRequestReportDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport01(
-        [FromBody] ServiceRequestReportDateTimeRequest request,
+        [FromBody] ServiceRequestReportDateTimePagedRequest request,
         CancellationToken cancellationToken)
     {
         // -------------------------
@@ -39,6 +39,21 @@ public class ReportController : ControllerBase
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
             ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -172,7 +187,31 @@ public class ReportController : ControllerBase
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            return Ok(result);
+            var total = result.Count;
+
+            var data = result
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<ServiceRequestReportDto>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -228,11 +267,11 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport02")]
-    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<SrCallbackResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport2(
-        [FromBody] ServiceRequestReportDateTimeRequest request,
+        [FromBody] ServiceRequestReportDateTimePagedRequest request,
         CancellationToken cancellationToken)
     {
         // -------------------------
@@ -241,6 +280,21 @@ public class ReportController : ControllerBase
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
             ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -406,7 +460,31 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            return Ok(result);
+            var total = result.Count;
+
+            var data = result
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<SrCallbackResponse>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -418,11 +496,11 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport03")]
-    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<SrCallbackResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport3(
-        [FromBody] ServiceRequestReportDateTimeRequest request,
+        [FromBody] ServiceRequestReportDateTimePagedRequest request,
         CancellationToken cancellationToken)
     {
         // -------------------------
@@ -431,6 +509,21 @@ public class ReportController : ControllerBase
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
             ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -596,7 +689,31 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            return Ok(result);
+            var total = result.Count;
+
+            var data = result
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<SrCallbackResponse>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -608,7 +725,7 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport04")]
-    [ProducesResponseType(typeof(IEnumerable<SrCallbackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<SrCallbackResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport4(
@@ -627,6 +744,21 @@ public class ReportController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.P_MainOrg))
         {
             ModelState.AddModelError(nameof(request.P_MainOrg), "กรุณาระบุ P_MainOrg");
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -796,7 +928,31 @@ public class ReportController : ControllerBase
                 .OrderBy(x => x.Code)
                 .ToListAsync(cancellationToken);
 
-            return Ok(result);
+            var total = result.Count;
+
+            var data = result
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<SrCallbackResponse>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -809,11 +965,11 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport05")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<ClaimContactDailyReportDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport5(
-        [FromBody] ServiceRequestReportDateTimeRequest request,
+        [FromBody] ServiceRequestReportDateTimePagedRequest request,
         CancellationToken cancellationToken)
     {
         // -------------------------
@@ -822,6 +978,21 @@ public class ReportController : ControllerBase
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
             ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -889,11 +1060,57 @@ public class ReportController : ControllerBase
         // ============================================================
         try
         {
-            var result = await query
+            var rawResult = await query
                 .OrderBy(x => x.contact_date)
                 .ToListAsync(cancellationToken);
 
-            return Ok(result);
+            var allRows = rawResult.Select(x => new ClaimContactDailyReportDto
+            {
+                Contact_Date = x.contact_date,
+                Bad_Signal = x.bad_signal,
+                Kidding_Abnormal = x.kidding_abnormal,
+                Kidding_Child = x.kidding_child,
+                Kidding_Rude = x.kidding_rude,
+                Kidding_Silent = x.kidding_silent,
+                Flood = x.flood,
+                Lost_Connection = x.lost_connection,
+                Wrong_Number_Pizza = x.wrong_number_pizza,
+                Wrong_Number_Other = x.wrong_number_other,
+                Stress_Social = x.stress_social,
+                Stress_Economic = x.stress_economic,
+                Stress_Political = x.stress_political,
+                Stress_Legal = x.stress_legal,
+                Stress_Natural_Resources = x.stress_natural_resources,
+                Consult_Officer = x.consult_officer,
+                Total = x.total
+            }).ToList();
+
+            var total = allRows.Count;
+
+            var data = allRows
+                .OrderBy(x => x.Contact_Date)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<ClaimContactDailyReportDto>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -905,11 +1122,11 @@ public class ReportController : ControllerBase
     }
 
     [HttpPost("GetReport06")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<NonServiceContactDailyReportDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReport6(
-        [FromBody] ServiceRequestReportDateTimeRequest request,
+        [FromBody] ServiceRequestReportDateTimePagedRequest request,
         CancellationToken cancellationToken)
     {
         // -------------------------
@@ -918,6 +1135,21 @@ public class ReportController : ControllerBase
         if (!TryBuildDateTimeRange(request, out var start, out var finish, out var error))
         {
             ModelState.AddModelError(nameof(request.P_Start), error);
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber ต้องมากกว่าหรือเท่ากับ 1");
+        }
+
+        if (request.PageSize < 1 || request.PageSize > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize ต้องอยู่ระหว่าง 1 ถึง {MaxPageSize}");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -1000,31 +1232,55 @@ public class ReportController : ControllerBase
                 .ToListAsync(cancellationToken);
 
             // แปลง Contact_Date เป็น DateOnly? หลังจากดึงข้อมูลมาแล้ว
-            var result = rawResult.Select(x => new
+            var allRows = rawResult.Select(x => new NonServiceContactDailyReportDto
             {
-                Contact_Date = (DateOnly?)DateOnly.FromDateTime(x.Contact_Date),
-                x.Kidding_Abnormal,
-                x.Kidding_Child,
-                x.Kidding_Rude,
-                x.Kidding_Silent,
-                x.Flood,
-                x.Kidding_Total,
-                x.Bad_Signal,
-                x.Lost_Connection,
-                x.Wrong_Number_Pizza,
-                x.Wrong_Number_Other,
-                x.Consult_Officer,
-                x.Stress_Social,
-                x.Stress_Economic,
-                x.Stress_Political,
-                x.Stress_Legal,
-                x.Stress_Natural_Resources,
-                x.Out_Of_Scope_Total,
-                x.Total
+                Contact_Date = DateOnly.FromDateTime(x.Contact_Date),
+                Kidding_Abnormal = x.Kidding_Abnormal,
+                Kidding_Child = x.Kidding_Child,
+                Kidding_Rude = x.Kidding_Rude,
+                Kidding_Silent = x.Kidding_Silent,
+                Flood = x.Flood,
+                Kidding_Total = x.Kidding_Total,
+                Bad_Signal = x.Bad_Signal,
+                Lost_Connection = x.Lost_Connection,
+                Wrong_Number_Pizza = x.Wrong_Number_Pizza,
+                Wrong_Number_Other = x.Wrong_Number_Other,
+                Consult_Officer = x.Consult_Officer,
+                Stress_Social = x.Stress_Social,
+                Stress_Economic = x.Stress_Economic,
+                Stress_Political = x.Stress_Political,
+                Stress_Legal = x.Stress_Legal,
+                Stress_Natural_Resources = x.Stress_Natural_Resources,
+                Out_Of_Scope_Total = x.Out_Of_Scope_Total,
+                Total = x.Total
             }).ToList();
 
-           
-            return Ok(result);
+            var total = allRows.Count;
+
+            var data = allRows
+                .OrderBy(x => x.Contact_Date)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToList();
+
+            var message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ";
+
+            return Ok(new PagedEnvelope<NonServiceContactDailyReportDto>
+            {
+                Status = "success",
+                Message = message,
+                Data = data,
+                Meta = new PagedMeta
+                {
+                    Pagination = new PaginationMeta
+                    {
+                        CurrentPage = request.PageNumber,
+                        PerPage = request.PageSize,
+                        Total = total,
+                        TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+                    }
+                }
+            });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -10,13 +10,24 @@ public class ServiceRequestReportDateTimeRequest
     public string? P_Finish { get; set; }
 }
 
-public class ServiceRequestReportRequestMainOrganization : ServiceRequestReportDateTimeRequest
+public class ServiceRequestReportRequestMainOrganization : ServiceRequestReportDateTimePagedRequest
 {
     // TblOrganization.Id ของหน่วยงานหลัก ได้ SR ของหน่วยงานหลักและทุกหน่วยงานย่อยใต้มัน
     [DefaultValue("00E071487E1343B987C548DEDAE71113")]
     public string? P_MainOrg { get; set; }
     [DefaultValue("00E071487E1343B987C548DEDAE71267")]
     public string? P_SubOrg { get; set; }
+}
+
+public class ServiceRequestReportDateTimePagedRequest : ServiceRequestReportDateTimeRequest
+{
+    // แบ่งหน้า: หน้าเริ่มที่ 1
+    [DefaultValue(1)]
+    public int PageNumber { get; set; } = 1;
+
+    // จำนวนรายการต่อหน้า
+    [DefaultValue(20)]
+    public int PageSize { get; set; } = 20;
 }
 
 public class ServiceRequestReportRequestService : ServiceRequestReportDateTimeRequest

@@ -106,6 +106,50 @@ public class SrCallbackResponse
     public string? ContactName { get; set; }
 }
 
+public class ClaimContactDailyReportDto
+{
+    [JsonPropertyName("contact_date")] public DateTime Contact_Date { get; set; }
+    [JsonPropertyName("bad_signal")] public int Bad_Signal { get; set; }
+    [JsonPropertyName("kidding_abnormal")] public int Kidding_Abnormal { get; set; }
+    [JsonPropertyName("kidding_child")] public int Kidding_Child { get; set; }
+    [JsonPropertyName("kidding_rude")] public int Kidding_Rude { get; set; }
+    [JsonPropertyName("kidding_silent")] public int Kidding_Silent { get; set; }
+    [JsonPropertyName("flood")] public int Flood { get; set; }
+    [JsonPropertyName("lost_connection")] public int Lost_Connection { get; set; }
+    [JsonPropertyName("wrong_number_pizza")] public int Wrong_Number_Pizza { get; set; }
+    [JsonPropertyName("wrong_number_other")] public int Wrong_Number_Other { get; set; }
+    [JsonPropertyName("stress_social")] public int Stress_Social { get; set; }
+    [JsonPropertyName("stress_economic")] public int Stress_Economic { get; set; }
+    [JsonPropertyName("stress_political")] public int Stress_Political { get; set; }
+    [JsonPropertyName("stress_legal")] public int Stress_Legal { get; set; }
+    [JsonPropertyName("stress_natural_resources")] public int Stress_Natural_Resources { get; set; }
+    [JsonPropertyName("consult_officer")] public int Consult_Officer { get; set; }
+    [JsonPropertyName("total")] public int Total { get; set; }
+}
+
+public class NonServiceContactDailyReportDto
+{
+    public DateOnly? Contact_Date { get; set; }
+    public int Kidding_Abnormal { get; set; }
+    public int Kidding_Child { get; set; }
+    public int Kidding_Rude { get; set; }
+    public int Kidding_Silent { get; set; }
+    public int Flood { get; set; }
+    public int Kidding_Total { get; set; }
+    public int Bad_Signal { get; set; }
+    public int Lost_Connection { get; set; }
+    public int Wrong_Number_Pizza { get; set; }
+    public int Wrong_Number_Other { get; set; }
+    public int Consult_Officer { get; set; }
+    public int Stress_Social { get; set; }
+    public int Stress_Economic { get; set; }
+    public int Stress_Political { get; set; }
+    public int Stress_Legal { get; set; }
+    public int Stress_Natural_Resources { get; set; }
+    public int Out_Of_Scope_Total { get; set; }
+    public int Total { get; set; }
+}
+
  public class ServiceRequestReportContact
     {
         public DateTime ContactStart { get; set; }
