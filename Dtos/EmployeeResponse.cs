@@ -44,6 +44,8 @@ public class EmployeeResponse
 
     public string? DefaultRowPerPage { get; set; }
 
+    public string? PictureProfile { get; set; }
+
     public string? IsEnable { get; set; }
 
     public string? Created { get; set; }
