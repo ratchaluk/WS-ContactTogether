@@ -37,7 +37,7 @@ public class UserManagementController : ControllerBase
     }
 
     /// <summary>Creates a <c>TblEmployee</c> row and returns it without the password.</summary>
-    [HttpPost("employees")]
+    [HttpPost("AddEmployee")]
     [ProducesResponseType(typeof(EmployeeResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
@@ -112,7 +112,39 @@ public class UserManagementController : ControllerBase
             employee.UserName,
             actingEmployeeId);
 
-        return StatusCode(StatusCodes.Status201Created, ToResponse(employee));
+        return StatusCode(StatusCodes.Status201Created, ToResponse(employee, StatusCodes.Status201Created));
+    }
+
+    /// <summary>
+    /// Returns every column of the calling employee's <c>TblEmployee</c> row except the password.
+    /// The employee is identified by the token's <c>sub</c> claim.
+    /// </summary>
+    [HttpGet("GetEmployeeProfile")]
+    [ProducesResponseType(typeof(EmployeeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetEmployeeProfile(CancellationToken cancellationToken)
+    {
+        var id = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(id))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot identify the employee."));
+        }
+
+        var employee = await _db.TblEmployees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+
+        if (employee is null)
+        {
+            return NotFound(new MessageResponse(
+                StatusCodes.Status404NotFound,
+                $"No employee with Id '{id}'."));
+        }
+
+        return Ok(ToResponse(employee, StatusCodes.Status200OK));
     }
 
     /// <summary>
@@ -145,9 +177,9 @@ public class UserManagementController : ControllerBase
     private static string? FormatDate(DateTime? value) =>
         value?.ToString(LegacyDateFormat, CultureInfo.InvariantCulture);
 
-    private static EmployeeResponse ToResponse(TblEmployee employee) => new()
+    private static EmployeeResponse ToResponse(TblEmployee employee, int statusCode) => new()
     {
-        StatusCode = StatusCodes.Status201Created,
+        StatusCode = statusCode,
         Id = employee.Id,
         UserName = employee.UserName,
         GenderId = employee.GenderId,
@@ -166,6 +198,7 @@ public class UserManagementController : ControllerBase
         OrganizationId = employee.OrganizationId,
         DefaultLanguage = employee.DefaultLanguage,
         DefaultRowPerPage = employee.DefaultRowPerPage,
+        PictureProfile = employee.PictureProfile,
         IsEnable = employee.IsEnable,
         Created = employee.Created,
         CreatedBy = employee.CreatedBy,
