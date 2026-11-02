@@ -37,7 +37,7 @@ public class UserManagementController : ControllerBase
     }
 
     /// <summary>Creates a <c>TblEmployee</c> row and returns it without the password.</summary>
-    [HttpPost("employees")]
+    [HttpPost("AddEmployee")]
     [ProducesResponseType(typeof(EmployeeResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
@@ -119,7 +119,7 @@ public class UserManagementController : ControllerBase
     /// Returns every column of the calling employee's <c>TblEmployee</c> row except the password.
     /// The employee is identified by the token's <c>sub</c> claim.
     /// </summary>
-    [HttpGet("employees")]
+    [HttpGet("GetEmployeeProfile")]
     [ProducesResponseType(typeof(EmployeeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
