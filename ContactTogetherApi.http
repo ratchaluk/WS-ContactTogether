@@ -264,3 +264,10 @@ POST {{ContactTogetherApi_HostAddress}}/Auth/logout
 Authorization: Bearer {{token}}
 
 ###
+
+# Helper - live server clock via Server-Sent Events. Streams an "event: time" frame every second
+# (override with ?intervalMs=500). Endless stream; cancel the request to stop. Anonymous.
+GET {{ContactTogetherApi_HostAddress}}/Helper/time/stream
+Accept: text/event-stream
+
+###

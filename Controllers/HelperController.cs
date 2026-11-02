@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -21,6 +24,16 @@ public class HelperController : ControllerBase
 {
     /// <summary>The server date-time format the reports use for Thai local date-times.</summary>
     private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+
+    /// <summary>
+    /// camelCase options for the hand-serialized SSE payload. The relaxed encoder keeps the ISO
+    /// offset's '+' readable (not escaped to +) in the raw stream; still valid JSON.
+    /// </summary>
+    private static readonly JsonSerializerOptions StreamJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     private readonly ApplicationDbContext _db;
     private readonly IWebHostEnvironment _env;
@@ -102,6 +115,54 @@ public class HelperController : ControllerBase
             utcOffset = TimeZoneInfo.Local.GetUtcOffset(now).ToString(),
             databaseTime,
         });
+    }
+
+    /// <summary>
+    /// Streams the server clock as Server-Sent Events (text/event-stream), one "time" frame every
+    /// <paramref name="intervalMs"/> ms (default 1000, clamped 250..60000). Anonymous and DB-free.
+    /// The client (EventSource) keeps the connection open; the loop ends when the client disconnects
+    /// (RequestAborted). Note: Swagger "Try it out" will appear to hang because the stream is endless.
+    /// </summary>
+    [HttpGet("time/stream")]
+    [Produces("text/event-stream")]
+    public async Task TimeStream([FromQuery] int? intervalMs, CancellationToken cancellationToken)
+    {
+        var interval = Math.Clamp(intervalMs ?? 1000, 250, 60000);
+
+        Response.Headers.ContentType = "text/event-stream";
+        // no-transform stops proxies (e.g. Next.js rewrites) from gzipping the stream, which buffers it.
+        Response.Headers.CacheControl = "no-cache, no-transform";
+        Response.Headers["X-Accel-Buffering"] = "no"; // stop nginx/proxy buffering
+        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+        // Tell EventSource how long to wait before reconnecting.
+        await Response.WriteAsync($"retry: {interval}\n\n", cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
+
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(interval));
+        try
+        {
+            do
+            {
+                var now = DateTimeOffset.Now;
+                var payload = JsonSerializer.Serialize(new
+                {
+                    iso = now.ToString("yyyy-MM-dd'T'HH:mm:ssK", CultureInfo.InvariantCulture),
+                    serverLocal = now.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
+                    serverUtc = now.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
+                    unixMs = now.ToUnixTimeMilliseconds(),
+                    timeZone = TimeZoneInfo.Local.Id,
+                    utcOffset = now.Offset.ToString(),
+                }, StreamJson);
+
+                await Response.WriteAsync($"event: time\ndata: {payload}\n\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+            } while (await timer.WaitForNextTickAsync(cancellationToken));
+        }
+        catch (OperationCanceledException)
+        {
+            // Client disconnected — normal end of an SSE stream, nothing to log.
+        }
     }
 
     /// <summary>Reports the deployed build and hosting environment.</summary>
