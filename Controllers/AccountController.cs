@@ -36,7 +36,7 @@ public class AccountController : ControllerBase
     }
 
     /// <summary>Creates a <c>TblAccount</c> row and returns it.</summary>
-    [HttpPost("accounts")]
+    [HttpPost("AddNewAccount")]
     [ProducesResponseType(typeof(AccountResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -98,7 +98,7 @@ public class AccountController : ControllerBase
     /// Looks up accounts by one of their telephone numbers in <c>TblAccountDetail</c>. A number can
     /// belong to several accounts, so this returns a list.
     /// </summary>
-    [HttpGet("by-phone")]
+    [HttpGet("GetAccountByPhoneNo")]
     [ProducesResponseType(typeof(IEnumerable<AccountByPhoneResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
