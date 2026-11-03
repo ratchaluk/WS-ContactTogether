@@ -19,7 +19,7 @@ public class ListOfValuesController : ControllerBase
     }
 
     /// <summary>Returns the enabled rows of <c>TblChannel</c> as id + Thai name.</summary>
-    [HttpGet("channels")]
+    [HttpGet("GetChannel")]
     [Authorize]
     [ProducesResponseType(typeof(IEnumerable<LookupItemResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -38,5 +38,29 @@ public class ListOfValuesController : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(channels);
+    }
+
+    /// <summary>Returns the enabled rows of <c>TblCategory</c> as service types.</summary>
+    [HttpGet("GetServiceType")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ServiceTypeResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetServiceType(CancellationToken cancellationToken)
+    {
+        var serviceTypes = await _db.TblCategories
+            .AsNoTracking()
+            .Where(c => c.IsEnable == "T")
+            .OrderBy(c => c.NameTh)
+            .Select(c => new ServiceTypeResponse
+            {
+                Id = c.Id,
+                RefId = c.RefId,
+                NameTh = c.NameTh,
+                NameEn = c.NameEn,
+                CategoryType = c.CategoryType,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(serviceTypes);
     }
 }
