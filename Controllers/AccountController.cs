@@ -26,6 +26,9 @@ public class AccountController : ControllerBase
     /// </summary>
     private static readonly string[] PhoneDetailTypes = ["MOBILE", "HOME", "OFFICE", "FAX"];
 
+    /// <summary>Upper bound on <see cref="GetAccounts"/> results, so a one-letter search stays cheap.</summary>
+    private const int MaxSearchResults = 100;
+
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AccountController> _logger;
 
@@ -139,6 +142,103 @@ public class AccountController : ControllerBase
             Address = m.Address,
             Created = m.Created,
         });
+
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Searches enabled accounts by partial first name, last name and/or contact info; at least one
+    /// is required, and every one given must match. Names match Thai or English. Contact info matches
+    /// the address or any <c>TblAccountDetail</c> row (phone, e-mail, ...). Returns at most
+    /// <see cref="MaxSearchResults"/> accounts.
+    /// </summary>
+    [HttpGet("GetAccounts")]
+    [ProducesResponseType(typeof(IEnumerable<AccountSearchResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetAccounts(
+        [FromQuery] string? firstName,
+        [FromQuery] string? lastName,
+        [FromQuery] string? contactInfo,
+        CancellationToken cancellationToken)
+    {
+        firstName = firstName?.Trim();
+        lastName = lastName?.Trim();
+        contactInfo = contactInfo?.Trim();
+
+        if (string.IsNullOrEmpty(firstName) && string.IsNullOrEmpty(lastName) && string.IsNullOrEmpty(contactInfo))
+        {
+            ModelState.AddModelError(
+                string.Empty,
+                $"At least one of {nameof(firstName)}, {nameof(lastName)} or {nameof(contactInfo)} is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        // Contains() becomes LIKE '%...%'. The DB collation is Thai_100_CS_AI, so it is case-sensitive.
+        var accounts = _db.TblAccounts.AsNoTracking().Where(a => a.IsEnable == "T");
+
+        if (!string.IsNullOrEmpty(firstName))
+        {
+            accounts = accounts.Where(a => a.FirstnameTh!.Contains(firstName) || a.FirstnameEn!.Contains(firstName));
+        }
+
+        if (!string.IsNullOrEmpty(lastName))
+        {
+            accounts = accounts.Where(a => a.LastnameTh!.Contains(lastName) || a.LastnameEn!.Contains(lastName));
+        }
+
+        if (!string.IsNullOrEmpty(contactInfo))
+        {
+            accounts = accounts.Where(a => a.Address!.Contains(contactInfo)
+                || _db.TblAccountDetails.Any(d => d.AccountId == a.Id
+                    && d.IsEnable == "T"
+                    && d.Detail.Contains(contactInfo)));
+        }
+
+        // Projected and untracked: TblAccount.Id has legacy duplicates, see ApplicationDbContext.Keys.cs.
+        var results = await (
+            from account in accounts
+            join gender in _db.TblGenders.AsNoTracking() on account.GenderId equals gender.Id into genders
+            from gender in genders.DefaultIfEmpty()
+            orderby account.FirstnameTh, account.LastnameTh
+            select new AccountSearchResponse
+            {
+                Id = account.Id,
+                SalutationTh = account.SalutationTh,
+                FirstnameTh = account.FirstnameTh,
+                LastnameTh = account.LastnameTh,
+                SalutationEn = account.SalutationEn,
+                FirstnameEn = account.FirstnameEn,
+                LastnameEn = account.LastnameEn,
+                GenderId = account.GenderId,
+                Gender = gender != null ? gender.NameTh : null,
+                Birthdate = account.Birthdate,
+                Address = account.Address,
+                AreaId = account.AreaId,
+                Zipcode = account.Zipcode,
+                Remark = account.Remark,
+                IsScret = account.IsScret,
+                Created = account.Created,
+            }).Take(MaxSearchResults).ToListAsync(cancellationToken);
+
+        // Second query for the contacts of the accounts found, rather than one per account.
+        var accountIds = results.Select(r => r.Id).Distinct().ToList();
+        var contacts = (await _db.TblAccountDetails
+                .AsNoTracking()
+                .Where(d => accountIds.Contains(d.AccountId) && d.IsEnable == "T")
+                .OrderBy(d => d.DetailType)
+                .ThenBy(d => d.Detail)
+                .Select(d => new { d.AccountId, d.DetailType, d.Detail })
+                .ToListAsync(cancellationToken))
+            .ToLookup(d => d.AccountId);
+
+        foreach (var result in results)
+        {
+            result.FullName = BuildFullName(result.SalutationTh, result.FirstnameTh, result.LastnameTh);
+            result.Contacts = contacts[result.Id]
+                .Select(d => new AccountContactResponse { DetailType = d.DetailType, Detail = d.Detail })
+                .ToList();
+        }
 
         return Ok(results);
     }
