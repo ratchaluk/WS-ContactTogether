@@ -33,5 +33,7 @@ public partial class ApplicationDbContext
                     .HasValueGenerator<GuidStringValueGenerator>();
             }
         }
+
+        ConfigureFunctions(modelBuilder);
     }
 }
