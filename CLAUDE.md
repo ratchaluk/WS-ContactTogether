@@ -78,7 +78,9 @@ these with free-form Thai messages.
 ## Architecture
 
 - [Program.cs](Program.cs): controllers, `ApplicationDbContext` on SQL Server, JWT bearer auth,
-  Swagger (with a bearer scheme) in Development, `UseAuthentication()` → `UseAuthorization()`.
+  Swagger (with a bearer scheme) in Development, QuestPDF licence and font registration, the
+  `report-export` rate limiter, `UseAuthentication()` → `UseAuthorization()` → `UseRateLimiter()`.
+- [Reports/](Reports/): report export layouts and the PDF/Excel writers (see Exports below).
 - [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
   issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
   `MemoryTokenRevocationStore` holds logged-out `jti` values.
@@ -102,7 +104,9 @@ these with free-form Thai messages.
   lookup ids (`GenderId`, `RoleId`, `AreaId`, …) against their tables in a `ValidateLookupsAsync`
   helper before inserting.
 - `ReportController`: `POST /Report/GetReport01`…`GetReport07`, each a large multi-join LINQ query
-  over `TblService`. It is **anonymous at the moment** (`[Authorize]` is commented out). Its DTOs
+  over `TblService`. `GetReportXX` are **anonymous at the moment** (`[Authorize]` is commented out
+  on the class). The export actions are anonymous too for now: their own `[Authorize]` is commented
+  out while the exports are being tested. It is a `partial` class. Its DTOs
   (`ServiceRequestReportRequest*`, `ServiceRequestReportDto`, …) live in
   [Dtos/RequestModel.cs](Dtos/RequestModel.cs) and [Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)
   in the **global namespace**. Every report takes `ServiceRequestReportDateTimeRequest` (04 and 07
@@ -111,43 +115,51 @@ these with free-form Thai messages.
   local date-times, `yyyy-MM-ddTHH:mm:ss` (seconds optional, no offset or `Z`), parsed by
   `TryBuildDateTimeRange`. It uses `InvariantCulture` and does no time-zone conversion, so the
   server's locale and time zone do not affect it. The range includes the end value.
-  - 01–04 and 07 filter `TblService.Created` by the full date-time.
+  - 01–04 and 07 filter `TblService.Created` by the full date-time. 02 = `Call_Back` `D` (dropped
+    call), 03 = `Y` (callback wanted; its rows also carry `ContactNo`, the account's phone).
   - 07 also requires `P_Service`, a top-level `TblCategory.Id` (Q&A, Claim, …), compared with
     `TblService.CategoryId`. Those top-level categories point `RefId` at themselves.
-  - 04 also requires `P_MainOrg` and returns SRs whose organization is that main organization or
-    one of its direct sub-organizations (`org.Id` or `org2.Id`).
+  - 04 takes optional `P_MainOrg`/`P_SubOrg`: none = every organization, `P_MainOrg` alone = that
+    organization or its direct sub-organizations (`org.Id` or `org2.Id`), `P_SubOrg` = only it.
   - 05/06 count contacts per day and use only the date part, because `TblContact.ContactStart`
-    holds dates only. 05 counts contacts whose creator is in a claim team (`RefGroupId` 53/77). 06
-    counts contacts whose creator is in none of 53/77/79/68. Both left-join a `DISTINCT` list of
-    employee ids rather than joining the keyless `TblEmployeeGroup`/`TblOrganizationGroup` rows
-    directly. An employee can sit in several groups, so the direct join counts a contact more than
-    once and can put it in both reports.
+    holds dates only. 05 counts contacts created by employees whose `Position` contains "Claim"; 06
+    counts the rest (creator not Claim, in some group other than 39). Both count only the four
+    top-level Non-Service categories.
+  - Each report's query lives in a `LoadReportXXAsync` method that returns every row of the range,
+    sorted. `GetReportXX` pages that list in memory, because EF Core 10 cannot translate
+    `Count()`/`OFFSET` over a `Distinct()` of these projections. `ExportReportXX` uses the same
+    method, so a file always matches the screen.
+- **Exports**: `POST /Report/ExportReport01`…`07?format=xlsx|pdf`
+  ([Controllers/ReportController.Export.cs](Controllers/ReportController.Export.cs)) take the
+  `GetReportXX` body, ignore paging, and return a file. `[Authorize]` on each action is commented
+  out during testing (re-enable it before release, since the files hold callers' names and phone
+  numbers). The `report-export` concurrency limiter (`ReportExport:MaxConcurrent`, default 2) answers 429 beyond
+  that. Layouts (title, columns, legacy value formats) are in
+  [Reports/ReportLayouts.cs](Reports/ReportLayouts.cs) and follow the legacy samples in
+  `docs/report01.pdf`–`report06.pdf`. The writers in [Reports/Export/](Reports/Export/) are generic:
+  Excel via SpreadCheetah (streams rows), PDF via QuestPDF (Community licence, Sarabun font embedded
+  from `Assets/Fonts`). PDFs over 3,000 rows are generated in chunks, merged with QuestPDF's
+  `DocumentOperation`, and numbered by an overlay, which keeps memory per chunk. Design notes and
+  measurements: [docs/report-export-design.md](docs/report-export-design.md); frontend guide:
+  [docs/report-api.md](docs/report-api.md).
 
-#### Response envelope and status codes
+#### Response shape and status codes
 
-`ReportController` wraps every response in `_0BaseReturn` ([Helper/0BaseReturn.cs](Helper/0BaseReturn.cs)):
-`{ callAPIStatus, callAPIStatusMessage, result }`. The HTTP status carries the outcome, and the body
-has no status-code field. `callAPIStatus` is `true` only for 2xx. `callAPIStatusMessage` is Thai
-text that can be shown to users. Never put `ex.Message` in it. `[BaseReturnModelStateFilter]`
-([Helper/BaseReturnModelStateFilter.cs](Helper/BaseReturnModelStateFilter.cs)) turns the automatic
-`[ApiController]` 400 (malformed JSON, missing body) into a `_0BaseReturn` too. Apply it per
-controller rather than changing `InvalidModelStateResponseFactory`, because that would also change
-`ValidationProblem()` in the ProblemDetails-style controllers.
+`GetReportXX` answer 200 with `PagedEnvelope<T>` ([Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)):
+`{ status, message, data, meta.pagination }`, with snake_case pagination keys. `message` is Thai
+text that can be shown to users (`พบข้อมูล N รายการ` / `ไม่พบข้อมูล`). Bad input returns
+`ValidationProblem(ModelState)`, and other failures return `MessageResponse`, as in the other
+controllers. Never put `ex.Message` in a response.
 
-| HTTP | When | `callAPIStatus` | `result` |
-|---|---|---|---|
-| 200 | Success, **including a search or report with no rows** | `true` | data, or `[]` |
-| 201 | A POST created a row | `true` | the created item |
-| 400 | Bad input: missing field, wrong format, start after finish, malformed JSON | `false` | `null` |
-| 401 | No token, an expired token, or a logged-out token | `false` | `null` |
-| 403 | Signed in but lacks the page right (`TblRolePage`) | `false` | `null` |
-| 404 | A specific resource by id does not exist (never for an empty report) | `false` | `null` |
-| 409 | Duplicate or conflicting data, e.g. a username that already exists | `false` | `null` |
-| 500 | Unexpected failure. Log it and answer `เกิดข้อผิดพลาดภายในระบบ` | `false` | `null` |
+| HTTP | When | Body |
+|---|---|---|
+| 200 | Success, **including a report with no rows** (`data: []`) | `PagedEnvelope<T>`, or the file for exports |
+| 400 | Bad input: missing field, wrong format, start after finish, malformed JSON | ProblemDetails |
+| 401 | No token, an expired token, or a logged-out token (once `[Authorize]` is back on) | empty (JwtBearer) |
+| 429 | Too many exports running at once | `MessageResponse` |
+| 500 | Unexpected failure. Log it and answer `เกิดข้อผิดพลาดภายในระบบ` | `MessageResponse` |
 
-401/403 currently come from JwtBearer with an empty body. To return `_0BaseReturn` for them, handle
-`OnChallenge`/`OnForbidden` in `JwtBearerEvents` when `[Authorize]` is turned on. A request the
-client cancels (`OperationCanceledException`) is not caught and gets no envelope.
+A request the client cancels (`OperationCanceledException`) is not caught and gets no body.
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 

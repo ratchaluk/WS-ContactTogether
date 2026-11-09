@@ -172,8 +172,9 @@ Content-Type: application/json
 
 ###
 
-# Report 04 - service requests of a main organization and all of its sub-organizations.
-# Same ISO 8601 date rules as Report 01; P_MainOrg (TblOrganization.Id) is required. Paged:
+# Report 04 - service requests by organization. Same ISO 8601 date rules as Report 01. P_MainOrg and
+# P_SubOrg (TblOrganization.Id) are optional: none = every organization, P_MainOrg alone = that
+# organization and its sub-organizations, P_SubOrg = only that sub-organization. Paged:
 # pageNumber (>=1) and pageSize (1..200) default to 1 and 20; response is the paged
 # { status, message, data, meta.pagination } envelope.
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
@@ -189,7 +190,7 @@ Content-Type: application/json
 
 ###
 
-# 400 - P_MainOrg missing
+# Report 04 - no organization: every organization
 POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
 Content-Type: application/json
 
@@ -255,6 +256,93 @@ Content-Type: application/json
 {
   "p_Start": "2026-01-01T00:00:00",
   "p_Finish": "2026-12-31T23:59:59"
+}
+
+###
+
+# Export - ExportReport01..07 take the same body as GetReportXX (paging is ignored: the whole range is
+# exported) plus ?format=xlsx|pdf. [Authorize] is off while testing, so the token is optional for now.
+# 200 = the file (Content-Disposition carries the name), 400 = ProblemDetails, 429 = too many exports
+# running at once (401 = no token, once [Authorize] is back on).
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=xlsx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+# Export Report 04 - no organization = every organization
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport04?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59",
+  "p_MainOrg": "00D1DA8C956043D5AD9B38299566A7F0"
+}
+
+###
+
+# Export Report 06 - daily counts; only the date part of the range is used
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport06?format=xlsx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59"
+}
+
+###
+
+# Export Report 07 - P_Service is required
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport07?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59",
+  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5"
+}
+
+###
+
+# 400 - format missing or not xlsx/pdf
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=docx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+# Export without a token - 200 while [Authorize] is off for testing ("พิมพ์โดย -"), 401 once it is back on
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=xlsx
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
 }
 
 ###

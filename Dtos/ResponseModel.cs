@@ -104,6 +104,10 @@ public class SrCallbackResponse
     public string? MainOrgName { get; set; }
 
     public string? ContactName { get; set; }
+
+    // Report 03 only: the caller account's phone (mobile first). Left out of the JSON when null.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContactNo { get; set; }
 }
 
 public class ClaimContactDailyReportDto
