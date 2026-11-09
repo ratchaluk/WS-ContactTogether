@@ -271,12 +271,8 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.ContactDetail)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.ContactEnd)
-                .HasMaxLength(50)
-                .IsUnicode(false);
-            entity.Property(e => e.ContactStart)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+            entity.Property(e => e.ContactEnd).HasPrecision(0);
+            entity.Property(e => e.ContactStart).HasPrecision(0);
             entity.Property(e => e.CreatedBy)
                 .HasMaxLength(50)
                 .IsUnicode(false);
@@ -665,20 +661,16 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.Code)
                 .HasMaxLength(200)
                 .IsUnicode(false);
-            entity.Property(e => e.Created)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+            entity.Property(e => e.Created).HasPrecision(0);
             entity.Property(e => e.CreatedBy)
                 .HasMaxLength(200)
                 .IsUnicode(false)
                 .HasColumnName("Created_By");
             entity.Property(e => e.DateClosed)
-                .HasMaxLength(100)
-                .IsUnicode(false)
+                .HasPrecision(0)
                 .HasColumnName("Date_Closed");
             entity.Property(e => e.DateOpened)
-                .HasMaxLength(100)
-                .IsUnicode(false)
+                .HasPrecision(0)
                 .HasColumnName("Date_Opened");
             entity.Property(e => e.Detail).HasMaxLength(1000);
             entity.Property(e => e.Id)
@@ -701,8 +693,7 @@ public partial class ApplicationDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("Level_Severity_ID");
             entity.Property(e => e.OnScene)
-                .HasMaxLength(200)
-                .IsUnicode(false)
+                .HasPrecision(0)
                 .HasColumnName("On_Scene");
             entity.Property(e => e.OrganizationId)
                 .HasMaxLength(200)
@@ -729,9 +720,7 @@ public partial class ApplicationDbContext : DbContext
                 .IsUnicode(false)
                 .HasColumnName("Status_ID");
             entity.Property(e => e.Summary).HasMaxLength(500);
-            entity.Property(e => e.Updated)
-                .HasMaxLength(200)
-                .IsUnicode(false);
+            entity.Property(e => e.Updated).HasPrecision(0);
             entity.Property(e => e.UpdatedBy)
                 .HasMaxLength(200)
                 .IsUnicode(false)

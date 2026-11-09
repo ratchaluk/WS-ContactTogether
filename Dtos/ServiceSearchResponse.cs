@@ -20,6 +20,6 @@ public class ServiceSearchResponse
     /// <summary>The <c>TblStatus</c> name.</summary>
     public string? ServicesStatus { get; set; }
 
-    /// <summary><c>TblService.Created</c> as stored (legacy text format).</summary>
-    public string? ServiceCreated { get; set; }
+    /// <summary><c>TblService.Created</c>, Thai local time without an offset.</summary>
+    public DateTime? ServiceCreated { get; set; }
 }

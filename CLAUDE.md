@@ -163,9 +163,8 @@ A request the client cancels (`OperationCanceledException`) is not caught and ge
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
-When inserting rows, follow the existing conventions. Generate ids as
-`Guid.NewGuid().ToString("N").ToUpperInvariant()`, and take `CreatedBy`/`UpdatedBy` from the
-token's `sub` claim, never from the request body.
+When inserting rows, follow the existing conventions. Leave `Id` unset (see **Keys** below), and
+take `CreatedBy`/`UpdatedBy` from the token's `sub` claim, never from the request body.
 
 ### Authentication
 
@@ -209,6 +208,13 @@ These are quirks of the existing schema. Do not "clean them up" in the models:
   New rows get a UUID key automatically (32 upper-case hex chars, no dashes): `ApplicationDbContext.Keys.cs`
   attaches `GuidStringValueGenerator` to every single-string primary key, so leave `Id` unset when
   inserting. Use `GuidStringValueGenerator.NewId()` if you need an id before `Add()`.
+- **Dates are mixed.** `TblService.Created`/`Updated`/`DateOpened`/`DateClosed`/`OnScene` and
+  `TblContact.ContactStart`/`ContactEnd` are `datetime2(0)` (`DateTime?`) holding Thai local time, so
+  compare them as `DateTime`. They used to be text, and copies of the database that still have text
+  columns no longer match these models. Other date columns (`TblAccount`, `TblEmployee`, …) are still
+  month-first text such as `05/30/2024 15:26`, which the legacy application parses. Write them with
+  the `LegacyDateFormat` constant of `AccountController`/`UserManagementController`, and filter them
+  in SQL with `ApplicationDbContext.ParseLegacyDate`.
 - **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`:
   `TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`. The root/parent convention matters when
   querying these.
