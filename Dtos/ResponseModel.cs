@@ -1,0 +1,180 @@
+using System.Text.Json.Serialization;
+
+/// <summary>
+/// Paged response envelope per APICOREPRINCIPLES.md: <c>{ status, message, data, meta.pagination }</c>.
+/// The pagination keys are snake_case by spec, so they need explicit <see cref="JsonPropertyNameAttribute"/>.
+/// </summary>
+public class PagedEnvelope<T>
+{
+    [JsonPropertyName("status")] public string Status { get; set; } = "success";
+    [JsonPropertyName("message")] public string Message { get; set; } = string.Empty;
+    [JsonPropertyName("data")] public IEnumerable<T> Data { get; set; } = Array.Empty<T>();
+    [JsonPropertyName("meta")] public PagedMeta Meta { get; set; } = new();
+}
+
+public class PagedMeta
+{
+    [JsonPropertyName("pagination")] public PaginationMeta Pagination { get; set; } = new();
+}
+
+public class PaginationMeta
+{
+    [JsonPropertyName("current_page")] public int CurrentPage { get; set; }
+    [JsonPropertyName("per_page")] public int PerPage { get; set; }
+    [JsonPropertyName("total")] public int Total { get; set; }
+    [JsonPropertyName("total_pages")] public int TotalPages { get; set; }
+}
+
+public class ServiceRequestReportDto
+{
+    public string? Code { get; set; }
+    public string? Summary { get; set; }
+    public string? Detail { get; set; }
+    public string SrReferenceLink { get; set; }
+
+    public  string? SrOpened { get; set; }
+    public  string? SrClosed { get; set; }
+
+    public string? SrRequireCallBack { get; set; }
+    public DateTime? Created { get; set; }
+
+    public string? ANumber { get; set; }
+
+    public string? ChannelName { get; set; }
+    public string? SrTypeName { get; set; }
+    public string? SrReference { get; set; }
+    public string? SrStatusName { get; set; }
+
+    public string? CreatedUName { get; set; }
+    public string? CreaterName { get; set; }
+    public int SkillAgentCreated { get; set; }
+
+    public string OwnerUName { get; set; }
+    public string? OwnerName { get; set; }
+
+    public string? LastUpdatedUName { get; set; }
+    public string? UpdateName { get; set; }
+
+    public string? SubOrgId { get; set; }
+    public string? SubOrgName { get; set; }
+
+    public string? MainOrgId { get; set; }
+    public string? MainOrgName { get; set; }
+
+    public string? ContactName { get; set; }
+    public string? Gender { get; set; }
+
+    public string? Remark { get; set; }
+}
+
+public class SrCallbackResponse
+{
+    public string? Code { get; set; }
+    public string? Summary { get; set; }
+    public string? Detail { get; set; }
+    public string? SrReferenceLink { get; set; }
+
+    public  string? SrOpened { get; set; }
+    public  string? SrClosed { get; set; }
+
+    public string? SrRequireCallBack { get; set; }
+    public DateTime? Created { get; set; }
+
+    public string? ANumber { get; set; }
+
+    public string? ChannelName { get; set; }
+    public string? SrTypeName { get; set; }
+    public string? SrReference { get; set; }
+    public string? SrStatusName { get; set; }
+
+    public string? CreatedUname { get; set; }
+    public string? CreatorName { get; set; }
+    public int SkillAgentCreated { get; set; }
+
+    public string? OwnerUname { get; set; }
+    public string? OwnerName { get; set; }
+
+    public string? LastUpdatedUname { get; set; }
+    public string? UpdaterName { get; set; }
+
+    public string? SubOrgId { get; set; }
+    public string? SubOrgName { get; set; }
+
+    public string? MainOrgId { get; set; }
+    public string? MainOrgName { get; set; }
+
+    public string? ContactName { get; set; }
+
+    // Report 03 only: the caller account's phone (mobile first). Left out of the JSON when null.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContactNo { get; set; }
+}
+
+public class ClaimContactDailyReportDto
+{
+    [JsonPropertyName("contact_date")] public DateTime Contact_Date { get; set; }
+    [JsonPropertyName("bad_signal")] public int Bad_Signal { get; set; }
+    [JsonPropertyName("kidding_abnormal")] public int Kidding_Abnormal { get; set; }
+    [JsonPropertyName("kidding_child")] public int Kidding_Child { get; set; }
+    [JsonPropertyName("kidding_rude")] public int Kidding_Rude { get; set; }
+    [JsonPropertyName("kidding_silent")] public int Kidding_Silent { get; set; }
+    [JsonPropertyName("flood")] public int Flood { get; set; }
+    [JsonPropertyName("lost_connection")] public int Lost_Connection { get; set; }
+    [JsonPropertyName("wrong_number_pizza")] public int Wrong_Number_Pizza { get; set; }
+    [JsonPropertyName("wrong_number_other")] public int Wrong_Number_Other { get; set; }
+    [JsonPropertyName("stress_social")] public int Stress_Social { get; set; }
+    [JsonPropertyName("stress_economic")] public int Stress_Economic { get; set; }
+    [JsonPropertyName("stress_political")] public int Stress_Political { get; set; }
+    [JsonPropertyName("stress_legal")] public int Stress_Legal { get; set; }
+    [JsonPropertyName("stress_natural_resources")] public int Stress_Natural_Resources { get; set; }
+    [JsonPropertyName("consult_officer")] public int Consult_Officer { get; set; }
+    [JsonPropertyName("total")] public int Total { get; set; }
+}
+
+public class NonServiceContactDailyReportDto
+{
+    public DateOnly? Contact_Date { get; set; }
+    public int Kidding_Abnormal { get; set; }
+    public int Kidding_Child { get; set; }
+    public int Kidding_Rude { get; set; }
+    public int Kidding_Silent { get; set; }
+    public int Flood { get; set; }
+    public int Kidding_Total { get; set; }
+    public int Bad_Signal { get; set; }
+    public int Lost_Connection { get; set; }
+    public int Wrong_Number_Pizza { get; set; }
+    public int Wrong_Number_Other { get; set; }
+    public int Consult_Officer { get; set; }
+    public int Stress_Social { get; set; }
+    public int Stress_Economic { get; set; }
+    public int Stress_Political { get; set; }
+    public int Stress_Legal { get; set; }
+    public int Stress_Natural_Resources { get; set; }
+    public int Out_Of_Scope_Total { get; set; }
+    public int Total { get; set; }
+}
+
+ public class ServiceRequestReportContact
+    {
+        public DateTime ContactStart { get; set; }
+        // Kidding call
+        public int JitMaiPakati { get; set; }
+        public int DekThoLen { get; set; }
+        public int SiangNgiap { get; set; }
+        public int ThoDaYapKhai { get; set; }
+        public int NamThuam { get; set; }
+        // สัญญาณไม่ชัดเจน
+        public int SanyanMaiChatJen { get; set; }
+        // สายหลุด
+        public int SaiLut { get; set; }
+        // โทรผิด
+        public int UenUen { get; set; }
+        public int ThePizzaCompany { get; set; }
+        // Out of Scope
+        public int KhorKhamPrueksa { get; set; }
+        public int StressSocial { get; set; }
+        public int StressEconomy { get; set; }
+        public int StressPolitics { get; set; }
+        public int StressLaw { get; set; }
+        public int StressNaturalResource { get; set; }
+    }

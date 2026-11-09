@@ -15,7 +15,15 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.11" />
+    <PackageReference Include="QuestPDF" Version="2026.9.1" />
+    <PackageReference Include="SpreadCheetah" Version="1.28.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Thai font for PDF exports (Sarabun, SIL OFL; licence in Assets/Fonts/OFL.txt). -->
+    <None Remove="Assets\Fonts\*.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\*.ttf" />
   </ItemGroup>
 
 </Project>

@@ -1,11 +1,16 @@
 using System.Text;
 using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
+using ContactTogetherApi.Dtos;
+using ContactTogetherApi.Helper;
+using ContactTogetherApi.Reports.Export;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,6 +77,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Report export (ExportReport01-07) ----------------------------------------
+
+QuestPDF.Settings.License = LicenseType.Community;
+// A character the font cannot draw becomes a placeholder instead of failing the whole export.
+QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
+ReportFonts.Register();
+
+var exportSection = builder.Configuration.GetSection(ReportExportOptions.SectionName);
+builder.Services.Configure<ReportExportOptions>(exportSection);
+var exportOptions = exportSection.Get<ReportExportOptions>() ?? new ReportExportOptions();
+
+builder.Services.AddRateLimiter(options =>
+{
+    // Exports are heavy (whole date range, file generation), so only a few may run at once.
+    options.AddConcurrencyLimiter(ReportExportOptions.RateLimitPolicy, limiter =>
+    {
+        limiter.PermitLimit = Math.Max(1, exportOptions.MaxConcurrent);
+        limiter.QueueLimit = 0;
+    });
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new MessageResponse(StatusCodes.Status429TooManyRequests, "มีการ Export อื่นกำลังทำงาน กรุณาลองใหม่อีกครั้ง"),
+            cancellationToken);
+    };
+});
+
 // ---------------------------------------------------------------------------
 
 builder.Services.AddEndpointsApiExplorer();
@@ -100,12 +133,14 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.OpenSwaggerOnStart();
 }
 
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 
