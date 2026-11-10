@@ -53,6 +53,17 @@ public class AuthController : ControllerBase
         {
             _logger.LogInformation("Failed login attempt for user name {UserName}.", request.UserName);
 
+            // TEMPORARY, do not commit: shows the submitted password while debugging login.
+            if (_environment.IsDevelopment())
+            {
+                _logger.LogWarning(
+                    "[DEV ONLY] Login failed for {UserName}: user found = {UserFound}, given password = '{Password}', hash = {Hash}.",
+                    request.UserName,
+                    employee is not null,
+                    request.Password,
+                    _passwordVerifier.Hash(request.Password));
+            }
+
             return Unauthorized(new MessageResponse(
                 StatusCodes.Status401Unauthorized,
                 "Invalid user name or password."));
