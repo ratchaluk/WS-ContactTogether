@@ -76,8 +76,299 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Report 01 - P_Start / P_Finish are ISO 8601 Thai local date-times, yyyy-MM-ddTHH:mm:ss
+# (seconds optional, no offset or Z). Both ends are inclusive. Paged: pageNumber (>=1) and
+# pageSize (1..200) default to 1 and 20. The 200 response is a { status, message, data,
+# meta.pagination } envelope (empty result -> data: [], message: "ไม่พบข้อมูล").
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T08:00:00",
+  "p_Finish": "2026-07-31T17:00:00",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# 400 - P_Start missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+# 400 - no time part (the time is required)
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01",
+  "p_Finish": "2026-07-31"
+}
+
+###
+
+# 400 - old MM/dd/yyyy format is no longer accepted by Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "07/01/2026",
+  "p_Finish": "07/31/2026"
+}
+
+###
+
+# 400 - P_Start after P_Finish
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2026-08-01T00:00:00",
+  "p_Finish": "2026-07-01T00:00:00"
+}
+
+###
+
+# 400 - malformed JSON still answers with _0BaseReturn, not ProblemDetails
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport01
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+
+###
+
+# Report 02 - service requests with CallBack = "D"; same ISO 8601 request rules and paged
+# { status, message, data, meta.pagination } envelope as Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport02
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# Report 03 - service requests with CallBack = "Y"; same ISO 8601 request rules and paged
+# { status, message, data, meta.pagination } envelope as Report 01
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport03
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# Report 04 - service requests by organization. Same ISO 8601 date rules as Report 01. P_MainOrg and
+# P_SubOrg (TblOrganization.Id) are optional: none = every organization, P_MainOrg alone = that
+# organization and its sub-organizations, P_SubOrg = only that sub-organization. Paged:
+# pageNumber (>=1) and pageSize (1..200) default to 1 and 20; response is the paged
+# { status, message, data, meta.pagination } envelope.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "p_MainOrg": "00D1DA8C956043D5AD9B38299566A7F0",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# Report 04 - no organization: every organization
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport04
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
+}
+
+###
+
+# Report 05 - contact counts per day by the claim teams (groups 53/77), from TblContact.ContactStart.
+# Same ISO 8601 request as Report 01, but only the date part is used (ContactStart holds dates only).
+# Paged: pageNumber (>=1) and pageSize (1..200) default to 1 and 20. The 200 response is a
+# { status, message, data, meta.pagination } envelope.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport05
+Content-Type: application/json
+
+{
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# Report 06 - contact counts per day by creators in none of the groups 53/77 (claim, Report 05),
+# 79 (1212) or 68 (training). Same date request as Report 05; only the date part is used. Paged:
+# pageNumber (>=1) and pageSize (1..200) default to 1 and 20. The 200 response is a
+# { status, message, data, meta.pagination } envelope.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport06
+Content-Type: application/json
+
+{
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# Report 07 - service requests of one service type. Same ISO 8601 date rules as Report 01;
+# P_Service (top-level TblCategory.Id, e.g. Q&A below) is required. Paged: pageNumber (>=1) and
+# pageSize (1..200) default to 1 and 20. The 200 response is a { status, message, data, meta.pagination } envelope.
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport07
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59",
+  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+
+###
+
+# 400 - P_Service missing
+POST {{ContactTogetherApi_HostAddress}}/Report/GetReport07
+Content-Type: application/json
+
+{
+  "p_Start": "2026-01-01T00:00:00",
+  "p_Finish": "2026-12-31T23:59:59"
+}
+
+###
+
+# Export - ExportReport01..07 take the same body as GetReportXX (paging is ignored: the whole range is
+# exported) plus ?format=xlsx|pdf. [Authorize] is off while testing, so the token is optional for now.
+# 200 = the file (Content-Disposition carries the name), 400 = ProblemDetails, 429 = too many exports
+# running at once (401 = no token, once [Authorize] is back on).
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=xlsx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+# Export Report 04 - no organization = every organization
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport04?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59",
+  "p_MainOrg": "00D1DA8C956043D5AD9B38299566A7F0"
+}
+
+###
+
+# Export Report 06 - daily counts; only the date part of the range is used
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport06?format=xlsx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2014-01-01T00:00:00",
+  "p_Finish": "2014-12-31T23:59:59"
+}
+
+###
+
+# Export Report 07 - P_Service is required
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport07?format=pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59",
+  "p_Service": "0168B738100C4CBAB9AA45906AD4D8E5"
+}
+
+###
+
+# 400 - format missing or not xlsx/pdf
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=docx
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
+# Export without a token - 200 while [Authorize] is off for testing ("พิมพ์โดย -"), 401 once it is back on
+POST {{ContactTogetherApi_HostAddress}}/Report/ExportReport01?format=xlsx
+Content-Type: application/json
+
+{
+  "p_Start": "2026-07-01T00:00:00",
+  "p_Finish": "2026-07-31T23:59:59"
+}
+
+###
+
 # Logout - revokes the presented token for the remainder of its lifetime
 POST {{ContactTogetherApi_HostAddress}}/Auth/logout
 Authorization: Bearer {{token}}
+
+###
+
+# Development only (404 elsewhere) - hashes the password and checks it against the stored one.
+# Returns { hash, userFound, storedFormat: hash|plaintext|empty, matches }. The hash changes on every
+# call (random salt); paste it into TblEmployee.UserPassword to store this password hashed.
+POST {{ContactTogetherApi_HostAddress}}/Auth/hash-password
+Content-Type: application/json
+
+{
+  "userName": "admin",
+  "password": "P@ssw0rd!"
+}
+
+###
+
+# Helper - live server clock via Server-Sent Events. Streams an "event: time" frame every second
+# (override with ?intervalMs=500). Endless stream; cancel the request to stop. Anonymous.
+GET {{ContactTogetherApi_HostAddress}}/Helper/time/stream
+Accept: text/event-stream
 
 ###

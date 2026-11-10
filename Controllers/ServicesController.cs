@@ -48,7 +48,7 @@ public class ServicesController : ControllerBase
 
         var services = await ToResponses(_db.TblServices.AsNoTracking()
                 .Where(service => service.OwnerId == employeeId
-                    && (service.DateClosed == null || service.DateClosed == "")
+                    && service.DateClosed == null
                     && service.IsEnable == "T"))
             .ToListAsync(cancellationToken);
 
@@ -107,9 +107,10 @@ public class ServicesController : ControllerBase
         var organizationGroupId = Normalize(request.OrganizationGroup);
         var organizationId = Normalize(request.Organization);
         var createdFrom = request.ServiceCreatedFrom;
-        // A bare date means the whole of that day.
+        // A bare date means the whole of that day. Created is datetime2(0), so stop at the last whole
+        // second: a fractional value would be rounded up to the next midnight.
         var createdTo = request.ServiceCreatedTo is { TimeOfDay.Ticks: 0 } to
-            ? to.AddDays(1).AddTicks(-1)
+            ? to.AddDays(1).AddSeconds(-1)
             : request.ServiceCreatedTo;
 
         if (new[] { phoneNo, statusId, code, summary, categoryId, ownerId, organizationGroupId, organizationId }
@@ -175,15 +176,14 @@ public class ServicesController : ControllerBase
             services = services.Where(s => s.OrganizationId == organizationId);
         }
 
-        // Created is varchar, so it is parsed in SQL; rows whose text does not parse never match.
         if (createdFrom is not null)
         {
-            services = services.Where(s => ApplicationDbContext.ParseLegacyDate(s.Created) >= createdFrom);
+            services = services.Where(s => s.Created >= createdFrom);
         }
 
         if (createdTo is not null)
         {
-            services = services.Where(s => ApplicationDbContext.ParseLegacyDate(s.Created) <= createdTo);
+            services = services.Where(s => s.Created <= createdTo);
         }
 
         // None of these columns has an FK constraint, hence the manual joins. TblAccount.Id has legacy
@@ -201,7 +201,7 @@ public class ServicesController : ControllerBase
                 .Where(a => a.Id == service.AccountId)
                 .Select(a => new { a.SalutationTh, a.FirstnameTh, a.LastnameTh })
                 .FirstOrDefault()
-            orderby ApplicationDbContext.ParseLegacyDate(service.Created) descending, service.Code descending
+            orderby service.Created descending, service.Code descending
             select new
             {
                 service.Id,

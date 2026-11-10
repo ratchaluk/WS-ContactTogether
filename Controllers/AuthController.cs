@@ -19,19 +19,22 @@ public class AuthController : ControllerBase
     private readonly ITokenService _tokenService;
     private readonly ITokenRevocationStore _revocationStore;
     private readonly ILogger<AuthController> _logger;
+    private readonly IHostEnvironment _environment;
 
     public AuthController(
         ApplicationDbContext db,
         IPasswordVerifier passwordVerifier,
         ITokenService tokenService,
         ITokenRevocationStore revocationStore,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IHostEnvironment environment)
     {
         _db = db;
         _passwordVerifier = passwordVerifier;
         _tokenService = tokenService;
         _revocationStore = revocationStore;
         _logger = logger;
+        _environment = environment;
     }
 
     /// <summary>Authenticates an employee by user name and password and issues a JWT.</summary>
@@ -49,6 +52,18 @@ public class AuthController : ControllerBase
         if (employee is null || !_passwordVerifier.Verify(employee, request.Password))
         {
             _logger.LogInformation("Failed login attempt for user name {UserName}.", request.UserName);
+
+            // TEMPORARY, do not commit: shows the submitted password while debugging login.
+            if (_environment.IsDevelopment())
+            {
+                _logger.LogWarning(
+                    "[DEV ONLY] Login failed for {UserName}: user found = {UserFound}, given password = '{Password}', hash = {Hash}.",
+                    request.UserName,
+                    employee is not null,
+                    request.Password,
+                    _passwordVerifier.Hash(request.Password));
+            }
+
             return Unauthorized(new MessageResponse(
                 StatusCodes.Status401Unauthorized,
                 "Invalid user name or password."));
@@ -79,6 +94,38 @@ public class AuthController : ControllerBase
             EmployeeId = employee.Id ?? string.Empty,
             UserName = employee.UserName ?? string.Empty,
             RoleId = employee.RoleId ?? string.Empty,
+        });
+    }
+
+    /// <summary>
+    /// Development only: hashes a password and checks it against the employee's stored password with
+    /// the same check as <see cref="Login"/>. Answers 404 outside Development.
+    /// </summary>
+    [HttpPost("hash-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PasswordCheckResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> HashPassword([FromBody] LoginRequest request, CancellationToken cancellationToken)
+    {
+        if (!_environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
+        var employee = await _db.TblEmployees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.UserName == request.UserName, cancellationToken);
+
+        var stored = employee?.UserPassword;
+        return Ok(new PasswordCheckResponse
+        {
+            Hash = _passwordVerifier.Hash(request.Password),
+            UserFound = employee is not null,
+            StoredFormat = employee is null ? null
+                : string.IsNullOrEmpty(stored) ? "empty"
+                : _passwordVerifier.IsHash(stored) ? "hash"
+                : "plaintext",
+            Matches = employee is not null && _passwordVerifier.Verify(employee, request.Password),
         });
     }
 

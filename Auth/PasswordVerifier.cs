@@ -56,6 +56,8 @@ public class PasswordVerifier : IPasswordVerifier
 
     public string Hash(string password) => _hasher.HashPassword(new TblEmployee(), password);
 
+    public bool IsHash(string stored) => LooksLikeHash(stored);
+
     /// <summary>
     /// An ASP.NET Core password hash is Base64 of a payload whose first byte is the format marker:
     /// 0x00 for the 49-byte v2 layout, 0x01 for the 61-byte v3 layout.

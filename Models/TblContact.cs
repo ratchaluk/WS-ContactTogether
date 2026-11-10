@@ -11,13 +11,13 @@ public partial class TblContact
 
     public string? ContactDetail { get; set; }
 
-    public string? ContactStart { get; set; }
-
-    public string? ContactEnd { get; set; }
-
     public string? MenuIvr { get; set; }
 
     public string? ChannelId { get; set; }
 
     public string? CreatedBy { get; set; }
+
+    public DateTime? ContactStart { get; set; }
+
+    public DateTime? ContactEnd { get; set; }
 }

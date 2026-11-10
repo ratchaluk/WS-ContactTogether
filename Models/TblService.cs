@@ -15,10 +15,6 @@ public partial class TblService
 
     public string? OwnerId { get; set; }
 
-    public string? DateOpened { get; set; }
-
-    public string? DateClosed { get; set; }
-
     public string? ChannelIncomingId { get; set; }
 
     public string? CallBack { get; set; }
@@ -34,8 +30,6 @@ public partial class TblService
     public string? ServiceArea { get; set; }
 
     public string? OrganizationId { get; set; }
-
-    public string? OnScene { get; set; }
 
     public string? ServiceReference { get; set; }
 
@@ -53,11 +47,17 @@ public partial class TblService
 
     public string? IsEnable { get; set; }
 
-    public string? Created { get; set; }
-
     public string? CreatedBy { get; set; }
 
-    public string? Updated { get; set; }
-
     public string? UpdatedBy { get; set; }
+
+    public DateTime? Created { get; set; }
+
+    public DateTime? Updated { get; set; }
+
+    public DateTime? DateOpened { get; set; }
+
+    public DateTime? DateClosed { get; set; }
+
+    public DateTime? OnScene { get; set; }
 }

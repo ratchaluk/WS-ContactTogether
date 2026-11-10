@@ -5,10 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project
 
 ASP.NET Core Web API (`net10.0`, controller-based) over an existing SQL Server database for a
-contact-center / service-request ("Contact Together") system. The project is at an early stage: the
-EF Core data layer has been scaffolded from the database, but the only controller so far is the
-template `WeatherForecastController`. There is no solution file, no test project, and the directory
-is not a git repository.
+contact-center / service-request ("Contact Together") system. The EF Core data layer is scaffolded
+from the database (database-first); endpoints are hand-written controllers on top of it. There is
+no solution file and no test project (`FilesTest/` is a placeholder, not tests).
 
 ## Commands
 
@@ -16,34 +15,27 @@ is not a git repository.
 dotnet build
 dotnet run                          # uses the "http" launch profile -> http://localhost:5018
 dotnet run --launch-profile https   # https://localhost:7066
-dotnet watch run                    # hot reload
+dotnet run watch                    # same as dotnet run (the app ignores "watch"); no hot reload
 ```
 
 Swagger UI (`/swagger`) is only mapped when `ASPNETCORE_ENVIRONMENT=Development`; both launch
-profiles set it.
+profiles set it. In Development, [Helper/SwaggerBrowserLauncher.cs](Helper/SwaggerBrowserLauncher.cs)
+logs the Swagger URL and opens it in the browser on startup. Turn that off with
+`Swagger:OpenBrowser=false` (e.g. `dotnet run -- --Swagger:OpenBrowser=false`).
 
-[ContactTogetherApi.http](ContactTogetherApi.http) holds request samples runnable from VS / VS Code
-REST clients.
+[ContactTogetherApi.http](ContactTogetherApi.http) holds runnable request samples (VS / VS Code REST
+clients). Its `login` request captures the token into `@token` for the requests after it; keep new
+endpoint samples in that file.
 
-### Connection string
+### Secrets
 
-`ConnectionStrings:DefaultConnection` is intentionally empty in
-[appsettings.json](appsettings.json). The real value lives in user secrets
-(`UserSecretsId` `5bd7ea0f-c854-4557-bbae-52312de693be`):
+`ConnectionStrings:DefaultConnection` and `Jwt:Key` are intentionally empty in
+[appsettings.json](appsettings.json); the real values live in user secrets (`UserSecretsId`
+`5bd7ea0f-c854-4557-bbae-52312de693be`). Startup throws if `Jwt:Key` is shorter than 32 characters.
 
 ```powershell
 dotnet user-secrets list
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<value>"
-```
-
-Keep the committed `appsettings*.json` free of credentials.
-
-### JWT signing key
-
-`Jwt:Key` is likewise empty in [appsettings.json](appsettings.json) and must come from user secrets.
-Startup throws if it is shorter than 32 characters:
-
-```powershell
 dotnet user-secrets set "Jwt:Key" "<random value, 32+ chars>"
 ```
 
@@ -52,40 +44,131 @@ The rest of the `Jwt` section (`Issuer`, `Audience`, `ExpiresMinutes`) is safe t
 
 ### Regenerating the data layer
 
-Models and `ApplicationDbContext` are **scaffolded output** — do not hand-edit them; changes are
-lost on the next scaffold. Re-scaffold after a schema change:
+Models and `ApplicationDbContext` are **scaffolded output**. Do not hand-edit them, because the
+next scaffold overwrites the changes. Re-scaffold after a schema change:
 
 ```powershell
 dotnet ef dbcontext scaffold "Name=ConnectionStrings:DefaultConnection" Microsoft.EntityFrameworkCore.SqlServer `
   --context ApplicationDbContext --context-dir Data --output-dir Models --no-onconfiguring --force
 ```
 
-There are no EF migrations and none should be added — the database is the source of truth
-(database-first). `dotnet ef` (10.0.11) is installed.
+Keep both the `Name=` connection argument and `--no-onconfiguring`. Without them the scaffolder
+writes an `OnConfiguring` override into `ApplicationDbContext` that hard-codes the connection
+string, password included, and emits a `CS1030` `#warning`. That override runs after the options
+from `AddDbContext` in `Program.cs`, so it silently replaces the user-secrets connection string. It
+also puts the password into git. If it ever shows up, delete the whole `OnConfiguring` method
+before committing. `Program.cs` already configures the context, and nothing calls the
+parameterless constructor.
+
+There are no EF migrations and none should be added; the database is the source of truth.
+
+## Git workflow
+
+From [README.md](README.md): work on a new branch per task, push it, open a pull request on GitHub,
+and wait for approval. Delete the branch (remote and local `git branch -D`) after it is merged.
+[.github/workflows/telegram-pr.yml](.github/workflows/telegram-pr.yml) posts PR and review events to
+Telegram. It is the only CI and does not build or test anything.
+
+The project skill `.claude/skills/git-commit-guide` (`<type>(<scope>): <subject>`, English subject,
+72 chars or fewer, present tense) was copied from a Next.js project. Its type list applies here, but
+its scopes, `.env`/Prisma gotchas and `npm run lint` checklist do not. Use scopes that match this
+repo (e.g. `auth`, `account`, `report`, `user-management`, `lov`, `data`). Existing history mixes
+these with free-form Thai messages.
 
 ## Architecture
 
-- [Program.cs](Program.cs) — minimal top-level setup: controllers, `ApplicationDbContext` on SQL
-  Server, JWT bearer authentication, Swagger (with a bearer security scheme) in Development, HTTPS
-  redirection, `UseAuthentication()` → `UseAuthorization()`.
-- [Auth/](Auth/) — hand-written authentication services, all registered in `Program.cs`:
-  `JwtTokenService` issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
-  `MemoryTokenRevocationStore` holds logged-out `jti` values. See "Authentication" below.
-- [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs) — single `partial` DbContext, ~30
-  `DbSet`s, all mapping configured in `OnModelCreating`. It calls `partial void
-  OnModelCreatingPartial(ModelBuilder)`: **put hand-written model configuration in a separate
-  partial class implementing that method**, so re-scaffolding does not clobber it.
-- [Models/](Models/) — one `partial` POCO per table, no data annotations (all configuration is
-  fluent, in the context).
-- [Dtos/](Dtos/) — hand-written request/response shapes. Never put these in `Models/`, which is
-  scaffolded output.
-- [Controllers/](Controllers/) — `[ApiController]` + `[Route("[controller]")]` convention.
+- [Program.cs](Program.cs): controllers, `ApplicationDbContext` on SQL Server, JWT bearer auth,
+  Swagger (with a bearer scheme) in Development, QuestPDF licence and font registration, the
+  `report-export` rate limiter, `UseAuthentication()` → `UseAuthorization()` → `UseRateLimiter()`.
+- [Reports/](Reports/): report export layouts and the PDF/Excel writers (see Exports below).
+- [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
+  issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
+  `MemoryTokenRevocationStore` holds logged-out `jti` values.
+- [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs): a single `partial` DbContext with
+  all mapping in `OnModelCreating`. **Put hand-written model configuration in a separate partial
+  class implementing `OnModelCreatingPartial`** so re-scaffolding does not clobber it.
+- [Models/](Models/): one scaffolded `partial` POCO per table, no data annotations.
+- [Dtos/](Dtos/): hand-written request/response shapes. Never put these in `Models/`.
+- [Controllers/](Controllers/): `[ApiController]` + `[Route("[controller]")]`. Controllers
+  inject `ApplicationDbContext` directly and query with LINQ. There is no service or repository
+  layer.
+
+### Controllers
+
+- `AuthController`: `POST /Auth/login`, `POST /Auth/logout`.
+- `UserManagementController` (`POST employees`), `AccountController` (`POST accounts`,
+  `GET by-phone`), and `ListOfValuesController` (`GET channels`, lookup lists for UI drop-downs).
+  These set the house style: namespaced DTOs in `Dtos/`, `[ProducesResponseType]`, a
+  `CancellationToken`, `AsNoTracking()` for reads, `ValidationProblem(ModelState)` for bad input,
+  and `MessageResponse` for other errors. Because the schema has no FKs, these controllers check
+  lookup ids (`GenderId`, `RoleId`, `AreaId`, …) against their tables in a `ValidateLookupsAsync`
+  helper before inserting.
+- `ReportController`: `POST /Report/GetReport01`…`GetReport07`, each a large multi-join LINQ query
+  over `TblService`. `GetReportXX` are **anonymous at the moment** (`[Authorize]` is commented out
+  on the class). The export actions are anonymous too for now: their own `[Authorize]` is commented
+  out while the exports are being tested. It is a `partial` class. Its DTOs
+  (`ServiceRequestReportRequest*`, `ServiceRequestReportDto`, …) live in
+  [Dtos/RequestModel.cs](Dtos/RequestModel.cs) and [Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)
+  in the **global namespace**. Every report takes `ServiceRequestReportDateTimeRequest` (04 and 07
+  take its subclasses `ServiceRequestReportRequestMainOrganization` and
+  `ServiceRequestReportRequestService`): `P_Start`/`P_Finish` as ISO 8601 Thai
+  local date-times, `yyyy-MM-ddTHH:mm:ss` (seconds optional, no offset or `Z`), parsed by
+  `TryBuildDateTimeRange`. It uses `InvariantCulture` and does no time-zone conversion, so the
+  server's locale and time zone do not affect it. The range includes the end value.
+  - 01–04 and 07 filter `TblService.Created` by the full date-time. 02 = `Call_Back` `D` (dropped
+    call), 03 = `Y` (callback wanted; its rows also carry `ContactNo`, the account's phone).
+  - 07 also requires `P_Service`, a top-level `TblCategory.Id` (Q&A, Claim, …), compared with
+    `TblService.CategoryId`. Those top-level categories point `RefId` at themselves.
+  - 04 takes optional `P_MainOrg`/`P_SubOrg`: none = every organization, `P_MainOrg` alone = that
+    organization or its direct sub-organizations (`org.Id` or `org2.Id`), `P_SubOrg` = only it.
+  - 05/06 count contacts per day and use only the date part, because `TblContact.ContactStart`
+    holds dates only. 05 counts contacts created by employees whose `Position` contains "Claim"; 06
+    counts the rest (creator not Claim, in some group other than 39). Both count only the four
+    top-level Non-Service categories.
+  - Each report's query lives in a `LoadReportXXAsync` method that returns every row of the range,
+    sorted. `GetReportXX` pages that list in memory, because EF Core 10 cannot translate
+    `Count()`/`OFFSET` over a `Distinct()` of these projections. `ExportReportXX` uses the same
+    method, so a file always matches the screen.
+- **Exports**: `POST /Report/ExportReport01`…`07?format=xlsx|pdf`
+  ([Controllers/ReportController.Export.cs](Controllers/ReportController.Export.cs)) take the
+  `GetReportXX` body, ignore paging, and return a file. `[Authorize]` on each action is commented
+  out during testing (re-enable it before release, since the files hold callers' names and phone
+  numbers). The `report-export` concurrency limiter (`ReportExport:MaxConcurrent`, default 2) answers 429 beyond
+  that. Layouts (title, columns, legacy value formats) are in
+  [Reports/ReportLayouts.cs](Reports/ReportLayouts.cs) and follow the legacy samples in
+  `docs/report01.pdf`–`report06.pdf`. The writers in [Reports/Export/](Reports/Export/) are generic:
+  Excel via SpreadCheetah (streams rows), PDF via QuestPDF (Community licence, Sarabun font embedded
+  from `Assets/Fonts`). PDFs over 3,000 rows are generated in chunks, merged with QuestPDF's
+  `DocumentOperation`, and numbered by an overlay, which keeps memory per chunk. Design notes and
+  measurements: [docs/report-export-design.md](docs/report-export-design.md); frontend guide:
+  [docs/report-api.md](docs/report-api.md).
+
+#### Response shape and status codes
+
+`GetReportXX` answer 200 with `PagedEnvelope<T>` ([Dtos/ResponseModel.cs](Dtos/ResponseModel.cs)):
+`{ status, message, data, meta.pagination }`, with snake_case pagination keys. `message` is Thai
+text that can be shown to users (`พบข้อมูล N รายการ` / `ไม่พบข้อมูล`). Bad input returns
+`ValidationProblem(ModelState)`, and other failures return `MessageResponse`, as in the other
+controllers. Never put `ex.Message` in a response.
+
+| HTTP | When | Body |
+|---|---|---|
+| 200 | Success, **including a report with no rows** (`data: []`) | `PagedEnvelope<T>`, or the file for exports |
+| 400 | Bad input: missing field, wrong format, start after finish, malformed JSON | ProblemDetails |
+| 401 | No token, an expired token, or a logged-out token (once `[Authorize]` is back on) | empty (JwtBearer) |
+| 429 | Too many exports running at once | `MessageResponse` |
+| 500 | Unexpected failure. Log it and answer `เกิดข้อผิดพลาดภายในระบบ` | `MessageResponse` |
+
+A request the client cancels (`OperationCanceledException`) is not caught and gets no body.
+- `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
+  are leftover template code and can be deleted.
+
+When inserting rows, follow the existing conventions. Leave `Id` unset (see **Keys** below), and
+take `CreatedBy`/`UpdatedBy` from the token's `sub` claim, never from the request body.
 
 ### Authentication
 
-[Controllers/AuthController.cs](Controllers/AuthController.cs) exposes `POST /Auth/login` (user name
-+ password against `TblEmployee`, returns a JWT) and `POST /Auth/logout` (`[Authorize]`, revokes the
-presented token). Endpoints opt in to protection with `[Authorize]`; everything else stays anonymous.
+Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 
 - **Passwords** — `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)` (widened from
   `varchar(50)` on 2026-10-07 — the 84-char PBKDF2 hash did not fit).
@@ -99,24 +182,25 @@ presented token). Endpoints opt in to protection with `[Authorize]`; everything 
   out to more than one instance requires a shared store (Redis or a table).
 - **Claims** — `sub` = `TblEmployee.Id`, `name` = `UserName`, `role` = `RoleId`, `org` =
   `OrganizationId`, `lang` = `DefaultLanguage`. Inbound claim mapping is disabled, so these arrive
-  under exactly those names; constants live in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs).
-  `role` carries the raw `RoleId`, so `[Authorize(Roles = ...)]` matches on ids, not role names —
-  per-page rights still have to be read from `TblRolePage`.
+  under exactly those names (constants are in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs)).
+  `role` is the raw `RoleId`, so `[Authorize(Roles = ...)]` matches ids, not names. Per-page rights
+  must be read from `TblRolePage`.
 
 ### Domain shape
 
-`TblService` is the central service-request entity (opened/closed dates, channel in/out, owner,
-category, status, severity/priority/secrecy levels, area, organization), with `TblActivity` as its
-per-request work log (composite key `ServiceId` + `Line`) and `TblReopenedLog` tracking reopenings
-(composite key `SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side;
-`TblEmployee` + `TblRole` + `TblRolePage` is the agent side and per-page permission matrix
-(`IsInsert`/`IsUpdate`/`IsDelete`/`IsSearch`/`IsDownload`/`IsPrint`/`IsOpen`/`IsAdmin`).
-`TblRunning` drives formatted running numbers (`RunningFormat`, `RunningNext`) for codes such as
-service-request numbers.
+`TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
+channel, owner, category, status, severity/priority/secrecy levels, area, organization).
+`TblActivity` is its per-request work log (composite key `ServiceId` + `Line`; `ContactId` →
+`TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
+`SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+`DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
+the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
+codes such as service-request numbers. Reports resolve the "main organization" by joining
+`TblOrganization` twice (`org.RefId` → parent).
 
 ### Conventions inherited from the database
 
-These are quirks of the existing schema, not choices to "clean up" in the models:
+These are quirks of the existing schema. Do not "clean them up" in the models:
 
 - **Flags are `string`, not `bool`** — `IsEnable`, `IsDefault`, `IsAdmin`, `TblAccount.IsScret` (sic), etc. are
   `nvarchar(10)`. Compare/assign them as strings; do not change the property types.
@@ -124,6 +208,13 @@ These are quirks of the existing schema, not choices to "clean up" in the models
   New rows get a UUID key automatically (32 upper-case hex chars, no dashes): `ApplicationDbContext.Keys.cs`
   attaches `GuidStringValueGenerator` to every single-string primary key, so leave `Id` unset when
   inserting. Use `GuidStringValueGenerator.NewId()` if you need an id before `Add()`.
+- **Dates are mixed.** `TblService.Created`/`Updated`/`DateOpened`/`DateClosed`/`OnScene` and
+  `TblContact.ContactStart`/`ContactEnd` are `datetime2(0)` (`DateTime?`) holding Thai local time, so
+  compare them as `DateTime`. They used to be text, and copies of the database that still have text
+  columns no longer match these models. Other date columns (`TblAccount`, `TblEmployee`, …) are still
+  month-first text such as `05/30/2024 15:26`, which the legacy application parses. Write them with
+  the `LegacyDateFormat` constant of `AccountController`/`UserManagementController`, and filter them
+  in SQL with `ApplicationDbContext.ParseLegacyDate`.
 - **Lookup tables are self-referencing hierarchies** via `RefId` → `Ref` / `InverseRef`:
   `TblCategory`, `TblArea`, `TblStatus`, `TblOrganization`. The root/parent convention matters when
   querying these.
@@ -136,12 +227,4 @@ These are quirks of the existing schema, not choices to "clean up" in the models
   `TblBroadcastGroup→TblBroadcast`, plus the self-references). Expect to join on ID columns
   manually rather than assuming a navigation exists.
 - `TblAccount1` maps the keyless legacy import table `TblAccounts` (columns literally named
-  `Column1 Address`, etc.) — an import staging artifact, distinct from `TblAccount`. Likewise
-  `TblAccount.Created`/`Updated`/`Birthdate` are `string` there while other tables use `DateTime`.
-
-## Cleanup left from the template
-
-[WeatherForecast.cs](WeatherForecast.cs),
-[Controllers/WeatherForecastController.cs](Controllers/WeatherForecastController.cs), and the
-sample request in the `.http` file are scaffolding from `dotnet new webapi` and can be deleted once
-real endpoints exist.
+  `Column1 Address`, etc.). It is a staging artifact, distinct from `TblAccount`.
