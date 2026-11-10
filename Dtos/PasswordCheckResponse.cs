@@ -4,8 +4,8 @@ namespace ContactTogetherApi.Dtos;
 public class PasswordCheckResponse
 {
     /// <summary>
-    /// A new PBKDF2 hash of the given password. The salt is random, so it differs on every call: it
-    /// can be stored in <c>TblEmployee.UserPassword</c>, but not compared with the stored value as text.
+    /// The legacy GCC MD5 hash of the given password, as <c>TblEmployee.UserPassword</c> stores it. It
+    /// is unsalted, so it equals the stored value whenever the password is right.
     /// </summary>
     public string Hash { get; set; } = string.Empty;
 
