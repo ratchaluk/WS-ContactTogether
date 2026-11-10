@@ -171,11 +171,13 @@ take `CreatedBy`/`UpdatedBy` from the token's `sub` claim, never from the reques
 Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 
 - **Passwords** — `TblEmployee.UserPassword` is an unconstrained `nvarchar(255)` (widened from
-  `varchar(50)` on 2026-10-07 — the 84-char PBKDF2 hash did not fit).
-  [Auth/PasswordVerifier.cs](Auth/PasswordVerifier.cs) treats a value that decodes to the ASP.NET
-  Core PBKDF2 layout as a hash and everything else as plain text. That fallback is on by default;
-  set `Auth:AllowLegacyPlaintextPasswords` to `false` once all rows are hashed. New passwords should
-  be stored via `IPasswordVerifier.Hash`.
+  `varchar(50)` on 2026-10-07). Nearly every row uses the legacy GCC web application's format,
+  `MD5String(encryptString(pw))` from `2022GCC/ClassCode/General/GeneralClass.cs`: RC2-CBC with a
+  fixed key and IV, Base64, then MD5 as 32 lower-case hex digits, unsalted. That application still
+  logs users in against this column, so `IPasswordVerifier.Hash` writes this format; always store new
+  passwords through it. **Do not switch to a plain `MD5(password)`**: it matches almost no rows.
+  `Verify` also accepts a bare MD5 digest, an ASP.NET Core PBKDF2 hash, and plain text; the plain-text
+  fallback is on by default, so set `Auth:AllowLegacyPlaintextPasswords` to `false` once no rows need it.
 - **Logout** — JWTs are stateless, so logout records the token's `jti` in
   [Auth/MemoryTokenRevocationStore.cs](Auth/MemoryTokenRevocationStore.cs) until its `exp`, and the
   `OnTokenValidated` event in `Program.cs` rejects it from then on. The store is per-process: scaling
