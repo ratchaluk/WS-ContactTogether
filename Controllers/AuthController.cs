@@ -47,6 +47,7 @@ public class AuthController : ControllerBase
         // The DB collation is Thai_100_CS_AI, so this comparison is case-sensitive in SQL.
         var employee = await _db.TblEmployees
             .AsNoTracking()
+            .Where(e => e.IsEnable == "T")
             .FirstOrDefaultAsync(e => e.UserName == request.UserName, cancellationToken);
 
         if (employee is null || !_passwordVerifier.Verify(employee, request.Password))
