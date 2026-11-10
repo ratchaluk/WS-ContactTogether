@@ -9,4 +9,7 @@ public interface IPasswordVerifier
 
     /// <summary>Produces a value suitable for storing in <see cref="TblEmployee.UserPassword"/>.</summary>
     string Hash(string password);
+
+    /// <summary>Whether a stored value is a hash made by <see cref="Hash"/> rather than plain text.</summary>
+    bool IsHash(string stored);
 }

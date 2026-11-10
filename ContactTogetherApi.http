@@ -353,6 +353,19 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Development only (404 elsewhere) - hashes the password and checks it against the stored one.
+# Returns { hash, userFound, storedFormat: hash|plaintext|empty, matches }. The hash changes on every
+# call (random salt); paste it into TblEmployee.UserPassword to store this password hashed.
+POST {{ContactTogetherApi_HostAddress}}/Auth/hash-password
+Content-Type: application/json
+
+{
+  "userName": "admin",
+  "password": "P@ssw0rd!"
+}
+
+###
+
 # Helper - live server clock via Server-Sent Events. Streams an "event: time" frame every second
 # (override with ?intervalMs=500). Endless stream; cancel the request to stop. Anonymous.
 GET {{ContactTogetherApi_HostAddress}}/Helper/time/stream
