@@ -11,8 +11,8 @@ POST {{ContactTogetherApi_HostAddress}}/Auth/login
 Content-Type: application/json
 
 {
-  "userName": "admin",
-  "password": "P@ssw0rd!"
+  "userName": "man",
+  "password": "1234"
 }
 
 ###
@@ -47,15 +47,68 @@ Content-Type: application/json
 ###
 
 # List of values - enabled channels as { id, nameTh }
-GET {{ContactTogetherApi_HostAddress}}/ListOfValues/channels
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetChannel
 Authorization: Bearer {{token}}
 
 ###
+
+# List of values - enabled channels as { id, nameTh }
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetServiceType
+Authorization: Bearer {{token}}
+
+###
+
 
 # Address dataset - every province / district / subdistrict for the three linked drop-downs.
 # Returns { version, province[{id,name}], district[{id,provinceId,name}],
 # subdistrict[{id,districtId,name,zipcode}] }. version changes only when the data does.
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetAddressDataset
+Authorization: Bearer {{token}}
+
+###
+
+# Address, one level at a time (instead of GetAddressDataset). Only enabled rows; an unknown or
+# disabled parent id gives []. A missing or non-numeric id gives 400 (ProblemDetails).
+# Provinces - [{ id, name }]
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetProvince
+Authorization: Bearer {{token}}
+
+###
+
+# The ids are the tables' own running numbers, not the DOPA codes (14 = เชียงใหม่ here, not 50).
+# Districts of one province - [{ id, provinceId, name }]  (14 = เชียงใหม่)
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetDistrict?provinceId=14
+Authorization: Bearer {{token}}
+
+###
+
+# Subdistricts of one district, each with its zipcode - [{ id, districtId, name, zipcode }]
+# (218 = เมืองเชียงใหม่). The zipcode belongs to the subdistrict: 1 district in 5 has more than one
+# (เมืองเชียงใหม่ has 50000/50100/50200/50300), so fill it in when a subdistrict is picked.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetSubdistrict?districtId=218
+Authorization: Bearer {{token}}
+
+###
+
+# Genders - enabled TblGender rows as [{ id, nameTh, nameEn, isDefault }]. isDefault is "T"/"F";
+# send id back as genderId when adding an account or an employee.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetGender
+Authorization: Bearer {{token}}
+
+###
+
+# Roles - enabled TblRole rows as [{ id, nameTh, nameEn, levelSecretId, isDefault, isAdmin }].
+# isDefault / isAdmin are "T"/"F"; levelSecretId is a TblLevel.Id. Send id back as roleId when
+# adding an employee.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetRole
+Authorization: Bearer {{token}}
+
+###
+
+# Call types (ประเภทการรับสาย) - the enabled TblCategory rows with CategoryType "CONTACT", as a tree
+# of [{ id, nameTh, nameEn, children[] }]: group (Service / Non Service) > radio > drop-down.
+# Save the id of the leaf the user picked as TblContact.CategoryId (the radio itself if it has no children).
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetContactType
 Authorization: Bearer {{token}}
 
 ###
@@ -98,6 +151,257 @@ Content-Type: application/json
   "callBack": "N",
   "summary": "ทดสอบเปิดเรื่อง",
   "detail": "รายละเอียด"
+}
+
+###
+
+# ---------------------------------------------------------------------------------------------
+# AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
+# channelId comes from GetChannel; categoryId is a leaf of GetContactType (the drop-down item, or
+# the radio itself when it has none). ID, CreatedBy (token sub) and ContactEnd (now) are set by the
+# server; contactStart is optional (Thai local time, no offset/Z, defaults to now).
+# 201 = the saved row with channelNameTh / categoryNameTh.
+#
+# NOTE: every 201 case writes a real row. They all use contactDetail 0899999999 so the test rows can
+# be found (and removed by hand) afterwards:
+#   SELECT * FROM TblContact WHERE ContactDetail = '0899999999'
+#
+# Ids used below: channel Phone 332E6D76F258C8294B160C20642AB9F5, Facebook 332E6D76F258C8294B160C20642AB915.
+# Call types: New Service ...A100011, Follow Up ...A100022, สายหลุด ...A200003,
+# สัญญาณไม่ชัดเจน ...A200002, โทรเล่น > เด็กโทรเล่น ...A200013, โทรผิด > The Pizza Company ...A200017,
+# Out of Scope > ขอคำปรึกษาเจ้าหน้าที่ ...A200006 (prefix 0168B738100C4CBAB9AA45906).
+# ---------------------------------------------------------------------------------------------
+
+# 201 - Service > New Service (a radio without a drop-down), with contactStart (any past time works)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A100011",
+  "contactStart": "2026-11-11T10:15:00"
+}
+
+###
+
+# 201 - Service > Follow Up, without contactStart (ContactStart = ContactEnd = now)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A100022"
+}
+
+###
+
+# 201 - Non Service > สายหลุด (a radio without a drop-down)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003"
+}
+
+###
+
+# 201 - Non Service > สัญญาณไม่ชัดเจน, spaces around the number are trimmed ("0899999999" is saved)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "  0899999999  ",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200002"
+}
+
+###
+
+# 201 - Non Service > โทรเล่น > เด็กโทรเล่น (the drop-down item, not the radio)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200013"
+}
+
+###
+
+# 201 - Non Service > โทรผิด > The Pizza Company
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200017"
+}
+
+###
+
+# 201 - Non Service > Out of Scope > ขอคำปรึกษาเจ้าหน้าที่, channel Facebook
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB915",
+  "categoryId": "0168B738100C4CBAB9AA45906A200006"
+}
+
+###
+
+# 400 - categoryId is a radio that has a drop-down (Out of Scope): send the drop-down item instead
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200005"
+}
+
+###
+
+# 400 - categoryId is a group heading (Non Service), not a choice
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A100002"
+}
+
+###
+
+# 400 - categoryId is a service type (Q&A, CategoryType SERVICE), not a call type
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906AD4D8E5"
+}
+
+###
+
+# 400 - channelId does not exist in TblChannel
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003"
+}
+
+###
+
+# 400 - every required field missing (contactDetail, channelId, categoryId)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+}
+
+###
+
+# 400 - contactDetail is blank (spaces only count as empty)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "   ",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003"
+}
+
+###
+
+# 400 - contactDetail longer than 50 characters (the column is varchar(50))
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "089999999908999999990899999999089999999908999999990",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003"
+}
+
+###
+
+# 400 - contactStart in the future
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003",
+  "contactStart": "2099-01-01T00:00:00"
+}
+
+###
+
+# 400 - contactStart with Z (UTC); send Thai local time without an offset instead
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003",
+  "contactStart": "2026-11-12T03:15:00Z"
+}
+
+###
+
+# 400 - contactStart is not a date-time JSON can read (old MM/dd/yyyy format)
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003",
+  "contactStart": "11/12/2026 10:15"
+}
+
+###
+
+# 401 - no token
+POST {{ContactTogetherApi_HostAddress}}/Contact/AddNewContact
+Content-Type: application/json
+
+{
+  "contactDetail": "0899999999",
+  "channelId": "332E6D76F258C8294B160C20642AB9F5",
+  "categoryId": "0168B738100C4CBAB9AA45906A200003"
 }
 
 ###

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ContactTogetherApi.Controllers;
 
-/// <summary>Read-only lookup lists that feed the drop-downs in the UI.</summary>
+/// <summary>รายการข้อมูลอ้างอิง (อ่านอย่างเดียว) สำหรับ drop-down ในหน้าจอ</summary>
 [ApiController]
 [Route("[controller]")]
 public class ListOfValuesController : ControllerBase
@@ -21,7 +22,7 @@ public class ListOfValuesController : ControllerBase
         _db = db;
     }
 
-    /// <summary>Returns the enabled rows of <c>TblChannel</c> as id + Thai name.</summary>
+    /// <summary>คืนรายการช่องทาง (<c>TblChannel</c>) ที่เปิดใช้งาน เป็น id และชื่อภาษาไทย</summary>
     [HttpGet("GetChannel")]
     [Authorize]
     [ProducesResponseType(typeof(IEnumerable<LookupItemResponse>), StatusCodes.Status200OK)]
@@ -43,7 +44,7 @@ public class ListOfValuesController : ControllerBase
         return Ok(channels);
     }
 
-    /// <summary>Returns the enabled rows of <c>TblCategory</c> as service types.</summary>
+    /// <summary>คืนรายการประเภทบริการ (<c>TblCategory</c>) ที่เปิดใช้งาน</summary>
     [HttpGet("GetServiceType")]
     [Authorize]
     [ProducesResponseType(typeof(IEnumerable<ServiceTypeResponse>), StatusCodes.Status200OK)]
@@ -68,10 +69,9 @@ public class ListOfValuesController : ControllerBase
     }
 
     /// <summary>
-    /// Returns every enabled province, district and subdistrict in one response, for the three linked
-    /// address drop-downs. Each child carries its parent's id, so picking a subdistrict fills in its
-    /// district and province, and picking a district fills in its province. A child whose parent is
-    /// disabled is left out.
+    /// คืนจังหวัด อำเภอ และตำบลที่เปิดใช้งานทั้งหมดในครั้งเดียว สำหรับ drop-down ที่อยู่ 3 ตัวที่ผูกกัน
+    /// แต่ละรายการมี id ของระดับแม่ติดมาด้วย เลือกตำบลแล้วเติมอำเภอและจังหวัดได้ เลือกอำเภอแล้วเติมจังหวัดได้
+    /// รายการที่ระดับแม่ถูกปิดใช้งานจะไม่ถูกส่งมา
     /// </summary>
     [HttpGet("GetAddressDataset")]
     [Authorize]
@@ -137,10 +137,195 @@ public class ListOfValuesController : ControllerBase
 
     private static int ParseId(string id) => int.Parse(id.Trim(), CultureInfo.InvariantCulture);
 
-    /// <summary>The first 16 hex digits of a SHA-256 over the lists, so it changes whenever the data does.</summary>
+    /// <summary>เลขฐานสิบหก 16 หลักแรกของ SHA-256 ที่คำนวณจากทั้งสามรายการ จึงเปลี่ยนทุกครั้งที่ข้อมูลเปลี่ยน</summary>
     private static string ComputeVersion(AddressDatasetResponse response)
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(new { response.Province, response.District, response.Subdistrict });
         return Convert.ToHexStringLower(SHA256.HashData(json))[..16];
     }
+
+    // Per-level address endpoints: the UI loads one level at a time as the user picks, instead of the
+    // whole GetAddressDataset up front. Same filtering as GetAddressDataset: only enabled rows, and a
+    // child whose parent is disabled is left out. An unknown or disabled parent id gives an empty list.
+
+    /// <summary>คืนจังหวัดที่เปิดใช้งานทั้งหมด สำหรับ drop-down ที่อยู่ตัวแรก</summary>
+    [HttpGet("GetProvince")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ProvinceResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetProvince(CancellationToken cancellationToken)
+    {
+        var provinces = await _db.TblProvinces.AsNoTracking()
+            .Where(p => p.IsEnable == "T")
+            .OrderBy(p => p.ProvinceName)
+            .Select(p => new { p.ProvinceId, p.ProvinceName })
+            .ToListAsync(cancellationToken);
+
+        return Ok(provinces.Select(p => new ProvinceResponse
+        {
+            Id = ParseId(p.ProvinceId),
+            Name = p.ProvinceName,
+        }));
+    }
+
+    /// <summary>คืนอำเภอที่เปิดใช้งานของจังหวัดที่ระบุ (<c>TblProvince.ProvinceId</c>)</summary>
+    [HttpGet("GetDistrict")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<DistrictResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetDistrict([FromQuery, Required] int? provinceId, CancellationToken cancellationToken)
+    {
+        var id = provinceId!.Value.ToString(CultureInfo.InvariantCulture);
+
+        var districts = await (
+            from d in _db.TblDistricts.AsNoTracking()
+            join p in _db.TblProvinces.AsNoTracking() on d.ProvinceId equals p.ProvinceId
+            where d.ProvinceId == id && d.IsEnable == "T" && p.IsEnable == "T"
+            orderby d.DistrictName
+            select new { d.DistrictId, d.ProvinceId, d.DistrictName })
+            .ToListAsync(cancellationToken);
+
+        return Ok(districts.Select(d => new DistrictResponse
+        {
+            Id = ParseId(d.DistrictId),
+            ProvinceId = ParseId(d.ProvinceId),
+            Name = d.DistrictName,
+        }));
+    }
+
+    /// <summary>
+    /// คืนตำบลที่เปิดใช้งานของอำเภอที่ระบุ (<c>TblDistrict.DistrictId</c>) พร้อมรหัสไปรษณีย์ของแต่ละตำบล
+    /// รหัสไปรษณีย์ผูกกับตำบล ไม่ใช่อำเภอ เพราะประมาณ 1 ใน 5 ของอำเภอมีหลายรหัส
+    /// หน้าจอจึงเติมรหัสไปรษณีย์ตอนเลือกตำบล
+    /// </summary>
+    [HttpGet("GetSubdistrict")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<SubdistrictResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSubdistrict([FromQuery, Required] int? districtId, CancellationToken cancellationToken)
+    {
+        var id = districtId!.Value.ToString(CultureInfo.InvariantCulture);
+
+        var subdistricts = await (
+            from s in _db.TblSubDistricts.AsNoTracking()
+            join d in _db.TblDistricts.AsNoTracking() on s.DistrictId equals d.DistrictId
+            join p in _db.TblProvinces.AsNoTracking() on d.ProvinceId equals p.ProvinceId
+            where s.DistrictId == id && s.IsEnable == "T" && d.IsEnable == "T" && p.IsEnable == "T"
+            orderby s.SubDistrictName
+            select new { s.SubDistrictId, s.DistrictId, s.SubDistrictName, s.ZipCode })
+            .ToListAsync(cancellationToken);
+
+        return Ok(subdistricts.Select(s => new SubdistrictResponse
+        {
+            Id = ParseId(s.SubDistrictId),
+            DistrictId = ParseId(s.DistrictId),
+            Name = s.SubDistrictName,
+            Zipcode = s.ZipCode,
+        }));
+    }
+
+    /// <summary>คืนรายการเพศ (<c>TblGender</c>) ที่เปิดใช้งาน สำหรับ drop-down เพศ</summary>
+    [HttpGet("GetGender")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<GenderResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetGender(CancellationToken cancellationToken)
+    {
+        var genders = await _db.TblGenders
+            .AsNoTracking()
+            .Where(g => g.IsEnable == "T")
+            .OrderBy(g => g.NameTh)
+            .Select(g => new GenderResponse
+            {
+                Id = g.Id,
+                NameTh = g.NameTh,
+                NameEn = g.NameEn,
+                IsDefault = g.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(genders);
+    }
+
+    /// <summary>คืนรายการบทบาท (<c>TblRole</c>) ที่เปิดใช้งาน สำหรับ drop-down บทบาท</summary>
+    [HttpGet("GetRole")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<RoleResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetRole(CancellationToken cancellationToken)
+    {
+        var roles = await _db.TblRoles
+            .AsNoTracking()
+            .Where(r => r.IsEnable == "T")
+            .OrderBy(r => r.NameTh)
+            .Select(r => new RoleResponse
+            {
+                Id = r.Id,
+                NameTh = r.NameTh,
+                NameEn = r.NameEn,
+                LevelSecretId = r.LevelSecretId,
+                IsDefault = r.IsDefault,
+                IsAdmin = r.IsAdmin,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(roles);
+    }
+
+    /// <summary>
+    /// คืนประเภทการรับสาย (<c>TblCategory</c> ที่ <c>CategoryType = "CONTACT"</c>) เป็นต้นไม้
+    /// ระดับแรกคือกลุ่ม Service / Non Service ระดับที่สองคือ radio ระดับที่สามคือ drop-down ข้าง radio
+    /// ค่าที่บันทึกลง <c>TblContact.CategoryId</c> คือ id ของรายการสุดท้ายที่เลือก (ตัว radio เองถ้าไม่มี drop-down)
+    /// </summary>
+    [HttpGet("GetContactType")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ContactTypeResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetContactType(CancellationToken cancellationToken)
+    {
+        // About 20 rows, so load them all at once and build the tree in memory. They are sorted by
+        // NameTh in SQL (the DB's Thai collation), and ToLookup keeps that order within each parent.
+        var rows = await _db.TblCategories
+            .AsNoTracking()
+            .Where(c => c.CategoryType == "CONTACT" && c.IsEnable == "T")
+            .OrderBy(c => c.NameTh)
+            .Select(c => new CategoryRow(c.Id, c.RefId, c.NameTh, c.NameEn))
+            .ToListAsync(cancellationToken);
+
+        // Roots point RefId at themselves. They are sorted by Id instead, so Service (…A100001) comes
+        // before Non Service (…A100002), as on the screen. A row whose parent is disabled or missing is
+        // never reached from a root, so it is left out.
+        var roots = rows.Where(r => r.RefId == r.Id).OrderBy(r => r.Id, StringComparer.Ordinal);
+        var childrenOf = rows.Where(r => r.RefId != r.Id).ToLookup(r => r.RefId);
+        var visited = new HashSet<string>();
+
+        List<ContactTypeResponse> BuildNodes(IEnumerable<CategoryRow> source)
+        {
+            var nodes = new List<ContactTypeResponse>();
+            foreach (var row in source)
+            {
+                // Guards against a RefId cycle in the data.
+                if (!visited.Add(row.Id))
+                {
+                    continue;
+                }
+
+                nodes.Add(new ContactTypeResponse
+                {
+                    Id = row.Id,
+                    NameTh = row.NameTh,
+                    NameEn = row.NameEn,
+                    Children = BuildNodes(childrenOf[row.Id]),
+                });
+            }
+
+            return nodes;
+        }
+
+        return Ok(BuildNodes(roots));
+    }
+
+    private sealed record CategoryRow(string Id, string RefId, string NameTh, string? NameEn);
 }
