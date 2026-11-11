@@ -52,6 +52,14 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Address dataset - every province / district / subdistrict for the three linked drop-downs.
+# Returns { version, province[{id,name}], district[{id,provinceId,name}],
+# subdistrict[{id,districtId,name,zipcode}] }. version changes only when the data does.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetAddressDataset
+Authorization: Bearer {{token}}
+
+###
+
 # Add an account (TblAccount only - phone numbers live in TblAccountDetail)
 POST {{ContactTogetherApi_HostAddress}}/Account/accounts
 Authorization: Bearer {{token}}
