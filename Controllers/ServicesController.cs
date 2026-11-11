@@ -1,3 +1,4 @@
+using System.Globalization;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using ContactTogetherApi.Models;
@@ -22,11 +23,18 @@ public class ServicesController : ControllerBase
     /// <summary>Upper bound on <see cref="GetServices"/> results, so a broad search stays cheap.</summary>
     private const int MaxSearchResults = 200;
 
-    private readonly ApplicationDbContext _db;
+    /// <summary><c>Code</c> is a six-digit <c>yyMMdd</c> prefix plus a five-digit running number.</summary>
+    private const int ServiceCodeLength = 11;
 
-    public ServicesController(ApplicationDbContext db)
+    private const int MaxDailyRunningNumber = 99999;
+
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<ServicesController> _logger;
+
+    public ServicesController(ApplicationDbContext db, ILogger<ServicesController> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     /// <summary>
@@ -231,6 +239,156 @@ public class ServicesController : ControllerBase
         });
 
         return Ok(results);
+    }
+
+    /// <summary>
+    /// Creates a <c>TblService</c> row and returns it. <c>Code</c> is generated as
+    /// <c>yyMMdd</c> in the Buddhist year plus a five-digit running number that restarts every day
+    /// (e.g. <c>69082500001</c> is the first service of 25 Aug 2569). <c>IsEnable</c> is always
+    /// <c>T</c>; <c>CreatedBy</c>/<c>UpdatedBy</c> come from the token.
+    /// </summary>
+    [HttpPost("AddNewService")]
+    [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AddNewService(
+        [FromBody] CreateServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the new service."));
+        }
+
+        await ValidateLookupsAsync(request, cancellationToken);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        // Thai local time, whole seconds (the columns are datetime2(0)).
+        var now = DateTime.Now;
+        now = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond));
+
+        var service = new TblService
+        {
+            Id = GuidStringValueGenerator.NewId(),
+            CategoryId = request.CategoryId,
+            StatusId = request.StatusId,
+            OwnerId = request.OwnerId ?? actingEmployeeId,
+            ChannelIncomingId = request.ChannelIncomingId,
+            CallBack = request.CallBack,
+            ChannelOutgoingId = request.ChannelOutgoingId,
+            AccountId = request.AccountId,
+            Summary = request.Summary,
+            Detail = request.Detail,
+            ServiceArea = request.ServiceArea,
+            OrganizationId = request.OrganizationId,
+            ServiceReference = request.ServiceReference,
+            ServiceReferenceLink = request.ServiceReferenceLink,
+            AreaId = request.AreaId,
+            Remark = request.Remark,
+            LevelSeverityId = request.LevelSeverityId,
+            LevelPriorityId = request.LevelPriorityId,
+            LevelSecretId = request.LevelSecretId,
+            IsEnable = "T",
+            Created = now,
+            CreatedBy = actingEmployeeId,
+            Updated = now,
+            UpdatedBy = actingEmployeeId,
+            DateOpened = request.DateOpened ?? now,
+            DateClosed = request.DateClosed,
+            OnScene = request.OnScene,
+        };
+
+        // TblService is keyless in the model, so EF cannot Add() it; insert with SQL instead. The
+        // app lock makes concurrent requests take numbers one at a time, so no two get the same code.
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _db.Database.ExecuteSqlRawAsync(
+            "EXEC sp_getapplock @Resource = 'TblService.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
+            cancellationToken);
+
+        var prefix = ServiceCodePrefix(now);
+        var lastCode = await _db.TblServices.AsNoTracking()
+            .Where(s => s.Code!.StartsWith(prefix) && s.Code.Length == ServiceCodeLength)
+            .MaxAsync(s => s.Code, cancellationToken);
+        var next = lastCode is null ? 1 : int.Parse(lastCode[prefix.Length..], CultureInfo.InvariantCulture) + 1;
+        if (next > MaxDailyRunningNumber)
+        {
+            return Conflict(new MessageResponse(
+                StatusCodes.Status409Conflict,
+                "The daily limit of service codes has been reached."));
+        }
+
+        service.Code = prefix + next.ToString("D5", CultureInfo.InvariantCulture);
+
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO TblService (
+                Id, Code, Category_ID, Status_ID, Owner_ID, Channel_Incoming_ID, Call_Back,
+                Channel_Outgoing_ID, Account_ID, Summary, Detail, Service_Area, Organization_ID,
+                Service_Reference, Service_Reference_Link, Area_ID, Remark, Level_Severity_ID,
+                Level_Priority_ID, Level_Secret_ID, Is_Enable, Created_By, Updated_By, Created,
+                Updated, Date_Opened, Date_Closed, On_Scene)
+            VALUES (
+                {service.Id}, {service.Code}, {service.CategoryId}, {service.StatusId}, {service.OwnerId},
+                {service.ChannelIncomingId}, {service.CallBack}, {service.ChannelOutgoingId},
+                {service.AccountId}, {service.Summary}, {service.Detail}, {service.ServiceArea},
+                {service.OrganizationId}, {service.ServiceReference}, {service.ServiceReferenceLink},
+                {service.AreaId}, {service.Remark}, {service.LevelSeverityId}, {service.LevelPriorityId},
+                {service.LevelSecretId}, {service.IsEnable}, {service.CreatedBy}, {service.UpdatedBy},
+                {service.Created}, {service.Updated}, {service.DateOpened}, {service.DateClosed},
+                {service.OnScene})
+            """, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Service {ServiceCode} ({ServiceId}) created by {ActingEmployeeId}.",
+            service.Code,
+            service.Id,
+            actingEmployeeId);
+
+        var created = await ToResponses(_db.TblServices.AsNoTracking().Where(s => s.Id == service.Id))
+            .FirstAsync(cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, created);
+    }
+
+    /// <summary>
+    /// <c>yyMMdd</c> with the last two digits of the Buddhist year, e.g. <c>690825</c> for
+    /// 25 Aug 2026 (2569 B.E.).
+    /// </summary>
+    private static string ServiceCodePrefix(DateTime date) =>
+        string.Create(CultureInfo.InvariantCulture, $"{(date.Year + 543) % 100:D2}{date.Month:D2}{date.Day:D2}");
+
+    /// <summary>
+    /// The schema has no FK constraints on these columns, so a bad id would otherwise be stored
+    /// happily. Check them against the lookup tables and report them as validation errors.
+    /// </summary>
+    private async Task ValidateLookupsAsync(CreateServiceRequest request, CancellationToken cancellationToken)
+    {
+        await CheckAsync(nameof(request.CategoryId), request.CategoryId, _db.TblCategories.Select(x => x.Id));
+        await CheckAsync(nameof(request.StatusId), request.StatusId, _db.TblStatuses.Select(x => x.Id));
+        await CheckAsync(nameof(request.OwnerId), request.OwnerId, _db.TblEmployees.Select(x => x.Id!));
+        await CheckAsync(nameof(request.ChannelIncomingId), request.ChannelIncomingId, _db.TblChannels.Select(x => x.Id));
+        await CheckAsync(nameof(request.ChannelOutgoingId), request.ChannelOutgoingId, _db.TblChannels.Select(x => x.Id));
+        await CheckAsync(nameof(request.AccountId), request.AccountId, _db.TblAccounts.Select(x => x.Id));
+        await CheckAsync(nameof(request.OrganizationId), request.OrganizationId, _db.TblOrganizations.Select(x => x.Id));
+        await CheckAsync(nameof(request.AreaId), request.AreaId, _db.TblAreas.Select(x => x.Id));
+        await CheckAsync(nameof(request.LevelSeverityId), request.LevelSeverityId, _db.TblLevels.Select(x => x.Id));
+        await CheckAsync(nameof(request.LevelPriorityId), request.LevelPriorityId, _db.TblLevels.Select(x => x.Id));
+        await CheckAsync(nameof(request.LevelSecretId), request.LevelSecretId, _db.TblLevels.Select(x => x.Id));
+
+        async Task CheckAsync(string field, string? id, IQueryable<string> ids)
+        {
+            if (!string.IsNullOrEmpty(id) && !await ids.AnyAsync(x => x == id, cancellationToken))
+            {
+                ModelState.AddModelError(field, $"No row with Id '{id}'.");
+            }
+        }
     }
 
     /// <summary>Trims a query-string value, treating an empty or blank one as not given.</summary>
