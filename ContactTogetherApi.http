@@ -76,6 +76,24 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Add a service (TblService). Code is generated: Buddhist yyMMdd + 5-digit daily running number
+# (e.g. 69111100001). IsEnable is always "T"; OwnerId defaults to the token's employee and
+# DateOpened to now. Every lookup id is optional but must exist when given (400 otherwise).
+POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "categoryId": "<TblCategory.Id>",
+  "statusId": "332E6D76F258C8294B160C20642AB9F6",
+  "accountId": "<TblAccount.Id>",
+  "callBack": "N",
+  "summary": "ทดสอบเปิดเรื่อง",
+  "detail": "รายละเอียด"
+}
+
+###
+
 # Report 01 - P_Start / P_Finish are ISO 8601 Thai local date-times, yyyy-MM-ddTHH:mm:ss
 # (seconds optional, no offset or Z). Both ends are inclusive. Paged: pageNumber (>=1) and
 # pageSize (1..200) default to 1 and 20. The 200 response is a { status, message, data,
