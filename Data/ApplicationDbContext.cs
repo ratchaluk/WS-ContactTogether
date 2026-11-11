@@ -7,10 +7,6 @@ namespace ContactTogetherApi.Data;
 
 public partial class ApplicationDbContext : DbContext
 {
-    public ApplicationDbContext()
-    {
-    }
-
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
@@ -38,6 +34,8 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblContact> TblContacts { get; set; }
 
+    public virtual DbSet<TblDistrict> TblDistricts { get; set; }
+
     public virtual DbSet<TblEmployee> TblEmployees { get; set; }
 
     public virtual DbSet<TblEmployeeGroup> TblEmployeeGroups { get; set; }
@@ -55,6 +53,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TblOrganizationGroup> TblOrganizationGroups { get; set; }
 
     public virtual DbSet<TblPage> TblPages { get; set; }
+
+    public virtual DbSet<TblProvince> TblProvinces { get; set; }
 
     public virtual DbSet<TblReference> TblReferences { get; set; }
 
@@ -77,6 +77,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TblSession> TblSessions { get; set; }
 
     public virtual DbSet<TblStatus> TblStatuses { get; set; }
+
+    public virtual DbSet<TblSubDistrict> TblSubDistricts { get; set; }
 
     public virtual DbSet<TblTmpSr> TblTmpSrs { get; set; }
 
@@ -284,6 +286,23 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("MenuIVR");
+        });
+
+        modelBuilder.Entity<TblDistrict>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblDistr__3214EC0748D4CD2B");
+
+            entity.ToTable("TblDistrict");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_District_UUID");
+            entity.Property(e => e.Created).HasMaxLength(50);
+            entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.DistrictId).HasMaxLength(10);
+            entity.Property(e => e.DistrictName).HasMaxLength(100);
+            entity.Property(e => e.IsEnable).HasMaxLength(1);
+            entity.Property(e => e.ProvinceId).HasMaxLength(10);
+            entity.Property(e => e.Updated).HasMaxLength(50);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(50);
         });
 
         modelBuilder.Entity<TblEmployee>(entity =>
@@ -501,6 +520,22 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.PageNameEn).HasMaxLength(200);
             entity.Property(e => e.PageNameTh).HasMaxLength(200);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<TblProvince>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Province__3214EC077211B2D9");
+
+            entity.ToTable("TblProvince");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_Province_UUID");
+            entity.Property(e => e.Created).HasMaxLength(50);
+            entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.IsEnable).HasMaxLength(1);
+            entity.Property(e => e.ProvinceId).HasMaxLength(10);
+            entity.Property(e => e.ProvinceName).HasMaxLength(100);
+            entity.Property(e => e.Updated).HasMaxLength(50);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(50);
         });
 
         modelBuilder.Entity<TblReference>(entity =>
@@ -761,6 +796,24 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)
                 .HasForeignKey(d => d.RefId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<TblSubDistrict>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblSubDi__3214EC07F6160D26");
+
+            entity.ToTable("TblSubDistrict");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_SubDistrict_UUID");
+            entity.Property(e => e.Created).HasMaxLength(50);
+            entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.DistrictId).HasMaxLength(10);
+            entity.Property(e => e.IsEnable).HasMaxLength(1);
+            entity.Property(e => e.SubDistrictId).HasMaxLength(10);
+            entity.Property(e => e.SubDistrictName).HasMaxLength(100);
+            entity.Property(e => e.Updated).HasMaxLength(50);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(50);
+            entity.Property(e => e.ZipCode).HasMaxLength(5);
         });
 
         modelBuilder.Entity<TblTmpSr>(entity =>
