@@ -1,3 +1,148 @@
+# HANDOFF: 2026-11-12
+
+สถานะงาน ณ สิ้นวัน เพื่อทำต่อวันถัดไป (handoff ฉบับก่อน 2026-10-08 เรื่อง Report API อยู่ท้ายไฟล์)
+
+- Branch: `dev-in` ทุกอย่างด้านล่าง **ยังไม่ได้ commit**
+- Build ผ่าน (0 error; warning ที่เหลือเป็นของเดิมใน `ReportController.cs`, `ResponseModel.cs` และแพ็กเกจ `System.Security.Cryptography.Pkcs`)
+- แอปที่รันค้างอยู่บนพอร์ต 5018 เป็น build เก่า ต้อง `Ctrl+C` แล้ว `dotnet run` ใหม่ก่อนทดสอบ endpoint ใหม่ (ไม่มี hot reload)
+- ถ้า VS Code ขึ้น `CS0246 ... could not be found` ของ DTO ใหม่ เป็นเพราะ language server ยังไม่เห็นไฟล์ ให้ **Restart Language Server**
+
+---
+
+## 1. งานที่ทำเสร็จวันนี้
+
+### Endpoint ใหม่
+
+| Endpoint | ไฟล์ | สรุป |
+|---|---|---|
+| `GET /ListOfValues/GetProvince` | `ListOfValuesController.cs` | จังหวัดที่เปิดใช้งาน `[{ id, name }]` |
+| `GET /ListOfValues/GetDistrict?provinceId=` | 〃 | อำเภอของจังหวัด `[{ id, provinceId, name }]` |
+| `GET /ListOfValues/GetSubdistrict?districtId=` | 〃 | ตำบลของอำเภอ **พร้อม zipcode** `[{ id, districtId, name, zipcode }]` |
+| `GET /ListOfValues/GetGender` | 〃 | `TblGender` `[{ id, nameTh, nameEn, isDefault }]` |
+| `GET /ListOfValues/GetRole` | 〃 | `TblRole` `[{ id, nameTh, nameEn, levelSecretId, isDefault, isAdmin }]` |
+| `GET /ListOfValues/GetContactType` | 〃 | ประเภทการรับสาย (`TblCategory` ที่ `CategoryType = 'CONTACT'`) เป็นต้นไม้ `children` |
+| `POST /Contact/AddNewContact` | `ContactController.cs` (ใหม่) | บันทึกฟอร์มรับสายลง `TblContact` |
+
+- `GetAddressDataset` (โหลดที่อยู่ทั้งก้อน) **ยังเก็บไว้** ตามที่ตกลง เพื่อเปรียบเทียบ
+- `GetZipcode` เคยทำแล้ว **ยุบรวมเข้า `GetSubdistrict`** แล้ว (ไม่มี endpoint นี้แล้ว)
+- summary และคอมเมนต์ใน `ListOfValuesController.cs` (เฉพาะ summary) และ `ContactController.cs` (ทั้ง summary และ `//`) เป็น **ภาษาไทย** ตามที่ขอ ส่วนข้อความ error และไฟล์ใน `Dtos/` ยังเป็นภาษาอังกฤษ
+
+### `AddNewContact` (รายละเอียด)
+
+- Request: `contactDetail` (บังคับ, ≤ 50), `channelId` (บังคับ, ช่องทางที่เปิดใช้งาน), `categoryId` (บังคับ, ต้องเป็น **leaf** ของ `GetContactType`), `contactStart` (ไม่บังคับ, เวลาไทยไม่มี `Z`/offset, ห้ามเป็นอนาคต)
+- Server ใส่เอง: `ID` (UUID), `CreatedBy` (= `sub` ใน token), `ContactEnd` (= เวลาบันทึก), `MenuIVR` = NULL
+- 201 คืนแถวที่บันทึก + `channelNameTh` / `categoryNameTh`; 400 = ProblemDetails (คีย์ `ContactDetail`/`ChannelId`/`CategoryId`/`ContactStart`); 401 ไม่มี token
+- ตรวจแล้ว: รัน build ใหม่บนพอร์ต 5099 → `GetReport05` (query `TblContact`) ตอบ 200 = EF model กับ key ใหม่ใช้ได้; `AddNewContact` ไม่ส่ง token → 401
+- **ยังไม่ได้ทดสอบ insert จริง** (จะเขียนแถวลง DB)
+
+### ไฟล์ที่เปลี่ยน
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `Controllers/ListOfValuesController.cs` | endpoint ใหม่ 6 ตัว + summary ภาษาไทย |
+| `Controllers/ContactController.cs` | ใหม่ |
+| `Data/ApplicationDbContext.Keys.cs` | เพิ่ม `modelBuilder.Entity<TblContact>().HasKey(e => e.Id)` (DB ไม่มี PK; ตรวจแล้ว ID ไม่ซ้ำ/ไม่ NULL ทั้ง 1,216 แถว) เพื่อให้ `Add()` ได้และได้ UUID อัตโนมัติ เหมือน `TblAccount`/`TblEmployee` |
+| `Dtos/AddressLookupResponses.cs`, `GenderResponse.cs`, `RoleResponse.cs`, `ContactTypeResponse.cs`, `CreateContactRequest.cs`, `ContactResponse.cs` | DTO ใหม่ |
+| `ContactTogetherApi.http` | ตัวอย่าง endpoint ใหม่ทั้งหมด + ชุดทดสอบ `AddNewContact` 18 กรณี (201 × 7, 400 × 10, 401 × 1) |
+| `docs/GetChannel.md`, `docs/GetContactType.md`, `docs/AddNewContact.md` | เอกสารสำหรับ frontend (Next.js) |
+
+---
+
+## 2. ข้อเท็จจริงจาก DB ที่ตรวจแล้ว (อ่านอย่างเดียว)
+
+- **ที่อยู่**: id ของ `TblProvince`/`TblDistrict`/`TblSubDistrict` เป็นเลขรันของตารางเอง (เชียงใหม่ = `14`, เมืองเชียงใหม่ = `218`, ช้างเผือก = `1440`) ไม่ใช่รหัสกรมการปกครอง ไม่มีเลข 0 นำหน้า/ช่องว่าง `SubDistrictId` ไม่ซ้ำ
+- **รหัสไปรษณีย์อยู่ระดับตำบล**: 194 จาก 928 อำเภอ (~21%) มีหลายรหัส และ 172 รหัสใช้ร่วมหลายอำเภอ
+- **`TblCategory` มี 3 ชุด**: `CONTACT` 22 (ประเภทการรับสาย → `TblContact.CategoryId`), `SERVICE` 49 (ประเภทบริการ → `TblService.CategoryId`), `ACTIVITY` 12 (→ `TblActivity.CategoryId`)
+  `GetServiceType` คืน **ทั้ง 83 แถวปนกัน** (ชื่อชวนเข้าใจผิด) หน้ารับสายต้องใช้ `GetContactType`
+- **`TblContact.CategoryId` เก็บ leaf เสมอ** (radio ที่ไม่มี drop-down หรือรายการใน drop-down)
+- **ฟอร์มรับสาย → `TblContact`**: เบอร์โทรเข้า = `ContactDetail`, ช่องทาง = `ChannelId`, ประเภท = `CategoryId`
+  ข้อมูลเดิมส่วนใหญ่ `ContactStart` มีแต่วันที่ ไม่มีเวลา; ไม่มี `TblActivity` ไหนกรอก `ContactId` เลย (การรับสายยังไม่ผูกกับเรื่อง)
+- **`TblChannel`** 14 แถว: เทียบกับ design **ขาด Tiktok, Instagram** และ **มี Twitter เกิน**; ไม่มีคอลัมน์ลำดับ; Phone คือ `IsDefault = T` แต่ `GetChannel` ไม่ส่ง `isDefault`
+- **Follow Up** (ใต้ Service) เปิดใช้งานและมีการใช้แล้ว 15 แถว (design ล่าสุดก็มีแล้ว)
+
+---
+
+## 3. งานค้าง: ฟอร์ม "ผู้ติดต่อ" (รอตัดสินใจ)
+
+ฟอร์มนี้คือ `TblAccount` (1 แถว/คน) + `TblAccountDetail` (1 แถว/เบอร์หรืออีเมล)
+
+| ช่องในฟอร์ม | DB |
+|---|---|
+| คำนำหน้า / ชื่อ / นามสกุล | `SalutationTh` / `FirstnameTh` / `LastnameTh` |
+| เพศ | `GenderId` (`GetGender`) |
+| วันเกิด | `Birthdate` (ข้อความ `M/d/yyyy H:mm` เช่น `5/1/2012 0:00`) |
+| โทรศัพท์ / มือถือ / โทรสาร / ที่ทำงาน / E-Mail | `TblAccountDetail.DetailType` = `HOME` / `MOBILE` / `FAX` / `OFFICE` / `MAIL` (ปุ่ม ⊕ = หลายแถว type เดียวกัน) |
+| ที่อยู่ / หมายเหตุ | `Address` / `Remark` |
+| จังหวัด/อำเภอ/ตำบล | `AreaId` (คอลัมน์เดียว) |
+| รหัสไปรษณีย์ | `Zipcode` |
+
+### สิ่งที่ยังไม่มี / ใช้ไม่ได้
+
+1. **บันทึกเบอร์/อีเมล (`TblAccountDetail`) ไม่มี endpoint เลย**: `AddNewAccount` บันทึกแค่ `TblAccount`
+2. **บันทึก "พื้นที่" ไม่ได้**: `AddNewAccount` (และ `AddNewService`) ตรวจ `AreaId` กับ `TblArea` ซึ่ง **ว่าง (0 แถว)** → ส่งค่าอะไรก็ 400; `AreaId` เดิม 61 แถวชี้ไปไหนไม่ได้
+3. **วันเกิดรับข้อความอิสระ** ไม่แปลงรูปแบบ (ฟอร์มแสดง วว/ดด/ปปปป เสี่ยงได้ปี พ.ศ.)
+4. **คำนำหน้าไม่มี master** (`TblAccountType` ไม่ใช่คำนำหน้า) ข้อมูลเดิมสกปรก (คุณ, นางสาว, นาย, นาง, คุน, คูณ, none …)
+5. **ไม่มี update** และ `GetAccountByPhoneNo` ไม่คืน `id` (ถ้าฟอร์มต้องใช้แก้ไขคนเดิม)
+6. เล็กน้อย: คอมเมนต์ `Zipcode` ใน `Dtos/CreateAccountRequest.cs` ล้าสมัย (บอกว่าเป็น decimal)
+
+### ต้องตัดสินใจ
+
+1. `AreaId` จะเก็บอะไร: **แนะนำ `SubDistrictId`** (เช่น `"1440"`) และเปลี่ยน validation เป็น `TblSubDistrict` (ต้องเช็กว่าระบบเดิมยังอ่าน `AreaId` อยู่ไหม)
+2. คำนำหน้า: endpoint คืนรายการคงที่ หรือให้ frontend ใส่เอง
+3. ฟอร์มใช้สร้างใหม่อย่างเดียว หรือแก้ไขด้วย (ถ้าแก้ไข ต้องทำ `UpdateAccount` + ให้ `GetAccountByPhoneNo` คืน `id`)
+
+แผนที่เสนอไว้: ขยาย `AddNewAccount` ให้รับ `contacts: [{ detailType, detail }]` แล้วบันทึก `TblAccount` + `TblAccountDetail` ใน transaction เดียว พร้อมแก้ `AreaId` และวันเกิด (รับ `yyyy-MM-dd` แล้วแปลงเป็นรูปแบบเดิม)
+
+---
+
+## 4. งานอื่นที่ค้าง / ข้อเสนอที่ยังไม่ได้ทำ
+
+- [ ] **Commit + PR**: แตก branch ตาม workflow ใน README แล้ว commit (เช่น `feat(lov): add address, gender, role and contact type lookups`, `feat(contact): add AddNewContact`, `docs(frontend): add channel, contact type and add-contact guides`)
+- [ ] ทดสอบ `AddNewContact` จริงด้วย `ContactTogetherApi.http` (หัวข้อ AddNewContact) กรณี 201 ใช้เบอร์ `0899999999` ไว้หาแถวทดสอบ:
+      `SELECT * FROM TblContact WHERE ContactDetail = '0899999999'` (ลบเองหลังตรวจ)
+- [ ] `GetChannel`: เพิ่ม `isDefault` และเรียง default ขึ้นก่อน (ยังไม่ได้ทำ; ถ้าทำต้องอัปเดต `docs/GetChannel.md`)
+- [ ] ข้อมูล `TblChannel`: เพิ่ม Tiktok/Instagram, ตัดสินใจเรื่อง Twitter (เขียน DB ต้องให้ผู้ดูแลยืนยัน)
+- [ ] `GetServiceType`: ทำให้คืนเฉพาะ `SERVICE` เป็นต้นไม้ หรือทำ endpoint ใหม่ (เช็กก่อนว่า frontend ใช้ตัวเดิมอยู่ไหม)
+- [ ] การผูกการรับสายกับเรื่องที่เปิด (`TblActivity.ContactId`) ยังไม่มี
+- [ ] ประสิทธิภาพ `GetAddressDataset` (ครั้งแรกช้า): เคยเสนอ response compression + memory cache + ETag ยังไม่ได้ทำ
+- [ ] `GetGender`/`GetRole`: `AccountController`/`UserManagementController` ตรวจ `GenderId`/`RoleId` แค่ว่ามีอยู่ ไม่ได้เช็ก `IsEnable`
+- [ ] `CLAUDE.md` ส่วน Controllers ล้าสมัย (route เก่า เช่น `POST employees`, ไม่มี `ServicesController`/`ContactController`)
+
+---
+
+## 5. วิธีตรวจข้อมูลใน DB แบบอ่านอย่างเดียว (ที่ใช้วันนี้)
+
+ใช้ .NET file-based app + `Microsoft.Data.SqlClient` ส่ง connection string จาก user secrets ผ่าน env var (ไม่พิมพ์ออกมา) วางสคริปต์ไว้ **นอก repo**
+
+```powershell
+$line = dotnet user-secrets list --project .\ContactTogetherApi.csproj |
+  Where-Object { $_ -like 'ConnectionStrings:DefaultConnection = *' } | Select-Object -First 1
+$env:CT_CS = $line.Substring('ConnectionStrings:DefaultConnection = '.Length)
+dotnet run --file C:\path\outside\repo\check.cs   # ต้องมี --file ไม่งั้นจะไปรันตัวโปรเจกต์
+```
+
+```csharp
+#:package Microsoft.Data.SqlClient@6.1.6
+using Microsoft.Data.SqlClient;
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+await using var conn = new SqlConnection(Environment.GetEnvironmentVariable("CT_CS"));
+await conn.OpenAsync();
+await using var cmd = new SqlCommand("SELECT TOP 5 * FROM TblContact", conn);
+await using var r = await cmd.ExecuteReaderAsync();
+while (await r.ReadAsync())
+    Console.WriteLine(string.Join(" | ", Enumerable.Range(0, r.FieldCount).Select(i => r.GetValue(i))));
+```
+
+ถ้าต้อง build ระหว่างที่แอปรันอยู่ (exe ถูกล็อก) ให้ build ไปอีกโฟลเดอร์: `dotnet build -o <โฟลเดอร์นอก repo>`
+
+---
+
+# Handoff ก่อนหน้า: 2026-10-08 (เก็บไว้อ้างอิง)
+
+> เนื้อหาด้านล่างคือ HANDOFF.md ฉบับก่อน (branch `Foung98`) คงไว้ตามเดิมทุกตัวอักษร บางส่วนล้าสมัยแล้ว
+> เช่น ตอนนี้ `GetReportXX` ตอบเป็น `PagedEnvelope<T>` (`{ status, message, data, meta.pagination }`)
+> ไม่ใช่ `_0BaseReturn` ให้ยึด `CLAUDE.md` และโค้ดปัจจุบันเป็นหลัก
+
 # Handoff: Report API (01–07) ใช้ ISO 8601 + `_0BaseReturn` + ผล audit
 
 วันที่ 2026-10-08 · branch `Foung98`

@@ -13,11 +13,13 @@ public partial class ApplicationDbContext
         // These tables have no primary key in the database, so the scaffolder maps them as keyless
         // and EF refuses to insert into them. Declare the key EF needs to track new rows.
         //
-        // TblEmployee.Id is unique in the data. TblAccount.Id is not (legacy duplicates exist), so
+        // TblEmployee.Id and TblContact.ID are unique in the data (TblContact checked on 2026-11-12:
+        // 1,216 rows, no duplicate or null ID). TblAccount.Id is not (legacy duplicates exist), so
         // only read TblAccount with AsNoTracking or projections - a tracking query over duplicate
         // ids would collapse them into one entity.
         modelBuilder.Entity<TblEmployee>().HasKey(e => e.Id);
         modelBuilder.Entity<TblAccount>().HasKey(e => e.Id);
+        modelBuilder.Entity<TblContact>().HasKey(e => e.Id);
 
         // Every insert gets a UUID primary key: any entity whose key is a single string column is
         // assigned one by GuidStringValueGenerator when it is Add()ed with the key left null. A key
