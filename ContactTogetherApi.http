@@ -62,8 +62,19 @@ Authorization: Bearer {{token}}
 # Address dataset - every province / district / subdistrict for the three linked drop-downs.
 # Returns { version, province[{id,name}], district[{id,provinceId,name}],
 # subdistrict[{id,districtId,name,zipcode}] }. version changes only when the data does.
+# Cached in server memory for 1 hour, sent br/gzip per Accept-Encoding, with
+# Cache-Control: private, max-age=600 and a weak ETag W/"<version>".
+# @name addressDataset
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetAddressDataset
 Authorization: Bearer {{token}}
+Accept-Encoding: br, gzip
+
+###
+
+# Same request with the ETag from above - 304 Not Modified, no body, while the data is unchanged
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetAddressDataset
+Authorization: Bearer {{token}}
+If-None-Match: {{addressDataset.response.headers.ETag}}
 
 ###
 

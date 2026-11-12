@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ContactTogetherApi.Data;
@@ -7,6 +8,9 @@ using ContactTogetherApi.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
+using Microsoft.Net.Http.Headers;
 
 namespace ContactTogetherApi.Controllers;
 
@@ -16,10 +20,12 @@ namespace ContactTogetherApi.Controllers;
 public class ListOfValuesController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IMemoryCache _cache;
 
-    public ListOfValuesController(ApplicationDbContext db)
+    public ListOfValuesController(ApplicationDbContext db, IMemoryCache cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     /// <summary>คืนรายการช่องทาง (<c>TblChannel</c>) ที่เปิดใช้งาน เป็น id และชื่อภาษาไทย</summary>
@@ -73,11 +79,94 @@ public class ListOfValuesController : ControllerBase
     /// แต่ละรายการมี id ของระดับแม่ติดมาด้วย เลือกตำบลแล้วเติมอำเภอและจังหวัดได้ เลือกอำเภอแล้วเติมจังหวัดได้
     /// รายการที่ระดับแม่ถูกปิดใช้งานจะไม่ถูกส่งมา
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// แคชฝั่ง server: เก็บ JSON ที่บีบอัดไว้แล้ว (Brotli และ gzip) ใน <see cref="IMemoryCache"/> นาน
+    /// <see cref="AddressDatasetCacheDuration"/> จึง query DB เพียงครั้งเดียวต่อช่วงเวลานั้น
+    /// และไม่ต้องบีบอัดใหม่ทุก request
+    /// </para>
+    /// <para>
+    /// แคชฝั่ง browser: ส่ง <c>Cache-Control: private</c> พร้อม ETag (ค่า <c>version</c>) ถ้า client ส่ง
+    /// <c>If-None-Match</c> ที่ตรงกันมา จะได้ 304 แบบไม่มี body
+    /// </para>
+    /// </remarks>
     [HttpGet("GetAddressDataset")]
     [Authorize]
     [ProducesResponseType(typeof(AddressDatasetResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetAddressDataset(CancellationToken cancellationToken)
+    {
+        // The cached entry does not depend on this request, so a cancelled request must not cancel
+        // building it for everyone else.
+        var dataset = await _cache.GetOrCreateAsync(AddressDatasetCacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = AddressDatasetCacheDuration;
+            return BuildCachedAddressDataset(await LoadAddressDatasetAsync(CancellationToken.None));
+        });
+
+        // private: the endpoint needs a token, so shared caches (proxies) must not keep the response.
+        Response.Headers.CacheControl = $"private, max-age={(int)AddressDatasetClientMaxAge.TotalSeconds}";
+        Response.Headers.Vary = HeaderNames.AcceptEncoding;
+
+        var (body, encoding) = PickEncoding(dataset!, Request.Headers.AcceptEncoding);
+        if (encoding is not null)
+        {
+            Response.Headers.ContentEncoding = encoding;
+        }
+
+        // Weak ETag: the br, gzip and plain bodies differ in bytes but carry the same data. File()
+        // answers 304 itself when If-None-Match matches.
+        return File(body, "application/json; charset=utf-8", lastModified: null,
+            entityTag: new EntityTagHeaderValue($"\"{dataset!.Version}\"", isWeak: true));
+    }
+
+    private const string AddressDatasetCacheKey = "ListOfValues:AddressDataset";
+
+    /// <summary>ระยะเวลาที่ server เก็บ dataset ไว้ใน memory ก่อน query DB ใหม่</summary>
+    private static readonly TimeSpan AddressDatasetCacheDuration = TimeSpan.FromHours(1);
+
+    /// <summary>ระยะเวลาที่ browser ใช้ของเดิมได้โดยไม่ต้องถาม server หลังจากนั้นจะถามด้วย ETag</summary>
+    private static readonly TimeSpan AddressDatasetClientMaxAge = TimeSpan.FromMinutes(10);
+
+    private sealed record CachedAddressDataset(string Version, byte[] Json, byte[] Brotli, byte[] Gzip);
+
+    private static CachedAddressDataset BuildCachedAddressDataset(AddressDatasetResponse response)
+    {
+        // Same camelCase naming as the MVC JSON output.
+        var json = JsonSerializer.SerializeToUtf8Bytes(response, JsonSerializerOptions.Web);
+        return new CachedAddressDataset(response.Version, json, Compress(json, brotli: true), Compress(json, brotli: false));
+    }
+
+    private static byte[] Compress(byte[] data, bool brotli)
+    {
+        using var output = new MemoryStream();
+        using (Stream stream = brotli
+                   ? new BrotliStream(output, CompressionLevel.SmallestSize)
+                   : new GZipStream(output, CompressionLevel.SmallestSize))
+        {
+            stream.Write(data);
+        }
+
+        return output.ToArray();
+    }
+
+    /// <summary>เลือก Brotli ถ้า client รับได้ ไม่งั้น gzip ไม่งั้นส่งแบบไม่บีบอัด (ข้ามตัวที่ระบุ <c>q=0</c>)</summary>
+    private static (byte[] Body, string? Encoding) PickEncoding(CachedAddressDataset dataset, StringValues acceptEncoding)
+    {
+        var accepted = StringWithQualityHeaderValue.TryParseList(acceptEncoding, out var values)
+            ? values.Where(v => v.Quality is not 0).Select(v => v.Value.Value).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : [];
+
+        if (accepted.Contains("br"))
+        {
+            return (dataset.Brotli, "br");
+        }
+
+        return accepted.Contains("gzip") ? (dataset.Gzip, "gzip") : (dataset.Json, null);
+    }
+
+    private async Task<AddressDatasetResponse> LoadAddressDatasetAsync(CancellationToken cancellationToken)
     {
         var provinces = await _db.TblProvinces.AsNoTracking()
             .Where(p => p.IsEnable == "T")
@@ -132,7 +221,7 @@ public class ListOfValuesController : ControllerBase
         };
         response.Version = ComputeVersion(response);
 
-        return Ok(response);
+        return response;
     }
 
     private static int ParseId(string id) => int.Parse(id.Trim(), CultureInfo.InvariantCulture);
