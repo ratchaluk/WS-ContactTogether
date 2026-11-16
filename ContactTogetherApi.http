@@ -125,7 +125,7 @@ Authorization: Bearer {{token}}
 ###
 
 # Add an account (TblAccount only - phone numbers live in TblAccountDetail)
-POST {{ContactTogetherApi_HostAddress}}/Account/accounts
+POST {{ContactTogetherApi_HostAddress}}/Account/AddNewAccount
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -143,8 +143,68 @@ Content-Type: application/json
 ###
 
 # Look up accounts by phone number - matches MOBILE / HOME / OFFICE / FAX details
-GET {{ContactTogetherApi_HostAddress}}/Account/by-phone?phoneNo=0908606424
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountByPhoneNo?phoneNo=0908606424
 Authorization: Bearer {{token}}
+
+###
+
+# ---------------------------------------------------------------------------------------------
+# GetAccounts - search accounts by partial firstName / lastName (Thai or English) and/or contactInfo
+# (address or any enabled phone / e-mail). At least one is required; every one given must match.
+# 200 = array of at most 100 accounts (no total, no paging), each with its id and contacts[].
+# Matching is case-sensitive. Thai text in the URL is percent-encoded (UTF-8) below.
+# ---------------------------------------------------------------------------------------------
+
+# 200 - by phone number (8 accounts). Use this, not GetAccountByPhoneNo, when you need the account id.
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=0909840822
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - by part of a phone number
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=090984
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - by e-mail domain (matches any e-mail containing the text)
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=@gmail.com
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName "สม" (465 matches in the DB, so the result stops at 100)
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%E0%B8%AA%E0%B8%A1
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName "สม" AND lastName "ใจ"
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%E0%B8%AA%E0%B8%A1&lastName=%E0%B9%83%E0%B8%88
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName in English (case-sensitive: "somchai" does not match "Somchai")
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=Som
+Authorization: Bearer {{token}}
+
+###
+
+# 400 - no filter at all
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts
+Authorization: Bearer {{token}}
+
+###
+
+# 400 - filters that are blank after trimming count as not given
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%20%20&contactInfo=
+Authorization: Bearer {{token}}
+
+###
+
+# 401 - no token
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=0909840822
 
 ###
 
@@ -163,6 +223,15 @@ Content-Type: application/json
   "summary": "ทดสอบเปิดเรื่อง",
   "detail": "รายละเอียด"
 }
+
+###
+
+# Search services. At least one filter is required (AccountPhoneNo, ServicesStatus, ServiceCode,
+# ServiceSummary, ServiceType, ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
+# PageNumber (default 1) / PageSize (default 20, max 200) pick the page.
+# 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
 
 ###
 
