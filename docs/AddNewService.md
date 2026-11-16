@@ -33,7 +33,7 @@
 | Field | ยาวสุด | ความหมาย | เอาค่ามาจาก |
 |---|---|---|---|
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
-| `statusId` | 200 | สถานะของเรื่อง | ยังไม่มี endpoint รายการ |
+| `statusId` | 200 | สถานะของเรื่อง | `id` ของ **สถานะย่อย** จาก `GET /ListOfValues/GetStatus?statusType=SERVICE` (ดู `docs/GetStatus.md`) ส่งสถานะหลักที่มีสถานะย่อย หรือสถานะ ACTIVITY = 400 |
 | `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง | ไม่ส่ง = **ผู้ที่ login อยู่** |
 | `channelIncomingId` | 200 | ช่องทางที่ผู้ติดต่อเข้ามา | `id` จาก `GET /ListOfValues/GetChannel` |
 | `channelOutgoingId` | 200 | ช่องทางที่จะติดต่อกลับ | `id` จาก `GET /ListOfValues/GetChannel` |
@@ -43,13 +43,13 @@
 | `detail` | 1000 | รายละเอียด | ผู้ใช้กรอก |
 | `serviceArea` | 2000 | พื้นที่ที่เกี่ยวข้อง (ข้อความอิสระ) | ผู้ใช้กรอก |
 | `organizationId` | 200 | หน่วยงานที่รับผิดชอบ | ยังไม่มี endpoint รายการ |
-| `serviceReference` | 500 | เลขอ้างอิง | ผู้ใช้กรอก |
-| `serviceReferenceLink` | 500 | ลิงก์อ้างอิง | ผู้ใช้กรอก |
+| `serviceReference` | 500 | ที่มาข้อมูล (lookup `TblReference`) | `id` จาก `GET /ListOfValues/GetReference` (เช่น Joomla, Other Website, เจ้าหน้าที่กระทรวง, อื่นๆ) ส่ง id ที่ไม่มีในตาราง = 400 |
+| `serviceReferenceLink` | 500 | ลิงก์ที่มาข้อมูล (URL โพสต์/ข่าว) | ผู้ใช้กรอก |
 | `remark` | 500 | หมายเหตุ | ผู้ใช้กรอก |
 | `areaId` | 200 | พื้นที่ (lookup) | ⚠️ **อย่าส่ง** ตอนนี้ส่งค่าอะไรก็ได้ 400 (ดูข้อ 5) |
-| `levelSeverityId` | 500 | ระดับความรุนแรง | ⚠️ **อย่าส่ง** ตอนนี้ส่งค่าอะไรก็ได้ 400 (ดูข้อ 5) |
-| `levelPriorityId` | 500 | ระดับความสำคัญ | ⚠️ **อย่าส่ง** (เหตุผลเดียวกัน) |
-| `levelSecretId` | 500 | ระดับชั้นความลับ | ⚠️ **อย่าส่ง** (เหตุผลเดียวกัน) |
+| `levelSeverityId` | 500 | ความเร่งด่วน | `id` จาก `GET /ListOfValues/GetLevel?levelType=SEVERITY` (ดู `docs/GetLevel.md`) ส่ง id ผิดประเภท = 400 |
+| `levelPriorityId` | 500 | ความสำคัญ | `id` จาก `GET /ListOfValues/GetLevel?levelType=PRIORITY` |
+| `levelSecretId` | 500 | ชั้นความลับ | `id` จาก `GET /ListOfValues/GetLevel?levelType=SECRET` |
 | `dateOpened` | – | วันเวลาที่เปิดเรื่อง | ไม่ส่ง = **เวลาที่บันทึก** |
 | `dateClosed` | – | วันเวลาที่ปิดเรื่อง | ส่งเมื่อเปิดแล้วปิดทันที ไม่ส่ง = ยังไม่ปิด |
 | `onScene` | – | วันเวลาที่ถึงหน้างาน | ไม่บังคับ |
@@ -179,7 +179,9 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 |---|---|
 | id ไม่มีอยู่จริง | ชื่อ field นั้น เช่น `CategoryId`, `OwnerId`, `ChannelIncomingId` |
 | ยาวเกินกำหนด | ชื่อ field นั้น เช่น `Summary` (`... maximum length of '500'.`) |
-| ส่ง `areaId` / `level...Id` | `AreaId`, `LevelSeverityId`, `LevelPriorityId`, `LevelSecretId` (ดูข้อ 5) |
+| `statusId` ไม่ใช่สถานะ SERVICE หรือเป็นสถานะหลักที่มีสถานะย่อย (เช่น "เปิดเรื่อง") | `StatusId` |
+| ส่ง `areaId` (ดูข้อ 5) | `AreaId` |
+| `level...Id` ไม่มีอยู่ หรือผิดประเภท (เช่น id ชั้นความลับในช่องความเร่งด่วน) | `LevelSeverityId`, `LevelPriorityId`, `LevelSecretId` |
 | JSON พัง หรือวันที่ผิดรูปแบบ | `$.dateOpened` (หรือ path ของ field ที่ผิด) และ/หรือ `request` |
 
 ถ้ามีทั้งข้อความยาวเกินและ id ผิด จะได้แค่เรื่องความยาวก่อน แก้แล้วส่งใหม่ถึงจะเห็นเรื่อง id
@@ -220,7 +222,10 @@ export interface CreateServiceRequest {
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย ห้ามมี Z
   dateClosed?: string | null;
   onScene?: string | null;
-  // areaId และ level...Id: ยังส่งไม่ได้ (ดูข้อ 5)
+  levelSeverityId?: string | null; // GetLevel?levelType=SEVERITY
+  levelPriorityId?: string | null; // GetLevel?levelType=PRIORITY
+  levelSecretId?: string | null;   // GetLevel?levelType=SECRET
+  // areaId: ยังส่งไม่ได้ (ดูข้อ 5)
 }
 
 export interface ServiceResponse {
@@ -419,9 +424,8 @@ export function NewServiceForm({ token }: { token: string }) {
 | เรื่อง | ผลกับ frontend |
 |---|---|
 | **ส่ง `areaId` ไม่ได้** | API ตรวจ `areaId` กับตารางพื้นที่ ซึ่งตอนนี้ **ว่าง** ส่งค่าอะไรก็ได้ 400 ให้ซ่อนช่องนี้หรือไม่ส่งไปก่อน |
-| **ส่ง `levelSeverityId` / `levelPriorityId` / `levelSecretId` ไม่ได้** | ตารางระดับ **ว่าง** เหตุผลเดียวกับ `areaId` |
 | **API ไม่มี field บังคับ** | frontend ต้องบังคับเอง (ดู 2.3) |
-| **ยังไม่มี endpoint รายการ** สถานะ / หน่วยงาน / เจ้าหน้าที่ | ยังทำ drop-down `statusId`, `organizationId`, `ownerId` จาก API ไม่ได้ ถ้าต้องใช้ แจ้ง backend |
+| **ยังไม่มี endpoint รายการ** หน่วยงาน / เจ้าหน้าที่ | ยังทำ drop-down `organizationId`, `ownerId` จาก API ไม่ได้ ถ้าต้องใช้ แจ้ง backend (สถานะใช้ `GetStatus` ได้แล้ว) |
 | **`GetServiceType` คืนทุกประเภทปนกัน** | กรอง `categoryType === "SERVICE"` เอง |
 | **`GetAccountByPhoneNo` ไม่คืน `id`** | หา `accountId` จากเบอร์โทรด้วย endpoint นั้นยังไม่ได้ ใช้ `GetAccounts` หรือ `AddNewAccount` แทน |
 | **ยังไม่ผูกกับการรับสาย** | ถ้าเปิดเรื่องต่อจากหน้ารับสาย (`AddNewContact`) ตอนนี้ยังไม่มี field เชื่อมสองอย่างนี้ |

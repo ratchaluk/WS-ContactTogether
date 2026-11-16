@@ -1,6 +1,7 @@
 using System.Globalization;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
+using ContactTogetherApi.Helper;
 using ContactTogetherApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -420,16 +421,49 @@ public class ServicesController : ControllerBase
     private async Task ValidateLookupsAsync(CreateServiceRequest request, CancellationToken cancellationToken)
     {
         await CheckAsync(nameof(request.CategoryId), request.CategoryId, _db.TblCategories.Select(x => x.Id));
-        await CheckAsync(nameof(request.StatusId), request.StatusId, _db.TblStatuses.Select(x => x.Id));
+        await CheckStatusAsync();
         await CheckAsync(nameof(request.OwnerId), request.OwnerId, _db.TblEmployees.Select(x => x.Id!));
         await CheckAsync(nameof(request.ChannelIncomingId), request.ChannelIncomingId, _db.TblChannels.Select(x => x.Id));
         await CheckAsync(nameof(request.ChannelOutgoingId), request.ChannelOutgoingId, _db.TblChannels.Select(x => x.Id));
         await CheckAsync(nameof(request.AccountId), request.AccountId, _db.TblAccounts.Select(x => x.Id));
         await CheckAsync(nameof(request.OrganizationId), request.OrganizationId, _db.TblOrganizations.Select(x => x.Id));
+        await CheckAsync(nameof(request.ServiceReference), request.ServiceReference, _db.TblReferences.Select(x => x.Id));
         await CheckAsync(nameof(request.AreaId), request.AreaId, _db.TblAreas.Select(x => x.Id));
-        await CheckAsync(nameof(request.LevelSeverityId), request.LevelSeverityId, _db.TblLevels.Select(x => x.Id));
-        await CheckAsync(nameof(request.LevelPriorityId), request.LevelPriorityId, _db.TblLevels.Select(x => x.Id));
-        await CheckAsync(nameof(request.LevelSecretId), request.LevelSecretId, _db.TblLevels.Select(x => x.Id));
+        // One table holds all three kinds of level, so the id must also be of the right LevelType.
+        await CheckAsync(nameof(request.LevelSeverityId), request.LevelSeverityId, LevelIds(LevelTypes.Severity));
+        await CheckAsync(nameof(request.LevelPriorityId), request.LevelPriorityId, LevelIds(LevelTypes.Priority));
+        await CheckAsync(nameof(request.LevelSecretId), request.LevelSecretId, LevelIds(LevelTypes.Secret));
+
+        IQueryable<string> LevelIds(string levelType) =>
+            _db.TblLevels.Where(x => x.LevelType == levelType).Select(x => x.Id);
+
+        // TblStatus is a two-level tree per StatusType (main status -> sub-status), and services store
+        // the sub-status, so a SERVICE main status that has enabled sub-statuses is rejected.
+        async Task CheckStatusAsync()
+        {
+            if (string.IsNullOrEmpty(request.StatusId))
+            {
+                return;
+            }
+
+            var status = await _db.TblStatuses.AsNoTracking()
+                .Where(s => s.Id == request.StatusId && s.StatusType == StatusTypes.Service)
+                .Select(s => new
+                {
+                    HasChildren = _db.TblStatuses.Any(c => c.RefId == s.Id && c.Id != s.Id && c.IsEnable == "T"),
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (status is null)
+            {
+                ModelState.AddModelError(nameof(request.StatusId), $"No SERVICE status with Id '{request.StatusId}'.");
+            }
+            else if (status.HasChildren)
+            {
+                ModelState.AddModelError(nameof(request.StatusId),
+                    $"'{request.StatusId}' is a main status; send the Id of one of its sub-statuses.");
+            }
+        }
 
         async Task CheckAsync(string field, string? id, IQueryable<string> ids)
         {

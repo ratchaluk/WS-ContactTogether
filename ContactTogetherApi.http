@@ -108,6 +108,57 @@ Authorization: Bearer {{token}}
 
 ###
 
+# References (ที่มาข้อมูล) - enabled TblReference rows as [{ id, nameTh, nameEn, isDefault }].
+# Send id back as serviceReference when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetReference
+Authorization: Bearer {{token}}
+
+###
+
+# Levels - enabled TblLevel rows of one type as [{ id, nameTh, nameEn, multiplier, isDefault }],
+# sorted by multiplier. levelType is SEVERITY (send id as levelSeverityId), PRIORITY (levelPriorityId)
+# or SECRET (levelSecretId) when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=SEVERITY
+Authorization: Bearer {{token}}
+
+###
+
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=PRIORITY
+Authorization: Bearer {{token}}
+
+###
+
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=SECRET
+Authorization: Bearer {{token}}
+
+###
+
+# Unknown or missing levelType -> 400 ProblemDetails (errors.levelType)
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=xxx
+Authorization: Bearer {{token}}
+
+###
+
+# Statuses - no query = StatusType ACTIVITY: [เปิด, ปิด, ยกเลิก] as [{ id, nameTh, nameEn, isType,
+# isDefault, children: [] }]. Pre-select the one with isDefault "T" (ปิด).
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus
+Authorization: Bearer {{token}}
+
+###
+
+# Service statuses as a tree: main statuses (เปิดเรื่อง, ปิดเรื่อง, ยกเลิก) with sub-statuses in children.
+# Send the sub-status id as statusId when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=SERVICE
+Authorization: Bearer {{token}}
+
+###
+
+# Unknown statusType -> 400 ProblemDetails (errors.statusType)
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=xxx
+Authorization: Bearer {{token}}
+
+###
+
 # Roles - enabled TblRole rows as [{ id, nameTh, nameEn, levelSecretId, isDefault, isAdmin }].
 # isDefault / isAdmin are "T"/"F"; levelSecretId is a TblLevel.Id. Send id back as roleId when
 # adding an employee.

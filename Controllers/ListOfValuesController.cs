@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
+using ContactTogetherApi.Helper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -337,6 +338,144 @@ public class ListOfValuesController : ControllerBase
 
         return Ok(genders);
     }
+
+    /// <summary>
+    /// คืนรายการที่มาข้อมูล (<c>TblReference</c>) ที่เปิดใช้งาน สำหรับ drop-down "ที่มาข้อมูล" ตอนเปิดเรื่อง
+    /// ส่ง <c>id</c> ที่เลือกกลับไปเป็น <c>serviceReference</c> ของ <c>POST /Services/AddNewService</c>
+    /// </summary>
+    [HttpGet("GetReference")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ReferenceResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetReference(CancellationToken cancellationToken)
+    {
+        var references = await _db.TblReferences
+            .AsNoTracking()
+            .Where(r => r.IsEnable == "T")
+            .OrderBy(r => r.NameTh)
+            .Select(r => new ReferenceResponse
+            {
+                Id = r.Id,
+                NameTh = r.NameTh,
+                NameEn = r.NameEn,
+                IsDefault = r.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(references);
+    }
+
+    /// <summary>
+    /// คืนรายการระดับ (<c>TblLevel</c>) ที่เปิดใช้งานของประเภทที่ระบุ เรียงตาม <c>Multiplier</c>
+    /// <c>SEVERITY</c> = ความเร่งด่วน, <c>PRIORITY</c> = ความสำคัญ, <c>SECRET</c> = ชั้นความลับ
+    /// ส่ง <c>id</c> ที่เลือกกลับไปเป็น <c>levelSeverityId</c> / <c>levelPriorityId</c> / <c>levelSecretId</c>
+    /// ของ <c>POST /Services/AddNewService</c> ตามประเภท
+    /// </summary>
+    [HttpGet("GetLevel")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<LevelResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetLevel([FromQuery, Required] string? levelType, CancellationToken cancellationToken)
+    {
+        // The DB compares case-sensitively and stores the types in upper case, so accept any case here.
+        var type = levelType!.Trim().ToUpperInvariant();
+        if (!LevelTypes.All.Contains(type))
+        {
+            ModelState.AddModelError(nameof(levelType),
+                $"Must be one of {string.Join(", ", LevelTypes.All)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        var levels = await _db.TblLevels
+            .AsNoTracking()
+            .Where(l => l.LevelType == type && l.IsEnable == "T")
+            .OrderBy(l => l.Multiplier)
+            .ThenBy(l => l.NameTh)
+            .Select(l => new LevelResponse
+            {
+                Id = l.Id,
+                NameTh = l.NameTh,
+                NameEn = l.NameEn,
+                Multiplier = l.Multiplier,
+                IsDefault = l.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(levels);
+    }
+
+    /// <summary>
+    /// คืนสถานะ (<c>TblStatus</c>) ที่เปิดใช้งาน ค่าเริ่มต้นคือ <c>StatusType = "ACTIVITY"</c>
+    /// (เปิด / ปิด / ยกเลิก ไม่มีสถานะย่อย; ตัวที่ <c>isDefault = "T"</c> คือ ปิด)
+    /// ส่ง <c>statusType=SERVICE</c> เพื่อได้สถานะของเรื่องเป็นต้นไม้ 2 ชั้น (เปิดเรื่อง / ปิดเรื่อง / ยกเลิก → สถานะย่อย)
+    /// </summary>
+    [HttpGet("GetStatus")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<StatusResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetStatus([FromQuery] string? statusType, CancellationToken cancellationToken)
+    {
+        // ACTIVITY unless the caller asks for another type. The DB compares case-sensitively and stores
+        // the types in upper case, so accept any case here.
+        var type = string.IsNullOrWhiteSpace(statusType)
+            ? StatusTypes.Activity
+            : statusType.Trim().ToUpperInvariant();
+        if (!StatusTypes.All.Contains(type))
+        {
+            ModelState.AddModelError(nameof(statusType),
+                $"Must be one of {string.Join(", ", StatusTypes.All)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        // About 20 rows, so load them all and build the tree in memory. Sorted by NameTh in SQL (the
+        // DB's Thai collation); ToLookup keeps that order within each parent.
+        var rows = await _db.TblStatuses
+            .AsNoTracking()
+            .Where(s => s.StatusType == type && s.IsEnable == "T")
+            .OrderBy(s => s.NameTh)
+            .Select(s => new StatusRow(s.Id, s.RefId, s.NameTh, s.NameEn, s.IsType, s.IsDefault))
+            .ToListAsync(cancellationToken);
+
+        // Main statuses point RefId at themselves. They are ordered by the state they stand for, so the
+        // drop-down reads เปิดเรื่อง, ปิดเรื่อง, ยกเลิก. A sub-status whose main status is disabled is left out.
+        var roots = rows
+            .Where(r => r.RefId == r.Id)
+            .OrderBy(r => StatusRank(r.IsType));
+        var childrenOf = rows.Where(r => r.RefId != r.Id).ToLookup(r => r.RefId);
+
+        return Ok(roots.Select(r => new StatusResponse
+        {
+            Id = r.Id,
+            NameTh = r.NameTh,
+            NameEn = r.NameEn,
+            IsType = r.IsType,
+            IsDefault = r.IsDefault,
+            Children = childrenOf[r.Id]
+                .Select(c => new StatusResponse
+                {
+                    Id = c.Id,
+                    NameTh = c.NameTh,
+                    NameEn = c.NameEn,
+                    IsType = c.IsType,
+                    IsDefault = c.IsDefault,
+                })
+                .ToList(),
+        }));
+    }
+
+    /// <summary>Position of a main status in the drop-down by its <c>IsType</c>; unknown types go last.</summary>
+    private static int StatusRank(string isType) => isType switch
+    {
+        "OPEN" => 0,
+        "PENDING" => 1,
+        "CLOSE" => 2,
+        "CANCEL" => 3,
+        _ => 4,
+    };
+
+    private sealed record StatusRow(string Id, string RefId, string NameTh, string? NameEn, string IsType, string IsDefault);
 
     /// <summary>คืนรายการบทบาท (<c>TblRole</c>) ที่เปิดใช้งาน สำหรับ drop-down บทบาท</summary>
     [HttpGet("GetRole")]
