@@ -125,6 +125,7 @@ public class AccountController : ControllerBase
             orderby account.FirstnameTh, account.LastnameTh
             select new
             {
+                AccountId = account.Id,
                 PhoneNo = detail.Detail,
                 account.SalutationTh,
                 account.FirstnameTh,
@@ -189,10 +190,19 @@ public class AccountController : ControllerBase
 
         if (!string.IsNullOrEmpty(contactInfo))
         {
-            accounts = accounts.Where(a => a.Address!.Contains(contactInfo)
-                || _db.TblAccountDetails.Any(d => d.AccountId == a.Id
-                    && d.IsEnable == "T"
-                    && d.Detail.Contains(contactInfo)));
+            // Collect the matching ids with a UNION, then filter with IN. Neither table has an index on
+            // these columns (TblAccount is a heap, TblAccountDetail has none on AccountId), and the
+            // obvious "Address LIKE ... OR EXISTS (detail ...)" makes SQL Server re-scan
+            // TblAccountDetail once per account: over 30 s, so the request timed out. The UNION scans
+            // each table once and finishes in well under 100 ms.
+            var matchingIds = _db.TblAccounts
+                .Where(a => a.Address!.Contains(contactInfo))
+                .Select(a => a.Id)
+                .Union(_db.TblAccountDetails
+                    .Where(d => d.IsEnable == "T" && d.Detail.Contains(contactInfo))
+                    .Select(d => d.AccountId));
+
+            accounts = accounts.Where(a => matchingIds.Contains(a.Id));
         }
 
         // Projected and untracked: TblAccount.Id has legacy duplicates, see ApplicationDbContext.Keys.cs.
