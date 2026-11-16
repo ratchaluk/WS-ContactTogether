@@ -15,15 +15,15 @@ namespace ContactTogetherApi.Controllers;
 public class ServicesController : ControllerBase
 {
     /// <summary>
-    /// <c>TblAccountDetail.DetailType</c> values that hold a telephone number; <c>MAIL</c> holds
-    /// e-mail addresses and is deliberately excluded.
+    /// ค่า <c>TblAccountDetail.DetailType</c> ที่เป็นเบอร์โทร ไม่รวม <c>MAIL</c> โดยตั้งใจ
+    /// เพราะเก็บอีเมล
     /// </summary>
     private static readonly string[] PhoneDetailTypes = ["MOBILE", "HOME", "OFFICE", "FAX"];
 
-    /// <summary>Upper bound on <see cref="GetServices"/> results, so a broad search stays cheap.</summary>
-    private const int MaxSearchResults = 200;
+    /// <summary>ค่าสูงสุดของ <see cref="ServiceSearchRequest.PageSize"/> ให้แต่ละหน้าไม่หนักเกินไป</summary>
+    private const int MaxPageSize = 200;
 
-    /// <summary><c>Code</c> is a six-digit <c>yyMMdd</c> prefix plus a five-digit running number.</summary>
+    /// <summary><c>Code</c> คือ <c>yyMMdd</c> 6 หลัก ตามด้วยเลขรัน 5 หลัก</summary>
     private const int ServiceCodeLength = 11;
 
     private const int MaxDailyRunningNumber = 99999;
@@ -38,8 +38,8 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the enabled, not-yet-closed <c>TblService</c> rows owned by the calling employee. The
-    /// employee is identified by the token's <c>sub</c> claim.
+    /// คืนเรื่อง (<c>TblService</c>) ที่เปิดใช้งานและยังไม่ปิด ซึ่งพนักงานที่เรียกเป็นเจ้าของ
+    /// ระบุตัวพนักงานจาก claim <c>sub</c> ใน token
     /// </summary>
     [HttpGet("GetInProcessServices")]
     [ProducesResponseType(typeof(IEnumerable<ServiceResponse>), StatusCodes.Status200OK)]
@@ -64,9 +64,8 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the enabled <c>TblService</c> rows that have an open, enabled <c>TblActivity</c>
-    /// assigned to the calling employee, whoever owns the service itself. The employee is identified
-    /// by the token's <c>sub</c> claim.
+    /// คืนเรื่อง (<c>TblService</c>) ที่เปิดใช้งาน และมีงาน (<c>TblActivity</c>) ที่ยังไม่ปิดและเปิดใช้งาน
+    /// มอบหมายให้พนักงานที่เรียก ไม่ว่าใครจะเป็นเจ้าของเรื่อง ระบุตัวพนักงานจาก claim <c>sub</c> ใน token
     /// </summary>
     [HttpGet("GetPendingServices")]
     [ProducesResponseType(typeof(IEnumerable<ServiceResponse>), StatusCodes.Status200OK)]
@@ -94,12 +93,12 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
-    /// Searches enabled <c>TblService</c> rows. At least one filter is required, and every one given
-    /// must match (see <see cref="ServiceSearchRequest"/>). Newest first, at most
-    /// <see cref="MaxSearchResults"/> rows.
+    /// ค้นหาเรื่อง (<c>TblService</c>) ที่เปิดใช้งาน ต้องมีเงื่อนไขอย่างน้อย 1 ตัว และต้องตรงทุกเงื่อนไขที่ส่งมา
+    /// (ดู <see cref="ServiceSearchRequest"/>) เรียงจากใหม่ไปเก่า คืนครั้งละหนึ่งหน้า ห่อด้วย
+    /// <see cref="PagedEnvelope{T}"/> พร้อมจำนวนที่ค้นเจอทั้งหมด
     /// </summary>
     [HttpGet("GetServices")]
-    [ProducesResponseType(typeof(IEnumerable<ServiceSearchResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PagedEnvelope<ServiceSearchResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetServices(
@@ -135,6 +134,21 @@ public class ServicesController : ControllerBase
             ModelState.AddModelError(
                 nameof(request.ServiceCreatedFrom),
                 $"{nameof(request.ServiceCreatedFrom)} must not be after {nameof(request.ServiceCreatedTo)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        if (request.PageNumber < 1)
+        {
+            ModelState.AddModelError(nameof(request.PageNumber), "PageNumber must be 1 or greater.");
+        }
+
+        if (request.PageSize is < 1 or > MaxPageSize)
+        {
+            ModelState.AddModelError(nameof(request.PageSize), $"PageSize must be between 1 and {MaxPageSize}.");
+        }
+
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -194,6 +208,16 @@ public class ServicesController : ControllerBase
             services = services.Where(s => s.Created <= createdTo);
         }
 
+        // Counted before the joins below: they add one row per service at most, so the total matches.
+        var total = await services.CountAsync(cancellationToken);
+
+        // long, because a huge PageNumber would overflow int into a negative OFFSET (a SQL error).
+        var skip = (long)(request.PageNumber - 1) * request.PageSize;
+        if (skip >= total)
+        {
+            return Ok(Paged([], total, request));
+        }
+
         // None of these columns has an FK constraint, hence the manual joins. TblAccount.Id has legacy
         // duplicates, so the account is picked with a TOP 1 subquery rather than joined, which would
         // repeat the service once per duplicate.
@@ -209,7 +233,8 @@ public class ServicesController : ControllerBase
                 .Where(a => a.Id == service.AccountId)
                 .Select(a => new { a.SalutationTh, a.FirstnameTh, a.LastnameTh })
                 .FirstOrDefault()
-            orderby service.Created descending, service.Code descending
+            // Id last makes the order total, so a row cannot move between pages.
+            orderby service.Created descending, service.Code descending, service.Id
             select new
             {
                 service.Id,
@@ -224,7 +249,10 @@ public class ServicesController : ControllerBase
                 service.Summary,
                 Status = status != null ? status.NameTh : null,
                 service.Created,
-            }).Take(MaxSearchResults).ToListAsync(cancellationToken);
+            })
+            .Skip((int)skip)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
 
         var results = rows.Select(r => new ServiceSearchResponse
         {
@@ -236,16 +264,37 @@ public class ServicesController : ControllerBase
             ServiceSummary = r.Summary,
             ServicesStatus = r.Status,
             ServiceCreated = r.Created,
-        });
+        }).ToList();
 
-        return Ok(results);
+        return Ok(Paged(results, total, request));
     }
 
+    /// <summary>ห่อผลลัพธ์หนึ่งหน้าของ <see cref="GetServices"/> แบบเดียวกับ <c>GetReportXX</c></summary>
+    private static PagedEnvelope<ServiceSearchResponse> Paged(
+        IEnumerable<ServiceSearchResponse> data,
+        int total,
+        ServiceSearchRequest request) => new()
+    {
+        Status = "success",
+        Message = total == 0 ? "ไม่พบข้อมูล" : $"พบข้อมูล {total} รายการ",
+        Data = data,
+        Meta = new PagedMeta
+        {
+            Pagination = new PaginationMeta
+            {
+                CurrentPage = request.PageNumber,
+                PerPage = request.PageSize,
+                Total = total,
+                TotalPages = (int)Math.Ceiling(total / (double)request.PageSize),
+            },
+        },
+    };
+
     /// <summary>
-    /// Creates a <c>TblService</c> row and returns it. <c>Code</c> is generated as
-    /// <c>yyMMdd</c> in the Buddhist year plus a five-digit running number that restarts every day
-    /// (e.g. <c>69082500001</c> is the first service of 25 Aug 2569). <c>IsEnable</c> is always
-    /// <c>T</c>; <c>CreatedBy</c>/<c>UpdatedBy</c> come from the token.
+    /// เปิดเรื่องใหม่ (เพิ่มแถวใน <c>TblService</c>) แล้วคืนแถวนั้นกลับไป <c>Code</c> สร้างให้อัตโนมัติเป็น
+    /// <c>yyMMdd</c> แบบปี พ.ศ. ตามด้วยเลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
+    /// (เช่น <c>69082500001</c> คือเรื่องแรกของวันที่ 25 ส.ค. 2569) <c>IsEnable</c> เป็น <c>T</c> เสมอ
+    /// ส่วน <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token
     /// </summary>
     [HttpPost("AddNewService")]
     [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status201Created)]
@@ -358,15 +407,15 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
-    /// <c>yyMMdd</c> with the last two digits of the Buddhist year, e.g. <c>690825</c> for
-    /// 25 Aug 2026 (2569 B.E.).
+    /// <c>yyMMdd</c> โดยใช้เลข 2 หลักท้ายของปี พ.ศ. เช่น <c>690825</c> คือวันที่
+    /// 25 ส.ค. 2026 (พ.ศ. 2569)
     /// </summary>
     private static string ServiceCodePrefix(DateTime date) =>
         string.Create(CultureInfo.InvariantCulture, $"{(date.Year + 543) % 100:D2}{date.Month:D2}{date.Day:D2}");
 
     /// <summary>
-    /// The schema has no FK constraints on these columns, so a bad id would otherwise be stored
-    /// happily. Check them against the lookup tables and report them as validation errors.
+    /// คอลัมน์เหล่านี้ไม่มี FK constraint ใน DB ถ้าไม่ตรวจ id ที่ผิดก็จะถูกบันทึกลงไปเฉย ๆ
+    /// จึงตรวจกับตาราง lookup แต่ละตัว แล้วรายงานเป็น validation error
     /// </summary>
     private async Task ValidateLookupsAsync(CreateServiceRequest request, CancellationToken cancellationToken)
     {
@@ -391,18 +440,18 @@ public class ServicesController : ControllerBase
         }
     }
 
-    /// <summary>Trims a query-string value, treating an empty or blank one as not given.</summary>
+    /// <summary>ตัดช่องว่างหน้า/หลังของค่าจาก query string ค่าว่างหรือมีแต่ช่องว่างถือว่าไม่ได้ส่งมา</summary>
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <summary>Joins the Thai name parts, skipping the ones that are missing.</summary>
+    /// <summary>ต่อคำนำหน้า ชื่อ และนามสกุลภาษาไทย ข้ามส่วนที่ไม่มีค่า</summary>
     private static string BuildFullName(string? salutation, string? firstname, string? lastname) =>
         string.Join(' ', new[] { salutation, firstname, lastname }
             .Where(part => !string.IsNullOrWhiteSpace(part)));
 
     /// <summary>
-    /// Adds each service's status name and orders the rows by <c>Code</c>. TblService is keyless, so
-    /// callers pass an untracked query. Status_ID has no FK constraint, hence the manual left join.
+    /// เติมชื่อสถานะของแต่ละเรื่อง และเรียงตาม <c>Code</c> TblService ไม่มี key ผู้เรียกจึงต้องส่ง query
+    /// แบบ untracked มา Status_ID ไม่มี FK constraint จึงต้อง left join เอง
     /// </summary>
     private IQueryable<ServiceResponse> ToResponses(IQueryable<TblService> services) =>
             from service in services
