@@ -16,6 +16,14 @@ public class CreateServiceRequest
     [MaxLength(200)]
     public string? StatusId { get; set; }
 
+    /// <summary>
+    /// <c>TblServiceTitles.Id</c> (หัวข้อเรื่อง จาก <c>GET /ListOfValues/GetServiceTitle</c>) ต้องระบุ
+    /// เพราะคอลัมน์เป็น NOT NULL รับได้ทั้งตัวพิมพ์เล็กและใหญ่
+    /// </summary>
+    [Required]
+    [MaxLength(50)]
+    public string? ServiceTitleId { get; set; }
+
     /// <summary><c>TblEmployee.Id</c>. Defaults to the calling employee.</summary>
     [MaxLength(200)]
     public string? OwnerId { get; set; }

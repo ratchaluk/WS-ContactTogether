@@ -58,6 +58,13 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Service titles (TblServiceTitles, IsEnable = 'T') as [{ id, serviceTitleText }]. id is upper case,
+# like TblService.ServiceTitleId. AddNewService requires one; GetServices can filter by one.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetServiceTitle
+Authorization: Bearer {{token}}
+
+###
+
 
 # Address dataset - every province / district / subdistrict for the three linked drop-downs.
 # Returns { version, province[{id,name}], district[{id,provinceId,name}],
@@ -285,6 +292,7 @@ Content-Type: application/json
 {
   "categoryId": "<TblCategory.Id>",
   "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
+  "serviceTitleId": "81EE380A-96E2-F111-8E93-96F1F7A12F5E",
   "accountId": "<TblAccount.Id>",
   "callBack": "N",
   "summary": "ทดสอบเปิดเรื่อง",

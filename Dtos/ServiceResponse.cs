@@ -19,6 +19,9 @@ public class ServiceResponse
 
     public string? StatusNameEn { get; set; }
 
+    /// <summary><c>TblServiceTitles.Id</c> (หัวข้อเรื่อง) ตัวพิมพ์ใหญ่</summary>
+    public string? ServiceTitleId { get; set; }
+
     public string? OwnerId { get; set; }
 
     public DateTime? DateOpened { get; set; }
