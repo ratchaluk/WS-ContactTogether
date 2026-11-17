@@ -139,22 +139,29 @@ Authorization: Bearer {{token}}
 
 ###
 
-# Statuses - no query = StatusType ACTIVITY: [เปิด, ปิด, ยกเลิก] as [{ id, nameTh, nameEn, isType,
-# isDefault, children: [] }]. Pre-select the one with isDefault "T" (ปิด).
+# Statuses for the add-service form - no query = every enabled StatusType SERVICE row (14), sorted by
+# nameTh, as [{ id, refId, nameTh, nameEn, isType, isDefault }]. Send the chosen id as statusId.
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus
 Authorization: Bearer {{token}}
 
 ###
 
-# Service statuses as a tree: main statuses (เปิดเรื่อง, ปิดเรื่อง, ยกเลิก) with sub-statuses in children.
-# Send the sub-status id as statusId when adding a service.
+# Work-log (TblActivity) statuses: [เปิด, ปิด, ยกเลิก]. Not accepted by AddNewService (400).
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=SERVICE
 Authorization: Bearer {{token}}
 
 ###
 
 # Unknown statusType -> 400 ProblemDetails (errors.statusType)
-GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=xxx
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=ACTIVITY
+Authorization: Bearer {{token}}
+
+###
+
+# Organizations - every enabled TblOrganization row (395), sorted by nameTh, as [{ id, refId, nameTh, nameEn }].
+# Two levels: a ministry (กระทรวง) has refId == id (22 rows), a department (กรม) has refId = its ministry.
+# Send the department id as organizationId when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetOrganization
 Authorization: Bearer {{token}}
 
 ###
@@ -198,6 +205,12 @@ GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountByPhoneNo?phoneNo=09086
 Authorization: Bearer {{token}}
 
 ###
+# Look up accounts by phone number - matches MOBILE / HOME / OFFICE / FAX details
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountByPhoneNo?phoneNo=0934153694
+Authorization: Bearer {{token}}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # GetAccounts - search accounts by partial firstName / lastName (Thai or English) and/or contactInfo
@@ -262,17 +275,32 @@ GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=090984082
 # Add a service (TblService). Code is generated: Buddhist yyMMdd + 5-digit daily running number
 # (e.g. 69111100001). IsEnable is always "T"; OwnerId defaults to the token's employee and
 # DateOpened to now. Every lookup id is optional but must exist when given (400 otherwise).
+# statusId is any StatusType SERVICE id from GetStatus, stored as sent
+# (e.g. อยู่ระหว่างดำเนินการ 19C49E66B6F9EF1BCE11A3B93DED12C8).
+# NOTE: a 201 writes a real row and uses up one service code of the day.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "categoryId": "<TblCategory.Id>",
-  "statusId": "332E6D76F258C8294B160C20642AB9F6",
+  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
   "accountId": "<TblAccount.Id>",
   "callBack": "N",
   "summary": "ทดสอบเปิดเรื่อง",
   "detail": "รายละเอียด"
+}
+
+###
+
+# 400 - an ACTIVITY status (ปิด) is not a service status: errors.StatusId. Nothing is written.
+POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "CB0A973609E8D684F2944D92ED4126A1",
+  "summary": "ทดสอบสถานะผิดประเภท"
 }
 
 ###
@@ -285,6 +313,16 @@ GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=09098
 Authorization: Bearer {{token}}
 
 ###
+
+# Search services. At least one filter is required (AccountPhoneNo, ServicesStatus, ServiceCode,
+# ServiceSummary, ServiceType, ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
+# PageNumber (default 1) / PageSize (default 20, max 200) pick the page.
+# 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=0934153694&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.

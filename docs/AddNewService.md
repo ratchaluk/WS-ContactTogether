@@ -33,8 +33,8 @@
 | Field | ยาวสุด | ความหมาย | เอาค่ามาจาก |
 |---|---|---|---|
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
-| `statusId` | 200 | สถานะของเรื่อง | `id` ของ **สถานะย่อย** จาก `GET /ListOfValues/GetStatus?statusType=SERVICE` (ดู `docs/GetStatus.md`) ส่งสถานะหลักที่มีสถานะย่อย หรือสถานะ ACTIVITY = 400 |
-| `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง | ไม่ส่ง = **ผู้ที่ login อยู่** |
+| `statusId` | 200 | สถานะของเรื่อง | `id` จาก `GET /ListOfValues/GetStatus` (สถานะประเภท SERVICE ดู [GetStatus.md](GetStatus.md)) บันทึกตามที่ส่ง ส่งสถานะ ACTIVITY = 400 |
+| `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น (ยังไม่มี endpoint รายชื่อเจ้าหน้าที่) ถ้าต้องใช้ id ของตัวเอง ใช้ `employeeId` จาก `POST /Auth/login` (ค่าเดียวกับ `id` ของ `GET /UserManagement/GetEmployeeProfile`) |
 | `channelIncomingId` | 200 | ช่องทางที่ผู้ติดต่อเข้ามา | `id` จาก `GET /ListOfValues/GetChannel` |
 | `channelOutgoingId` | 200 | ช่องทางที่จะติดต่อกลับ | `id` จาก `GET /ListOfValues/GetChannel` |
 | `callBack` | 200 | ต้องการให้ติดต่อกลับไหม | `"Y"` ต้องการ / `"N"` ไม่ต้องการ / `"D"` สายหลุด |
@@ -112,7 +112,7 @@
 | `createdBy` / `updatedBy` | string | id ของผู้ที่ login อยู่ |
 | field อื่น ๆ | | ค่าเดียวกับที่ส่งไป (`categoryId`, `statusId`, `ownerId`, `channelIncomingId`, `callBack`, `channelOutgoingId`, `accountId`, `summary`, `detail`, `serviceArea`, `organizationId`, `onScene`, `serviceReference`, `serviceReferenceLink`, `areaId`, `remark`, `levelSeverityId`, `levelPriorityId`, `levelSecretId`, `dateOpened`, `dateClosed`) |
 
-- `ownerId` เป็น id ของผู้ที่ login ถ้าไม่ได้ส่งมา ส่วน `dateOpened` เป็นเวลาที่บันทึกถ้าไม่ได้ส่งมา
+- `ownerId` เป็น id ของผู้ที่ login ถ้าไม่ได้ส่งมาหรือส่งค่าว่าง ส่วน `dateOpened` เป็นเวลาที่บันทึกถ้าไม่ได้ส่งมา
 - วันที่ทุกตัวเป็นเวลาไทย ไม่มี offset เช่น `2026-11-16T10:30:00` field ที่ไม่ได้ส่งเป็น `null`
 
 ```json
@@ -179,7 +179,7 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 |---|---|
 | id ไม่มีอยู่จริง | ชื่อ field นั้น เช่น `CategoryId`, `OwnerId`, `ChannelIncomingId` |
 | ยาวเกินกำหนด | ชื่อ field นั้น เช่น `Summary` (`... maximum length of '500'.`) |
-| `statusId` ไม่ใช่สถานะ SERVICE หรือเป็นสถานะหลักที่มีสถานะย่อย (เช่น "เปิดเรื่อง") | `StatusId` |
+| `statusId` ไม่มีอยู่ หรือไม่ใช่สถานะประเภท SERVICE (เช่น ส่งสถานะ ACTIVITY มา) | `StatusId` |
 | ส่ง `areaId` (ดูข้อ 5) | `AreaId` |
 | `level...Id` ไม่มีอยู่ หรือผิดประเภท (เช่น id ชั้นความลับในช่องความเร่งด่วน) | `LevelSeverityId`, `LevelPriorityId`, `LevelSecretId` |
 | JSON พัง หรือวันที่ผิดรูปแบบ | `$.dateOpened` (หรือ path ของ field ที่ผิด) และ/หรือ `request` |

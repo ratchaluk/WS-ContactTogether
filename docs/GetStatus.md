@@ -1,10 +1,12 @@
 # Status API (`GET /ListOfValues/GetStatus`) สำหรับ Frontend
 
-ใช้ดึงรายการ **สถานะ** (`TblStatus`) ไปแสดงใน drop-down สถานะ
-เรียกแบบไม่ส่ง query จะได้สถานะประเภท **`ACTIVITY`** 3 รายการ: **เปิด / ปิด / ยกเลิก**
-ให้เลือกตัวที่ **`isDefault = "T"`** (ตอนนี้คือ **ปิด**) ไว้ให้ก่อนตอนเปิดฟอร์ม
+ใช้ดึงรายการ **สถานะของเรื่อง** (`TblStatus` ที่ `StatusType = SERVICE`) ไปแสดงใน drop-down สถานะ
+ของฟอร์มเปิดเรื่อง แล้วส่ง `id` ที่ผู้ใช้เลือกเป็น `statusId` ของ `POST /Services/AddNewService` ได้เลย
 
 > อ้างอิงโค้ด: `Controllers/ListOfValuesController.cs` (`GetStatus`), `Dtos/StatusResponse.cs`, `Helper/StatusTypes.cs`
+
+> **เปลี่ยนแปลง (17 พ.ย. 2026):** ไม่ส่ง query ตอนนี้ได้สถานะประเภท `SERVICE` ทั้งหมดเป็นรายการเดียว
+> (เดิมได้ `ACTIVITY`) และไม่มี field `children` แล้ว
 
 ---
 
@@ -14,7 +16,7 @@
 |---|---|
 | Method | `GET` |
 | Auth | **ต้องใช้ token**: `Authorization: Bearer <token>` (ได้จาก `POST /Auth/login`) |
-| Query | `statusType` (ไม่บังคับ) ไม่ส่ง = `ACTIVITY` (ตัวพิมพ์เล็กก็ได้) |
+| Query | `statusType` (ไม่บังคับ) ไม่ส่ง = `SERVICE` (สถานะของเรื่อง) / `ACTIVITY` = สถานะของงาน ตัวพิมพ์เล็กก็ได้ |
 | Backend (dev) | `http://localhost:5018/ListOfValues/GetStatus` |
 | URL จาก Next.js | `/api/backend/ListOfValues/GetStatus` (ผ่าน `rewrites()` ใน `next.config.ts` เพราะ API ยังไม่เปิด CORS) |
 
@@ -24,40 +26,48 @@
 
 ### 2.1 รูปแบบ
 
-200 ตอบเป็น **array ตรง ๆ** ไม่มี envelope `{ status, message, data }` แบบรายงาน
+200 ตอบเป็น **array ตรง ๆ** ไม่มี envelope เฉพาะรายการที่เปิดใช้งาน **เรียงตามชื่อ (`nameTh`)**
 
 | Field | Type | ความหมาย |
 |---|---|---|
-| `id` | string | `TblStatus.Id` (hex 32 ตัว) ใช้เป็น `value` ของ option และส่งกลับไปตอนบันทึก |
+| `id` | string | `TblStatus.Id` ใช้เป็น `value` ของ option และส่งเป็น `statusId` ตอนบันทึก |
+| `refId` | string | สถานะหลักที่สถานะนี้อยู่ใต้ ถ้า `refId === id` คือสถานะหลัก (เปิดเรื่อง / ปิดเรื่อง / ยกเลิก) ใช้จัดกลุ่มใน drop-down ได้ |
 | `nameTh` | string | ชื่อที่ใช้แสดงผล |
 | `nameEn` | string \| null | ชื่อภาษาอังกฤษ |
-| `isType` | `"OPEN"` \| `"CLOSE"` \| `"CANCEL"` | ความหมายของสถานะ ใช้แยกสี/ไอคอนได้ |
-| `isDefault` | `"T"` \| `"F"` | **`"T"` = ตัวที่ต้องเลือกไว้ให้ก่อน** (เป็น string ไม่ใช่ boolean) |
-| `children` | array | ของ `ACTIVITY` เป็น `[]` เสมอ ไม่ต้องใช้ |
+| `isType` | `"OPEN"` \| `"PENDING"` \| `"CLOSE"` \| `"CANCEL"` | ความหมายของสถานะ ใช้แยกสี/ไอคอนได้ |
+| `isDefault` | `"T"` \| `"F"` | ค่าเริ่มต้น **ภายในกลุ่มของมัน** ตามข้อมูลเดิม (ดูข้อ 4) |
 
-- ส่งมาเฉพาะรายการที่เปิดใช้งาน (`IsEnable = "T"`)
-- เรียง เปิด → ปิด → ยกเลิก (ตาม `isType`: OPEN → CLOSE → CANCEL)
-
-### 2.2 ตัวอย่าง (ข้อมูลจริง ณ 16 พ.ย. 2026)
+### 2.2 ตัวอย่าง (ข้อมูลจริง ณ 17 พ.ย. 2026, 14 รายการ)
 
 `GET /ListOfValues/GetStatus`
 
 ```json
 [
-  { "id": "0A5753389CDCD23F173268D8D46AC004", "nameTh": "เปิด",   "nameEn": "Open",   "isType": "OPEN",   "isDefault": "F", "children": [] },
-  { "id": "CB0A973609E8D684F2944D92ED4126A1", "nameTh": "ปิด",    "nameEn": "Closed", "isType": "CLOSE",  "isDefault": "T", "children": [] },
-  { "id": "CD6469896CF379C64A2FB75263FD3362", "nameTh": "ยกเลิก", "nameEn": "Cancel", "isType": "CANCEL", "isDefault": "F", "children": [] }
+  { "id": "5899EE5D72CF3652A4AAE69E429D9D4F", "refId": "67F7D634C1D74FDE512C164D6A2A1EF9", "nameTh": "Extenally Transfered", "nameEn": "Extenally Transfered", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "332E6D76F258C8294B160C20642AB9F6", "refId": "67F7D634C1D74FDE512C164D6A2A1EF9", "nameTh": "Internally Closed", "nameEn": "Internally Closed", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "ED219C0783D7F81CC6B4E2466A678480", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "ทำซ้ำ", "nameEn": "In Process", "isType": "OPEN", "isDefault": "T" },
+  { "id": "F8E07541CE9A0039578FE2066B78E88B", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "โทรผิด", "nameEn": "Wrong Number", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "B56BFA064D39DDDCBA4E7F10A2BBA230", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "โทรเล่น-จิตไม่ปกติ", "nameEn": null, "isType": "CLOSE", "isDefault": "F" },
+  { "id": "A7E0CAFC1FC4C18FC1544FB2E8933D6C", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "โทรเล่น-เด็กโทรเล่น", "nameEn": null, "isType": "CLOSE", "isDefault": "F" },
+  { "id": "19C49E66B6F9EF1BCE11A3B93DED12C4", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "โทรเล่น-โทรด่าหยาบคาย", "nameEn": "โทรเล่น-โทรด่าหยาบคาย", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "8CC720CB54323BCD7EE436C12F7E660E", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "โทรเล่น-เสียงเงียบ", "nameEn": "โทรเล่น-เสียงเงียบ", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "67F7D634C1D74FDE512C164D6A2A1EF9", "refId": "67F7D634C1D74FDE512C164D6A2A1EF9", "nameTh": "ปิดเรื่อง", "nameEn": "Closed", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "60CD725EA4455BA6770FC94BC78F466F", "refId": "60CD725EA4455BA6770FC94BC78F466F", "nameTh": "เปิดเรื่อง", "nameEn": "Open", "isType": "OPEN", "isDefault": "T" },
+  { "id": "1B751556C1458196BA0EB37037415A25", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "ยกเลิก", "nameEn": "Cancel", "isType": "CANCEL", "isDefault": "F" },
+  { "id": "9CF68DA7874E672EFCA3A6F0824FE543", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "สัญญาณไม่ชัดเจน", "nameEn": "Noise", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "C833A9E6D354B2AC350A50CFB41852A8", "refId": "1B751556C1458196BA0EB37037415A25", "nameTh": "สายหลุด", "nameEn": "Communication Terminate", "isType": "CLOSE", "isDefault": "F" },
+  { "id": "19C49E66B6F9EF1BCE11A3B93DED12C8", "refId": "60CD725EA4455BA6770FC94BC78F466F", "nameTh": "อยู่ระหว่างดำเนินการ", "nameEn": "Pending", "isType": "PENDING", "isDefault": "T" }
 ]
 ```
 
-ใช้เป็นตัวอย่างเท่านั้น **อย่า hard-code รายการหรือ id** ในหน้าเว็บ ให้หาตัว default จาก `isDefault === "T"`
+ใช้เป็นตัวอย่างเท่านั้น **อย่า hard-code รายการหรือ id** ในหน้าเว็บ
 
 ### 2.3 Status code
 
 | HTTP | เมื่อไร | Body |
 |---|---|---|
 | 200 | สำเร็จ (รวมกรณีไม่มีข้อมูล `[]`) | `StatusItem[]` |
-| 400 | ส่ง `statusType` ที่ไม่ใช่ `ACTIVITY` / `SERVICE` | ProblemDetails (`errors.statusType`) |
+| 400 | ส่ง `statusType` ที่ไม่ใช่ `SERVICE` / `ACTIVITY` | ProblemDetails (`errors.statusType`) |
 | 401 | ไม่มี token, token หมดอายุ, หรือ logout แล้ว | ว่าง |
 | 500 | ข้อผิดพลาดฝั่ง server | ว่าง หรือ JSON (อย่าพึ่งรูปแบบ) |
 
@@ -65,21 +75,15 @@
 
 ## 3. โค้ดตัวอย่าง (Next.js + TypeScript)
 
-### 3.1 Type และฟังก์ชันเรียก API
-
 ```ts
 // lib/api/status.ts
 export interface StatusItem {
   id: string;
+  refId: string;
   nameTh: string;
   nameEn: string | null;
   isType: "OPEN" | "PENDING" | "CLOSE" | "CANCEL";
   isDefault: "T" | "F";
-  children: StatusItem[];
-}
-
-export class StatusApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
 }
 
 export async function fetchStatuses(opts: { token: string; signal?: AbortSignal }): Promise<StatusItem[]> {
@@ -87,72 +91,36 @@ export async function fetchStatuses(opts: { token: string; signal?: AbortSignal 
     headers: { Authorization: `Bearer ${opts.token}` },
     signal: opts.signal,
   });
-
   if (res.ok) return res.json();
-  if (res.status === 401) throw new StatusApiError(401, "กรุณาเข้าสู่ระบบใหม่");
-  throw new StatusApiError(res.status, "โหลดรายการสถานะไม่สำเร็จ");
+  if (res.status === 401) throw new Error("กรุณาเข้าสู่ระบบใหม่");
+  throw new Error("โหลดรายการสถานะไม่สำเร็จ");
 }
 ```
-
-### 3.2 drop-down ที่เลือกตัว `isDefault = "T"` ให้ (client component)
 
 ```tsx
-"use client";
-
-import { useEffect, useState } from "react";
-import { fetchStatuses, type StatusItem } from "@/lib/api/status";
-
-export function StatusSelect(props: {
-  token: string;
-  value: string;                 // "" = ยังไม่เลือก
-  onChange: (id: string) => void;
-}) {
-  const [items, setItems] = useState<StatusItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const ac = new AbortController();
-    fetchStatuses({ token: props.token, signal: ac.signal })
-      .then((list) => {
-        setItems(list);
-        // เลือกตัว isDefault = "T" (ปิด) ให้ ถ้ายังไม่ได้เลือกอะไร
-        const def = list.find((s) => s.isDefault === "T");
-        if (!props.value && def) props.onChange(def.id);
-      })
-      .catch((e) => { if (e.name !== "AbortError") setError(e.message); });
-    return () => ac.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.token]);
-
-  if (error) return <p>{error}</p>;
-
-  return (
-    <select value={props.value} onChange={(e) => props.onChange(e.target.value)}>
-      <option value="">-- เลือกสถานะ --</option>
-      {items.map((s) => (
-        <option key={s.id} value={s.id}>{s.nameTh}</option>
-      ))}
-    </select>
-  );
-}
+// drop-down ธรรมดา: แสดงทุกรายการตามลำดับที่ API ส่งมา แล้วส่ง id ที่เลือกเป็น statusId
+<select value={statusId} onChange={(e) => setStatusId(e.target.value)}>
+  <option value="">-- เลือกสถานะ --</option>
+  {statuses.map((s) => (
+    <option key={s.id} value={s.id}>{s.nameTh}</option>
+  ))}
+</select>
 ```
 
-### 3.3 Cache
+ถ้าอยากจัดกลุ่มตามสถานะหลัก ใช้ `refId` จับกลุ่ม (สถานะหลักคือตัวที่ `refId === id`) แล้วใช้ `<optgroup>` ได้
 
 รายการนี้แทบไม่เปลี่ยน โหลดครั้งเดียวต่อ session แล้วเก็บไว้ได้
-(เช่น React Query / SWR ตั้ง `staleTime` ยาว ๆ)
 
 ---
 
-## 4. ข้อควรรู้ (สถานะ ณ 16 พ.ย. 2026)
+## 4. ข้อควรรู้ (สถานะ ณ 17 พ.ย. 2026)
 
 | เรื่อง | ตอนนี้ |
 |---|---|
-| ค่าเริ่มต้น | **ปิด** (`isDefault = "T"`) |
-| ใช้กับ `statusId` ของ `AddNewService` ได้ไหม | **ยังไม่ได้** `AddNewService` รับเฉพาะสถานะประเภท `SERVICE` (ส่ง id ของ ACTIVITY จะได้ 400) ถ้าหน้าจอเปิดเรื่องต้องใช้รายการนี้ แจ้ง backend ก่อน |
-| สถานะของเรื่อง (`SERVICE`) | เรียก `GET /ListOfValues/GetStatus?statusType=SERVICE` ได้ จะได้ต้นไม้ 2 ชั้น เปิดเรื่อง / ปิดเรื่อง / ยกเลิก → สถานะย่อย (ส่ง id ของสถานะย่อยเป็น `statusId`) |
-
-ถ้า backend ปรับข้อมูลหรือเพิ่ม field จะแจ้งและอัปเดตเอกสารนี้
+| ใช้กับ `statusId` ของ `AddNewService` | **ได้ทุกตัวในรายการนี้** บันทึกตาม id ที่ส่ง |
+| `isDefault` | เป็นค่าเริ่มต้นภายในกลุ่มตามข้อมูลเดิม ในรายการนี้มี `"T"` 3 ตัว (เปิดเรื่อง, อยู่ระหว่างดำเนินการ, ทำซ้ำ) **อย่าใช้เลือกค่าเริ่มต้นของ drop-down** ถ้าต้องเลือกไว้ให้ก่อน ให้ตกลงกับทีมว่าใช้ตัวไหน |
+| เรื่องเก่าในระบบ | ส่วนใหญ่เก็บ อยู่ระหว่างดำเนินการ (101 เรื่อง) และ Internally Closed (83 เรื่อง) |
+| สถานะของงาน | `?statusType=ACTIVITY` ได้ เปิด / ปิด / ยกเลิก **ใช้กับ `AddNewService` ไม่ได้** (400) |
 
 ---
 
@@ -165,4 +133,5 @@ Authorization: Bearer <token>
 
 ```bash
 curl http://localhost:5018/ListOfValues/GetStatus -H "Authorization: Bearer <token>"
+curl "http://localhost:5018/ListOfValues/GetStatus?statusType=ACTIVITY" -H "Authorization: Bearer <token>"
 ```
