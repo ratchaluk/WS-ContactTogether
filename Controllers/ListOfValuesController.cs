@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
+using ContactTogetherApi.Helper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -336,6 +337,141 @@ public class ListOfValuesController : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(genders);
+    }
+
+    /// <summary>
+    /// คืนรายการที่มาข้อมูล (<c>TblReference</c>) ที่เปิดใช้งาน สำหรับ drop-down "ที่มาข้อมูล" ตอนเปิดเรื่อง
+    /// ส่ง <c>id</c> ที่เลือกกลับไปเป็น <c>serviceReference</c> ของ <c>POST /Services/AddNewService</c>
+    /// </summary>
+    [HttpGet("GetReference")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ReferenceResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetReference(CancellationToken cancellationToken)
+    {
+        var references = await _db.TblReferences
+            .AsNoTracking()
+            .Where(r => r.IsEnable == "T")
+            .OrderBy(r => r.NameTh)
+            .Select(r => new ReferenceResponse
+            {
+                Id = r.Id,
+                NameTh = r.NameTh,
+                NameEn = r.NameEn,
+                IsDefault = r.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(references);
+    }
+
+    /// <summary>
+    /// คืนรายการระดับ (<c>TblLevel</c>) ที่เปิดใช้งานของประเภทที่ระบุ เรียงตาม <c>Multiplier</c>
+    /// <c>SEVERITY</c> = ความเร่งด่วน, <c>PRIORITY</c> = ความสำคัญ, <c>SECRET</c> = ชั้นความลับ
+    /// ส่ง <c>id</c> ที่เลือกกลับไปเป็น <c>levelSeverityId</c> / <c>levelPriorityId</c> / <c>levelSecretId</c>
+    /// ของ <c>POST /Services/AddNewService</c> ตามประเภท
+    /// </summary>
+    [HttpGet("GetLevel")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<LevelResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetLevel([FromQuery, Required] string? levelType, CancellationToken cancellationToken)
+    {
+        // The DB compares case-sensitively and stores the types in upper case, so accept any case here.
+        var type = levelType!.Trim().ToUpperInvariant();
+        if (!LevelTypes.All.Contains(type))
+        {
+            ModelState.AddModelError(nameof(levelType),
+                $"Must be one of {string.Join(", ", LevelTypes.All)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        var levels = await _db.TblLevels
+            .AsNoTracking()
+            .Where(l => l.LevelType == type && l.IsEnable == "T")
+            .OrderBy(l => l.Multiplier)
+            .ThenBy(l => l.NameTh)
+            .Select(l => new LevelResponse
+            {
+                Id = l.Id,
+                NameTh = l.NameTh,
+                NameEn = l.NameEn,
+                Multiplier = l.Multiplier,
+                IsDefault = l.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(levels);
+    }
+
+    /// <summary>
+    /// คืนสถานะ (<c>TblStatus</c>) ที่เปิดใช้งานของประเภทที่ระบุ เรียงตามชื่อ ค่าเริ่มต้นคือ
+    /// <c>StatusType = "SERVICE"</c> (สถานะของเรื่อง) ส่ง id ที่เลือกเป็น <c>statusId</c> ของ
+    /// <c>POST /Services/AddNewService</c> ได้เลย ส่ง <c>statusType=ACTIVITY</c> สำหรับสถานะของงาน
+    /// </summary>
+    [HttpGet("GetStatus")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<StatusResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetStatus([FromQuery] string? statusType, CancellationToken cancellationToken)
+    {
+        // SERVICE unless the caller asks for another type. The DB compares case-sensitively and stores
+        // the types in upper case, so accept any case here.
+        var type = string.IsNullOrWhiteSpace(statusType)
+            ? StatusTypes.Service
+            : statusType.Trim().ToUpperInvariant();
+        if (!StatusTypes.All.Contains(type))
+        {
+            ModelState.AddModelError(nameof(statusType),
+                $"Must be one of {string.Join(", ", StatusTypes.All)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        var statuses = await _db.TblStatuses
+            .AsNoTracking()
+            .Where(s => s.StatusType == type && s.IsEnable == "T")
+            .OrderBy(s => s.NameTh)
+            .Select(s => new StatusResponse
+            {
+                Id = s.Id,
+                RefId = s.RefId,
+                NameTh = s.NameTh,
+                NameEn = s.NameEn,
+                IsType = s.IsType,
+                IsDefault = s.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(statuses);
+    }
+
+    /// <summary>
+    /// คืนหน่วยงาน (<c>TblOrganization</c>) ที่เปิดใช้งานทั้งหมด เรียงตามชื่อ เป็นต้นไม้ 2 ชั้นผ่าน <c>refId</c>:
+    /// หน่วยงานหลัก (กระทรวง) มี <c>refId</c> เท่ากับ <c>id</c> ของตัวเอง ส่วนหน่วยงานย่อย (กรม) ชี้ไปที่กระทรวง
+    /// ส่ง <c>id</c> ของหน่วยงานย่อยเป็น <c>organizationId</c> ของ <c>POST /Services/AddNewService</c>
+    /// </summary>
+    [HttpGet("GetOrganization")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetOrganization(CancellationToken cancellationToken)
+    {
+        var organizations = await _db.TblOrganizations
+            .AsNoTracking()
+            .Where(o => o.IsEnable == "T")
+            .OrderBy(o => o.NameTh)
+            .Select(o => new OrganizationResponse
+            {
+                Id = o.Id,
+                RefId = o.RefId,
+                NameTh = o.NameTh,
+                NameEn = o.NameEn,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(organizations);
     }
 
     /// <summary>คืนรายการบทบาท (<c>TblRole</c>) ที่เปิดใช้งาน สำหรับ drop-down บทบาท</summary>

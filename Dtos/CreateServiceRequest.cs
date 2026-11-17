@@ -49,9 +49,11 @@ public class CreateServiceRequest
     [MaxLength(200)]
     public string? OrganizationId { get; set; }
 
+    /// <summary><c>TblReference.Id</c>: where the request came from ("ที่มาข้อมูล" in the reports).</summary>
     [MaxLength(500)]
     public string? ServiceReference { get; set; }
 
+    /// <summary>Free-text link to the source (a post, a news page, …): "Link ที่มาข้อมูล" in the reports.</summary>
     [MaxLength(500)]
     public string? ServiceReferenceLink { get; set; }
 
@@ -62,15 +64,15 @@ public class CreateServiceRequest
     [MaxLength(500)]
     public string? Remark { get; set; }
 
-    /// <summary><c>TblLevel.Id</c>.</summary>
+    /// <summary><c>TblLevel.Id</c> with <c>LevelType = "SEVERITY"</c> (ความเร่งด่วน).</summary>
     [MaxLength(500)]
     public string? LevelSeverityId { get; set; }
 
-    /// <summary><c>TblLevel.Id</c>.</summary>
+    /// <summary><c>TblLevel.Id</c> with <c>LevelType = "PRIORITY"</c> (ความสำคัญ).</summary>
     [MaxLength(500)]
     public string? LevelPriorityId { get; set; }
 
-    /// <summary><c>TblLevel.Id</c>.</summary>
+    /// <summary><c>TblLevel.Id</c> with <c>LevelType = "SECRET"</c> (ชั้นความลับ).</summary>
     [MaxLength(500)]
     public string? LevelSecretId { get; set; }
 

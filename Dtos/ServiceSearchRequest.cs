@@ -1,9 +1,12 @@
+using System.ComponentModel;
+
 namespace ContactTogetherApi.Dtos;
 
 /// <summary>
 /// Query-string filters for <c>GET /Services/GetServices</c>. At least one is required; every one
 /// given must match. Ids are matched exactly, <see cref="ServiceCode"/> and
-/// <see cref="ServiceSummary"/> partially.
+/// <see cref="ServiceSummary"/> partially. <see cref="PageNumber"/>/<see cref="PageSize"/> choose the
+/// page and are not filters.
 /// </summary>
 public class ServiceSearchRequest
 {
@@ -37,4 +40,12 @@ public class ServiceSearchRequest
 
     /// <summary>Inclusive upper bound on <c>TblService.Created</c>; a date without a time covers the whole day.</summary>
     public DateTime? ServiceCreatedTo { get; set; }
+
+    /// <summary>Page to return, starting at 1.</summary>
+    [DefaultValue(1)]
+    public int PageNumber { get; set; } = 1;
+
+    /// <summary>Rows per page, 1 to 200.</summary>
+    [DefaultValue(20)]
+    public int PageSize { get; set; } = 20;
 }

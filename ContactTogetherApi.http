@@ -108,6 +108,64 @@ Authorization: Bearer {{token}}
 
 ###
 
+# References (ที่มาข้อมูล) - enabled TblReference rows as [{ id, nameTh, nameEn, isDefault }].
+# Send id back as serviceReference when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetReference
+Authorization: Bearer {{token}}
+
+###
+
+# Levels - enabled TblLevel rows of one type as [{ id, nameTh, nameEn, multiplier, isDefault }],
+# sorted by multiplier. levelType is SEVERITY (send id as levelSeverityId), PRIORITY (levelPriorityId)
+# or SECRET (levelSecretId) when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=SEVERITY
+Authorization: Bearer {{token}}
+
+###
+
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=PRIORITY
+Authorization: Bearer {{token}}
+
+###
+
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=SECRET
+Authorization: Bearer {{token}}
+
+###
+
+# Unknown or missing levelType -> 400 ProblemDetails (errors.levelType)
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetLevel?levelType=xxx
+Authorization: Bearer {{token}}
+
+###
+
+# Statuses for the add-service form - no query = every enabled StatusType SERVICE row (14), sorted by
+# nameTh, as [{ id, refId, nameTh, nameEn, isType, isDefault }]. Send the chosen id as statusId.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus
+Authorization: Bearer {{token}}
+
+###
+
+# Work-log (TblActivity) statuses: [เปิด, ปิด, ยกเลิก]. Not accepted by AddNewService (400).
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=SERVICE
+Authorization: Bearer {{token}}
+
+###
+
+# Unknown statusType -> 400 ProblemDetails (errors.statusType)
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus?statusType=ACTIVITY
+Authorization: Bearer {{token}}
+
+###
+
+# Organizations - every enabled TblOrganization row (395), sorted by nameTh, as [{ id, refId, nameTh, nameEn }].
+# Two levels: a ministry (กระทรวง) has refId == id (22 rows), a department (กรม) has refId = its ministry.
+# Send the department id as organizationId when adding a service.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetOrganization
+Authorization: Bearer {{token}}
+
+###
+
 # Roles - enabled TblRole rows as [{ id, nameTh, nameEn, levelSecretId, isDefault, isAdmin }].
 # isDefault / isAdmin are "T"/"F"; levelSecretId is a TblLevel.Id. Send id back as roleId when
 # adding an employee.
@@ -125,7 +183,7 @@ Authorization: Bearer {{token}}
 ###
 
 # Add an account (TblAccount only - phone numbers live in TblAccountDetail)
-POST {{ContactTogetherApi_HostAddress}}/Account/accounts
+POST {{ContactTogetherApi_HostAddress}}/Account/AddNewAccount
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -143,21 +201,90 @@ Content-Type: application/json
 ###
 
 # Look up accounts by phone number - matches MOBILE / HOME / OFFICE / FAX details
-GET {{ContactTogetherApi_HostAddress}}/Account/by-phone?phoneNo=0908606424
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountByPhoneNo?phoneNo=0908606424
 Authorization: Bearer {{token}}
+
+###
+# Look up accounts by phone number - matches MOBILE / HOME / OFFICE / FAX details
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountByPhoneNo?phoneNo=0934153694
+Authorization: Bearer {{token}}
+
+###
+
+
+# ---------------------------------------------------------------------------------------------
+# GetAccounts - search accounts by partial firstName / lastName (Thai or English) and/or contactInfo
+# (address or any enabled phone / e-mail). At least one is required; every one given must match.
+# 200 = array of at most 100 accounts (no total, no paging), each with its id and contacts[].
+# Matching is case-sensitive. Thai text in the URL is percent-encoded (UTF-8) below.
+# ---------------------------------------------------------------------------------------------
+
+# 200 - by phone number (8 accounts). Use this, not GetAccountByPhoneNo, when you need the account id.
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=0909840822
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - by part of a phone number
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=090984
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - by e-mail domain (matches any e-mail containing the text)
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=@gmail.com
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName "สม" (465 matches in the DB, so the result stops at 100)
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%E0%B8%AA%E0%B8%A1
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName "สม" AND lastName "ใจ"
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%E0%B8%AA%E0%B8%A1&lastName=%E0%B9%83%E0%B8%88
+Authorization: Bearer {{token}}
+
+###
+
+# 200 - firstName in English (case-sensitive: "somchai" does not match "Somchai")
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=Som
+Authorization: Bearer {{token}}
+
+###
+
+# 400 - no filter at all
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts
+Authorization: Bearer {{token}}
+
+###
+
+# 400 - filters that are blank after trimming count as not given
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?firstName=%20%20&contactInfo=
+Authorization: Bearer {{token}}
+
+###
+
+# 401 - no token
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=0909840822
 
 ###
 
 # Add a service (TblService). Code is generated: Buddhist yyMMdd + 5-digit daily running number
 # (e.g. 69111100001). IsEnable is always "T"; OwnerId defaults to the token's employee and
 # DateOpened to now. Every lookup id is optional but must exist when given (400 otherwise).
+# statusId is any StatusType SERVICE id from GetStatus, stored as sent
+# (e.g. อยู่ระหว่างดำเนินการ 19C49E66B6F9EF1BCE11A3B93DED12C8).
+# NOTE: a 201 writes a real row and uses up one service code of the day.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "categoryId": "<TblCategory.Id>",
-  "statusId": "332E6D76F258C8294B160C20642AB9F6",
+  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
   "accountId": "<TblAccount.Id>",
   "callBack": "N",
   "summary": "ทดสอบเปิดเรื่อง",
@@ -165,6 +292,37 @@ Content-Type: application/json
 }
 
 ###
+
+# 400 - an ACTIVITY status (ปิด) is not a service status: errors.StatusId. Nothing is written.
+POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "CB0A973609E8D684F2944D92ED4126A1",
+  "summary": "ทดสอบสถานะผิดประเภท"
+}
+
+###
+
+# Search services. At least one filter is required (AccountPhoneNo, ServicesStatus, ServiceCode,
+# ServiceSummary, ServiceType, ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
+# PageNumber (default 1) / PageSize (default 20, max 200) pick the page.
+# 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
+# Search services. At least one filter is required (AccountPhoneNo, ServicesStatus, ServiceCode,
+# ServiceSummary, ServiceType, ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
+# PageNumber (default 1) / PageSize (default 20, max 200) pick the page.
+# 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=0934153694&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
