@@ -48,6 +48,8 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblLoginHistory> TblLoginHistories { get; set; }
 
+    public virtual DbSet<TblNotification> TblNotifications { get; set; }
+
     public virtual DbSet<TblOrganization> TblOrganizations { get; set; }
 
     public virtual DbSet<TblOrganizationGroup> TblOrganizationGroups { get; set; }
@@ -74,6 +76,10 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblService> TblServices { get; set; }
 
+    public virtual DbSet<TblServiceTitle> TblServiceTitles { get; set; }
+
+    public virtual DbSet<TblServiceTransfer> TblServiceTransfers { get; set; }
+
     public virtual DbSet<TblSession> TblSessions { get; set; }
 
     public virtual DbSet<TblStatus> TblStatuses { get; set; }
@@ -81,6 +87,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TblSubDistrict> TblSubDistricts { get; set; }
 
     public virtual DbSet<TblTmpSr> TblTmpSrs { get; set; }
+
+    public virtual DbSet<TblTransferStatus> TblTransferStatuses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -452,6 +460,20 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.UserName).HasMaxLength(100);
         });
 
+        modelBuilder.Entity<TblNotification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblNotif__3214EC07DD6053B8");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_NotificationId");
+            entity.Property(e => e.Created).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.EmployeeId).HasMaxLength(50);
+            entity.Property(e => e.IsRead)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasDefaultValue("F");
+            entity.Property(e => e.TransferId).HasMaxLength(50);
+        });
+
         modelBuilder.Entity<TblOrganization>(entity =>
         {
             entity.ToTable("TblOrganization");
@@ -750,6 +772,10 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.ServiceReferenceLink)
                 .HasMaxLength(500)
                 .HasColumnName("Service_Reference_Link");
+            entity.Property(e => e.ServiceTitleId)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasDefaultValue("81EE380A-96E2-F111-8E93-96F1F7A12F5E");
             entity.Property(e => e.StatusId)
                 .HasMaxLength(200)
                 .IsUnicode(false)
@@ -760,6 +786,36 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(200)
                 .IsUnicode(false)
                 .HasColumnName("Updated_By");
+        });
+
+        modelBuilder.Entity<TblServiceTitle>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblServi__3214EC07026D556C");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_ServiceTitleId");
+            entity.Property(e => e.Created).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedBy).HasMaxLength(50);
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasDefaultValue("T");
+            entity.Property(e => e.ServiceTitleText).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<TblServiceTransfer>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblServi__3214EC073DE6064C");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_TransferId");
+            entity.Property(e => e.Created).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.FromEmployeeId).HasMaxLength(50);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.ServiceId).HasMaxLength(50);
+            entity.Property(e => e.ToEmployeeId).HasMaxLength(50);
+            entity.Property(e => e.TransferStatusId)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasDefaultValue("A203CAF6-6CDF-F111-8E93-96F1F7A12F5E");
         });
 
         modelBuilder.Entity<TblSession>(entity =>
@@ -823,6 +879,22 @@ public partial class ApplicationDbContext : DbContext
                 .ToTable("TblTmpSr");
 
             entity.Property(e => e.SrId).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TblTransferStatus>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblTrans__3214EC07E7C237E4");
+
+            entity.ToTable("TblTransferStatus");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_TransferStatusId");
+            entity.Property(e => e.Created).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.CreatedBy).HasMaxLength(50);
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasDefaultValue("T");
+            entity.Property(e => e.TransferStatusText).HasMaxLength(50);
         });
 
         OnModelCreatingPartial(modelBuilder);

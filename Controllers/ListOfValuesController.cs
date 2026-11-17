@@ -76,6 +76,31 @@ public class ListOfValuesController : ControllerBase
     }
 
     /// <summary>
+    /// คืนหัวข้อเรื่อง (<c>TblServiceTitles</c>) ที่เปิดใช้งาน สำหรับ drop-down หัวข้อเรื่อง
+    /// เรียงตามลำดับที่เพิ่มเข้าระบบ
+    /// </summary>
+    [HttpGet("GetServiceTitle")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<ServiceTitleResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetServiceTitle(CancellationToken cancellationToken)
+    {
+        var titles = await _db.TblServiceTitles
+            .AsNoTracking()
+            .Where(t => t.IsEnable == "T")
+            .OrderBy(t => t.Created)
+            .Select(t => new { t.Id, t.ServiceTitleText })
+            .ToListAsync(cancellationToken);
+
+        // Upper case, as TblService.ServiceTitleId stores it; a Guid would serialize in lower case.
+        return Ok(titles.Select(t => new ServiceTitleResponse
+        {
+            Id = t.Id.ToString("D").ToUpperInvariant(),
+            ServiceTitleText = t.ServiceTitleText,
+        }));
+    }
+
+    /// <summary>
     /// คืนจังหวัด อำเภอ และตำบลที่เปิดใช้งานทั้งหมดในครั้งเดียว สำหรับ drop-down ที่อยู่ 3 ตัวที่ผูกกัน
     /// แต่ละรายการมี id ของระดับแม่ติดมาด้วย เลือกตำบลแล้วเติมอำเภอและจังหวัดได้ เลือกอำเภอแล้วเติมจังหวัดได้
     /// รายการที่ระดับแม่ถูกปิดใช้งานจะไม่ถูกส่งมา

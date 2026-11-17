@@ -111,6 +111,8 @@ public class ServicesController : ControllerBase
         var code = Normalize(request.ServiceCode);
         var summary = Normalize(request.ServiceSummary);
         var categoryId = Normalize(request.ServiceType);
+        // TblService stores it in upper case and the DB collation is case-sensitive.
+        var serviceTitleId = Normalize(request.ServiceTitleId)?.ToUpperInvariant();
         var ownerId = Normalize(request.ServiceOwner);
         var organizationGroupId = Normalize(request.OrganizationGroup);
         var organizationId = Normalize(request.Organization);
@@ -121,7 +123,7 @@ public class ServicesController : ControllerBase
             ? to.AddDays(1).AddSeconds(-1)
             : request.ServiceCreatedTo;
 
-        if (new[] { phoneNo, statusId, code, summary, categoryId, ownerId, organizationGroupId, organizationId }
+        if (new[] { phoneNo, statusId, code, summary, categoryId, serviceTitleId, ownerId, organizationGroupId, organizationId }
                 .All(value => value is null)
             && createdFrom is null
             && createdTo is null)
@@ -181,6 +183,11 @@ public class ServicesController : ControllerBase
         if (categoryId is not null)
         {
             services = services.Where(s => s.CategoryId == categoryId);
+        }
+
+        if (serviceTitleId is not null)
+        {
+            services = services.Where(s => s.ServiceTitleId == serviceTitleId);
         }
 
         if (ownerId is not null)
@@ -247,6 +254,7 @@ public class ServicesController : ControllerBase
                 AccountFirstname = account != null ? account.FirstnameTh : null,
                 AccountLastname = account != null ? account.LastnameTh : null,
                 Category = category != null ? category.NameTh : null,
+                service.ServiceTitleId,
                 service.Summary,
                 Status = status != null ? status.NameTh : null,
                 service.Created,
@@ -262,6 +270,7 @@ public class ServicesController : ControllerBase
             ServiceOwner = BuildFullName(r.OwnerSalutation, r.OwnerFirstname, r.OwnerLastname),
             AccountFullname = BuildFullName(r.AccountSalutation, r.AccountFirstname, r.AccountLastname),
             ServiceType = r.Category,
+            ServiceTitleId = r.ServiceTitleId,
             ServiceSummary = r.Summary,
             ServicesStatus = r.Status,
             ServiceCreated = r.Created,
@@ -329,6 +338,8 @@ public class ServicesController : ControllerBase
             Id = GuidStringValueGenerator.NewId(),
             CategoryId = request.CategoryId,
             StatusId = request.StatusId,
+            // Upper case, as the existing rows and GetServiceTitle have it (the collation is case-sensitive).
+            ServiceTitleId = request.ServiceTitleId!.Trim().ToUpperInvariant(),
             // A blank owner (e.g. an unselected drop-down sends "") means the calling employee too.
             OwnerId = string.IsNullOrWhiteSpace(request.OwnerId) ? actingEmployeeId : request.OwnerId.Trim(),
             ChannelIncomingId = request.ChannelIncomingId,
@@ -383,7 +394,7 @@ public class ServicesController : ControllerBase
                 Channel_Outgoing_ID, Account_ID, Summary, Detail, Service_Area, Organization_ID,
                 Service_Reference, Service_Reference_Link, Area_ID, Remark, Level_Severity_ID,
                 Level_Priority_ID, Level_Secret_ID, Is_Enable, Created_By, Updated_By, Created,
-                Updated, Date_Opened, Date_Closed, On_Scene)
+                Updated, Date_Opened, Date_Closed, On_Scene, ServiceTitleId)
             VALUES (
                 {service.Id}, {service.Code}, {service.CategoryId}, {service.StatusId}, {service.OwnerId},
                 {service.ChannelIncomingId}, {service.CallBack}, {service.ChannelOutgoingId},
@@ -392,7 +403,7 @@ public class ServicesController : ControllerBase
                 {service.AreaId}, {service.Remark}, {service.LevelSeverityId}, {service.LevelPriorityId},
                 {service.LevelSecretId}, {service.IsEnable}, {service.CreatedBy}, {service.UpdatedBy},
                 {service.Created}, {service.Updated}, {service.DateOpened}, {service.DateClosed},
-                {service.OnScene})
+                {service.OnScene}, {service.ServiceTitleId})
             """, cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
@@ -431,6 +442,19 @@ public class ServicesController : ControllerBase
         await CheckAsync(nameof(request.OrganizationId), request.OrganizationId, _db.TblOrganizations.Select(x => x.Id));
         await CheckAsync(nameof(request.ServiceReference), request.ServiceReference, _db.TblReferences.Select(x => x.Id));
         await CheckAsync(nameof(request.AreaId), request.AreaId, _db.TblAreas.Select(x => x.Id));
+
+        // TblServiceTitles.Id is a uniqueidentifier, so parse it rather than compare text. [Required]
+        // has already reported a missing value.
+        if (!string.IsNullOrWhiteSpace(request.ServiceTitleId))
+        {
+            if (!Guid.TryParse(request.ServiceTitleId.Trim(), out var titleId)
+                || !await _db.TblServiceTitles.AnyAsync(t => t.Id == titleId && t.IsEnable == "T", cancellationToken))
+            {
+                ModelState.AddModelError(
+                    nameof(request.ServiceTitleId),
+                    $"No enabled TblServiceTitles row with Id '{request.ServiceTitleId}'.");
+            }
+        }
         // One table holds all three kinds of level, so the id must also be of the right LevelType.
         await CheckAsync(nameof(request.LevelSeverityId), request.LevelSeverityId, LevelIds(LevelTypes.Severity));
         await CheckAsync(nameof(request.LevelPriorityId), request.LevelPriorityId, LevelIds(LevelTypes.Priority));
@@ -474,6 +498,7 @@ public class ServicesController : ControllerBase
                 StatusId = service.StatusId,
                 StatusNameTh = status != null ? status.NameTh : null,
                 StatusNameEn = status != null ? status.NameEn : null,
+                ServiceTitleId = service.ServiceTitleId,
                 OwnerId = service.OwnerId,
                 DateOpened = service.DateOpened,
                 DateClosed = service.DateClosed,

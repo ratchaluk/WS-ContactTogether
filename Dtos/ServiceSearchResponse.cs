@@ -15,6 +15,9 @@ public class ServiceSearchResponse
     /// <summary>The <c>TblCategory</c> name.</summary>
     public string? ServiceType { get; set; }
 
+    /// <summary><c>TblServiceTitles.Id</c> (หัวข้อเรื่อง) ตัวพิมพ์ใหญ่</summary>
+    public string? ServiceTitleId { get; set; }
+
     public string? ServiceSummary { get; set; }
 
     /// <summary>The <c>TblStatus</c> name.</summary>

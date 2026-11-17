@@ -23,6 +23,9 @@ public class ServiceSearchRequest
     /// <summary><c>TblCategory.Id</c>.</summary>
     public string? ServiceType { get; set; }
 
+    /// <summary><c>TblServiceTitles.Id</c> (หัวข้อเรื่อง) รับได้ทั้งตัวพิมพ์เล็กและใหญ่</summary>
+    public string? ServiceTitleId { get; set; }
+
     /// <summary><c>TblEmployee.Id</c> of the service owner.</summary>
     public string? ServiceOwner { get; set; }
 

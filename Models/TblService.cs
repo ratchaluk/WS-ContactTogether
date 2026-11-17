@@ -60,4 +60,6 @@ public partial class TblService
     public DateTime? DateClosed { get; set; }
 
     public DateTime? OnScene { get; set; }
+
+    public string ServiceTitleId { get; set; } = null!;
 }
