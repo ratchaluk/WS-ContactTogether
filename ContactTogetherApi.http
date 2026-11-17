@@ -158,6 +158,12 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Activity (work-log) statuses only: StatusType = ACTIVITY, enabled, ordered by NameTh.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatusByStatusTypeActivity
+Authorization: Bearer {{token}}
+
+###
+
 # Organizations - every enabled TblOrganization row (395), sorted by nameTh, as [{ id, refId, nameTh, nameEn }].
 # Two levels: a ministry (กระทรวง) has refId == id (22 rows), a department (กรม) has refId = its ministry.
 # Send the department id as organizationId when adding a service.
