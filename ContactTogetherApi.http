@@ -285,6 +285,40 @@ GET {{ContactTogetherApi_HostAddress}}/Account/GetAccounts?contactInfo=090984082
 
 ###
 
+# One account by TblAccount.Id (accountId of a service), shaped like a GetAccounts row: names,
+# gender, address, contacts. Disabled accounts are returned too. 400 = no id; 404 = no such account.
+GET {{ContactTogetherApi_HostAddress}}/Account/GetAccountById?id=F05AB03D7CF74CEFA75504047FD52343
+Authorization: Bearer {{token}}
+
+###
+
+# Replace an account's columns (send the whole account: a field left out becomes null). Phones and
+# e-mails (TblAccountDetail) are not changed. Keeping the account's current areaId is allowed even
+# though TblArea is empty. 200 = the account as GetAccountById returns it; 400; 404.
+# WRITES TO THE DATABASE.
+PUT {{ContactTogetherApi_HostAddress}}/Account/UpdateAccountById?id=4D7B3F5E81104F349449B50571E72BCE
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "salutationTh": "นาย",
+  "firstnameTh": "อินดี้",
+  "lastnameTh": "ทดสอบจ้า",
+  "salutationEn": "",
+  "firstnameEn": "",
+  "lastnameEn": "",
+  "genderId": "19C49E66B6F9EF1BCE11A3B93DED12C4",
+  "birthdate": "",
+  "address": "",
+  "areaId": "",
+  "zipcode": "10210",
+  "remark": "",
+  "isScret": "F",
+  "isEnable": "T"
+}
+
+###
+
 # Add a service (TblService). Code is generated: Buddhist yyMMdd + 5-digit daily running number
 # (e.g. 69111100001). IsEnable is always "T"; OwnerId defaults to the token's employee and
 # DateOpened to now. Every lookup id is optional but must exist when given (400 otherwise).
@@ -333,6 +367,15 @@ Authorization: Bearer {{token}}
 # PageNumber (default 1) / PageSize (default 20, max 200) pick the page.
 # 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
 GET {{ContactTogetherApi_HostAddress}}/Services/GetServices?AccountPhoneNo=0934153694&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
+# One service for the detail page, by TblService.Id (serviceId of GetServices, id of AddNewService).
+# 200 = every id of AddNewService's response plus their names, categoryPath / organizationPath
+# (top level first), account (the whole TblAccount row with gender and contacts, or null);
+# 400 = no id; 404 = no enabled service with that id.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServiceById?id=427D66AA13734763AC1D99775554659B
 Authorization: Bearer {{token}}
 
 ###
