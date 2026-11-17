@@ -1,6 +1,7 @@
 using System.Globalization;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
+using ContactTogetherApi.Helper;
 using ContactTogetherApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -228,6 +229,7 @@ public class AccountController : ControllerBase
                 Zipcode = account.Zipcode,
                 Remark = account.Remark,
                 IsScret = account.IsScret,
+                IsEnable = account.IsEnable,
                 Created = account.Created,
             }).Take(MaxSearchResults).ToListAsync(cancellationToken);
 
@@ -254,10 +256,128 @@ public class AccountController : ControllerBase
     }
 
     /// <summary>
+    /// Returns one account by <c>TblAccount.Id</c>, with its gender name and enabled contact details, in
+    /// the shape of a <see cref="GetAccounts"/> row. Disabled accounts are returned too, so the account
+    /// of an old service can still be shown; <c>IsEnable</c> tells them apart.
+    /// </summary>
+    [HttpGet("GetAccountById")]
+    [ProducesResponseType(typeof(AccountSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAccountById(
+        [FromQuery] string? id,
+        CancellationToken cancellationToken)
+    {
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var accountId = id?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(accountId))
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var account = await _db.LoadAccountAsync(accountId, cancellationToken);
+        if (account is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"));
+        }
+
+        return Ok(account);
+    }
+
+    /// <summary>
+    /// Replaces the editable columns of one account (names, gender, birth date, address, zip code,
+    /// remark, flags) and returns it as <see cref="GetAccountById"/> does. Phone numbers and e-mail
+    /// addresses (<c>TblAccountDetail</c>) are not touched. <c>Updated</c>/<c>UpdatedBy</c> come from the
+    /// clock and the token; <c>Created</c>/<c>CreatedBy</c> are kept.
+    /// </summary>
+    [HttpPut("UpdateAccountById")]
+    [ProducesResponseType(typeof(AccountSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAccountById(
+        [FromQuery] string? id,
+        [FromBody] UpdateAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the change."));
+        }
+
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var accountId = id?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(accountId))
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        // Projected and untracked: TblAccount.Id has legacy duplicates, see ApplicationDbContext.Keys.cs.
+        var current = await _db.TblAccounts.AsNoTracking()
+            .Where(a => a.Id == accountId)
+            .Select(a => new { a.AreaId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (current is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"));
+        }
+
+        // TblArea is empty, so the legacy AreaId an account already has cannot pass the lookup check.
+        // Keeping that value is allowed, or saving an unchanged form would fail.
+        await ValidateLookupsAsync(request, cancellationToken, keepAreaId: current.AreaId);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var now = DateTime.Now.ToString(LegacyDateFormat, CultureInfo.InvariantCulture);
+
+        // A set-based UPDATE, so every duplicate row of this id gets the same values and none is lost
+        // the way a tracked entity would collapse them.
+        await _db.TblAccounts
+            .Where(a => a.Id == accountId)
+            .ExecuteUpdateAsync(s => s
+                    .SetProperty(a => a.SalutationTh, request.SalutationTh)
+                    .SetProperty(a => a.FirstnameTh, request.FirstnameTh)
+                    .SetProperty(a => a.LastnameTh, request.LastnameTh)
+                    .SetProperty(a => a.SalutationEn, request.SalutationEn)
+                    .SetProperty(a => a.FirstnameEn, request.FirstnameEn)
+                    .SetProperty(a => a.LastnameEn, request.LastnameEn)
+                    .SetProperty(a => a.GenderId, request.GenderId)
+                    .SetProperty(a => a.Birthdate, request.Birthdate)
+                    .SetProperty(a => a.Address, request.Address)
+                    .SetProperty(a => a.AreaId, request.AreaId)
+                    .SetProperty(a => a.Zipcode, request.Zipcode)
+                    .SetProperty(a => a.Remark, request.Remark)
+                    .SetProperty(a => a.IsScret, request.IsScret)
+                    .SetProperty(a => a.IsEnable, request.IsEnable)
+                    .SetProperty(a => a.Updated, now)
+                    .SetProperty(a => a.UpdatedBy, actingEmployeeId),
+                cancellationToken);
+
+        _logger.LogInformation(
+            "Account {AccountId} updated by {ActingEmployeeId}.",
+            accountId,
+            actingEmployeeId);
+
+        return Ok(await _db.LoadAccountAsync(accountId, cancellationToken));
+    }
+
+    /// <summary>
     /// The schema has no FK constraints on these columns, so a bad id would otherwise be stored
     /// happily. Check them against the lookup tables and report them as validation errors.
     /// </summary>
-    private async Task ValidateLookupsAsync(CreateAccountRequest request, CancellationToken cancellationToken)
+    /// <param name="keepAreaId">An update passes the account's current <c>AreaId</c>, which is accepted unchecked.</param>
+    private async Task ValidateLookupsAsync(
+        CreateAccountRequest request,
+        CancellationToken cancellationToken,
+        string? keepAreaId = null)
     {
         if (!string.IsNullOrEmpty(request.GenderId)
             && !await _db.TblGenders.AsNoTracking().AnyAsync(g => g.Id == request.GenderId, cancellationToken))
@@ -266,6 +386,7 @@ public class AccountController : ControllerBase
         }
 
         if (!string.IsNullOrEmpty(request.AreaId)
+            && request.AreaId != keepAreaId
             && !await _db.TblAreas.AsNoTracking().AnyAsync(a => a.Id == request.AreaId, cancellationToken))
         {
             ModelState.AddModelError(nameof(request.AreaId), $"No TblArea row with Id '{request.AreaId}'.");
