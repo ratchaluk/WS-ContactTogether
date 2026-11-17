@@ -329,7 +329,8 @@ public class ServicesController : ControllerBase
             Id = GuidStringValueGenerator.NewId(),
             CategoryId = request.CategoryId,
             StatusId = request.StatusId,
-            OwnerId = request.OwnerId ?? actingEmployeeId,
+            // A blank owner (e.g. an unselected drop-down sends "") means the calling employee too.
+            OwnerId = string.IsNullOrWhiteSpace(request.OwnerId) ? actingEmployeeId : request.OwnerId.Trim(),
             ChannelIncomingId = request.ChannelIncomingId,
             CallBack = request.CallBack,
             ChannelOutgoingId = request.ChannelOutgoingId,
@@ -421,7 +422,8 @@ public class ServicesController : ControllerBase
     private async Task ValidateLookupsAsync(CreateServiceRequest request, CancellationToken cancellationToken)
     {
         await CheckAsync(nameof(request.CategoryId), request.CategoryId, _db.TblCategories.Select(x => x.Id));
-        await CheckStatusAsync();
+        await CheckAsync(nameof(request.StatusId), request.StatusId,
+            _db.TblStatuses.Where(x => x.StatusType == StatusTypes.Service).Select(x => x.Id));
         await CheckAsync(nameof(request.OwnerId), request.OwnerId, _db.TblEmployees.Select(x => x.Id!));
         await CheckAsync(nameof(request.ChannelIncomingId), request.ChannelIncomingId, _db.TblChannels.Select(x => x.Id));
         await CheckAsync(nameof(request.ChannelOutgoingId), request.ChannelOutgoingId, _db.TblChannels.Select(x => x.Id));
@@ -436,34 +438,6 @@ public class ServicesController : ControllerBase
 
         IQueryable<string> LevelIds(string levelType) =>
             _db.TblLevels.Where(x => x.LevelType == levelType).Select(x => x.Id);
-
-        // TblStatus is a two-level tree per StatusType (main status -> sub-status), and services store
-        // the sub-status, so a SERVICE main status that has enabled sub-statuses is rejected.
-        async Task CheckStatusAsync()
-        {
-            if (string.IsNullOrEmpty(request.StatusId))
-            {
-                return;
-            }
-
-            var status = await _db.TblStatuses.AsNoTracking()
-                .Where(s => s.Id == request.StatusId && s.StatusType == StatusTypes.Service)
-                .Select(s => new
-                {
-                    HasChildren = _db.TblStatuses.Any(c => c.RefId == s.Id && c.Id != s.Id && c.IsEnable == "T"),
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (status is null)
-            {
-                ModelState.AddModelError(nameof(request.StatusId), $"No SERVICE status with Id '{request.StatusId}'.");
-            }
-            else if (status.HasChildren)
-            {
-                ModelState.AddModelError(nameof(request.StatusId),
-                    $"'{request.StatusId}' is a main status; send the Id of one of its sub-statuses.");
-            }
-        }
 
         async Task CheckAsync(string field, string? id, IQueryable<string> ids)
         {
