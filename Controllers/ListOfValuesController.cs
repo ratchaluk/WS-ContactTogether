@@ -454,7 +454,22 @@ public class ListOfValuesController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var statuses = await _db.TblStatuses
+        return Ok(await LoadStatusesAsync(type, cancellationToken));
+    }
+
+    /// <summary>
+    /// คืนสถานะของงาน (<c>TblStatus</c> ที่ <c>StatusType = "ACTIVITY"</c>) ที่เปิดใช้งาน เรียงตามชื่อ
+    /// ได้ผลเหมือน <c>GetStatus?statusType=ACTIVITY</c>
+    /// </summary>
+    [HttpGet("GetStatusByStatusTypeActivity")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<StatusResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetStatusByStatusTypeActivity(CancellationToken cancellationToken) =>
+        Ok(await LoadStatusesAsync(StatusTypes.Activity, cancellationToken));
+
+    private Task<List<StatusResponse>> LoadStatusesAsync(string type, CancellationToken cancellationToken) =>
+        _db.TblStatuses
             .AsNoTracking()
             .Where(s => s.StatusType == type && s.IsEnable == "T")
             .OrderBy(s => s.NameTh)
@@ -468,9 +483,6 @@ public class ListOfValuesController : ControllerBase
                 IsDefault = s.IsDefault,
             })
             .ToListAsync(cancellationToken);
-
-        return Ok(statuses);
-    }
 
     /// <summary>
     /// คืนหน่วยงาน (<c>TblOrganization</c>) ที่เปิดใช้งานทั้งหมด เรียงตามชื่อ เป็นต้นไม้ 2 ชั้นผ่าน <c>refId</c>:
