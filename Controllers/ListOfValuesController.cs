@@ -406,9 +406,9 @@ public class ListOfValuesController : ControllerBase
     }
 
     /// <summary>
-    /// คืนสถานะ (<c>TblStatus</c>) ที่เปิดใช้งาน ค่าเริ่มต้นคือ <c>StatusType = "ACTIVITY"</c>
-    /// (เปิด / ปิด / ยกเลิก ไม่มีสถานะย่อย; ตัวที่ <c>isDefault = "T"</c> คือ ปิด)
-    /// ส่ง <c>statusType=SERVICE</c> เพื่อได้สถานะของเรื่องเป็นต้นไม้ 2 ชั้น (เปิดเรื่อง / ปิดเรื่อง / ยกเลิก → สถานะย่อย)
+    /// คืนสถานะ (<c>TblStatus</c>) ที่เปิดใช้งานของประเภทที่ระบุ เรียงตามชื่อ ค่าเริ่มต้นคือ
+    /// <c>StatusType = "SERVICE"</c> (สถานะของเรื่อง) ส่ง id ที่เลือกเป็น <c>statusId</c> ของ
+    /// <c>POST /Services/AddNewService</c> ได้เลย ส่ง <c>statusType=ACTIVITY</c> สำหรับสถานะของงาน
     /// </summary>
     [HttpGet("GetStatus")]
     [Authorize]
@@ -417,10 +417,10 @@ public class ListOfValuesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetStatus([FromQuery] string? statusType, CancellationToken cancellationToken)
     {
-        // ACTIVITY unless the caller asks for another type. The DB compares case-sensitively and stores
+        // SERVICE unless the caller asks for another type. The DB compares case-sensitively and stores
         // the types in upper case, so accept any case here.
         var type = string.IsNullOrWhiteSpace(statusType)
-            ? StatusTypes.Activity
+            ? StatusTypes.Service
             : statusType.Trim().ToUpperInvariant();
         if (!StatusTypes.All.Contains(type))
         {
@@ -429,53 +429,50 @@ public class ListOfValuesController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        // About 20 rows, so load them all and build the tree in memory. Sorted by NameTh in SQL (the
-        // DB's Thai collation); ToLookup keeps that order within each parent.
-        var rows = await _db.TblStatuses
+        var statuses = await _db.TblStatuses
             .AsNoTracking()
             .Where(s => s.StatusType == type && s.IsEnable == "T")
             .OrderBy(s => s.NameTh)
-            .Select(s => new StatusRow(s.Id, s.RefId, s.NameTh, s.NameEn, s.IsType, s.IsDefault))
+            .Select(s => new StatusResponse
+            {
+                Id = s.Id,
+                RefId = s.RefId,
+                NameTh = s.NameTh,
+                NameEn = s.NameEn,
+                IsType = s.IsType,
+                IsDefault = s.IsDefault,
+            })
             .ToListAsync(cancellationToken);
 
-        // Main statuses point RefId at themselves. They are ordered by the state they stand for, so the
-        // drop-down reads เปิดเรื่อง, ปิดเรื่อง, ยกเลิก. A sub-status whose main status is disabled is left out.
-        var roots = rows
-            .Where(r => r.RefId == r.Id)
-            .OrderBy(r => StatusRank(r.IsType));
-        var childrenOf = rows.Where(r => r.RefId != r.Id).ToLookup(r => r.RefId);
-
-        return Ok(roots.Select(r => new StatusResponse
-        {
-            Id = r.Id,
-            NameTh = r.NameTh,
-            NameEn = r.NameEn,
-            IsType = r.IsType,
-            IsDefault = r.IsDefault,
-            Children = childrenOf[r.Id]
-                .Select(c => new StatusResponse
-                {
-                    Id = c.Id,
-                    NameTh = c.NameTh,
-                    NameEn = c.NameEn,
-                    IsType = c.IsType,
-                    IsDefault = c.IsDefault,
-                })
-                .ToList(),
-        }));
+        return Ok(statuses);
     }
 
-    /// <summary>Position of a main status in the drop-down by its <c>IsType</c>; unknown types go last.</summary>
-    private static int StatusRank(string isType) => isType switch
+    /// <summary>
+    /// คืนหน่วยงาน (<c>TblOrganization</c>) ที่เปิดใช้งานทั้งหมด เรียงตามชื่อ เป็นต้นไม้ 2 ชั้นผ่าน <c>refId</c>:
+    /// หน่วยงานหลัก (กระทรวง) มี <c>refId</c> เท่ากับ <c>id</c> ของตัวเอง ส่วนหน่วยงานย่อย (กรม) ชี้ไปที่กระทรวง
+    /// ส่ง <c>id</c> ของหน่วยงานย่อยเป็น <c>organizationId</c> ของ <c>POST /Services/AddNewService</c>
+    /// </summary>
+    [HttpGet("GetOrganization")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<OrganizationResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetOrganization(CancellationToken cancellationToken)
     {
-        "OPEN" => 0,
-        "PENDING" => 1,
-        "CLOSE" => 2,
-        "CANCEL" => 3,
-        _ => 4,
-    };
+        var organizations = await _db.TblOrganizations
+            .AsNoTracking()
+            .Where(o => o.IsEnable == "T")
+            .OrderBy(o => o.NameTh)
+            .Select(o => new OrganizationResponse
+            {
+                Id = o.Id,
+                RefId = o.RefId,
+                NameTh = o.NameTh,
+                NameEn = o.NameEn,
+            })
+            .ToListAsync(cancellationToken);
 
-    private sealed record StatusRow(string Id, string RefId, string NameTh, string? NameEn, string IsType, string IsDefault);
+        return Ok(organizations);
+    }
 
     /// <summary>คืนรายการบทบาท (<c>TblRole</c>) ที่เปิดใช้งาน สำหรับ drop-down บทบาท</summary>
     [HttpGet("GetRole")]
