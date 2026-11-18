@@ -38,7 +38,11 @@ public class AccountController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Creates a <c>TblAccount</c> row and returns it.</summary>
+    /// <summary>
+    /// Creates a <c>TblAccount</c> row and returns it. When <c>PhoneNo</c> is given, also adds a
+    /// <c>TblAccountDetail</c> row with <c>AccountId</c> = the new account's <c>Id</c>; both are saved
+    /// together or not at all.
+    /// </summary>
     [HttpPost("AddNewAccount")]
     [ProducesResponseType(typeof(AccountResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -62,10 +66,12 @@ public class AccountController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var now = DateTime.Now.ToString(LegacyDateFormat, CultureInfo.InvariantCulture);
+        var clock = DateTime.Now;
+        var now = clock.ToString(LegacyDateFormat, CultureInfo.InvariantCulture);
         var account = new TblAccount
         {
-            // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
+            // Set here rather than left to Add(), so the detail row below can point at it.
+            Id = GuidStringValueGenerator.NewId(),
             SalutationTh = request.SalutationTh,
             FirstnameTh = request.FirstnameTh,
             LastnameTh = request.LastnameTh,
@@ -87,6 +93,29 @@ public class AccountController : ControllerBase
         };
 
         _db.TblAccounts.Add(account);
+
+        TblAccountDetail? detail = null;
+        var phoneNo = request.PhoneNo?.Trim();
+        if (!string.IsNullOrEmpty(phoneNo))
+        {
+            // TblAccountDetail dates are yyyy-MM-dd HH:mm:ss text (every existing row), unlike TblAccount.
+            var detailNow = clock.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
+            detail = new TblAccountDetail
+            {
+                // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
+                AccountId = account.Id,
+                Detail = phoneNo,
+                DetailType = NormalizeDetailType(request.DetailType),
+                IsEnable = "T",
+                Created = detailNow,
+                CreatedBy = actingEmployeeId,
+                Updated = detailNow,
+                UpdatedBy = actingEmployeeId,
+            };
+            _db.TblAccountDetails.Add(detail);
+        }
+
+        // One SaveChanges runs in one transaction, so the account and its detail are saved together.
         await _db.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
@@ -94,8 +123,24 @@ public class AccountController : ControllerBase
             account.Id,
             actingEmployeeId);
 
-        return StatusCode(StatusCodes.Status201Created, ToResponse(account));
+        var response = ToResponse(account);
+        if (detail is not null)
+        {
+            response.Contacts.Add(new AccountContactResponse { DetailType = detail.DetailType, Detail = detail.Detail });
+        }
+
+        return StatusCode(StatusCodes.Status201Created, response);
     }
+
+    /// <summary>The text format of <c>TblAccountDetail.Created</c>/<c>Updated</c> in every existing row.</summary>
+    private const string AccountDetailDateFormat = "yyyy-MM-dd HH:mm:ss";
+
+    /// <summary>Every <c>TblAccountDetail.DetailType</c> value in use.</summary>
+    private static readonly string[] AccountDetailTypes = ["MOBILE", "HOME", "OFFICE", "FAX", "MAIL"];
+
+    /// <summary>Upper-cases the type (the collation is case-sensitive) and defaults a blank one to <c>MOBILE</c>.</summary>
+    private static string NormalizeDetailType(string? detailType) =>
+        string.IsNullOrWhiteSpace(detailType) ? "MOBILE" : detailType.Trim().ToUpperInvariant();
 
     /// <summary>
     /// Looks up accounts by one of their telephone numbers in <c>TblAccountDetail</c>. A number can
@@ -269,6 +314,14 @@ public class AccountController : ControllerBase
             && !await _db.TblAreas.AsNoTracking().AnyAsync(a => a.Id == request.AreaId, cancellationToken))
         {
             ModelState.AddModelError(nameof(request.AreaId), $"No TblArea row with Id '{request.AreaId}'.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PhoneNo)
+            && !AccountDetailTypes.Contains(NormalizeDetailType(request.DetailType)))
+        {
+            ModelState.AddModelError(
+                nameof(request.DetailType),
+                $"DetailType must be one of {string.Join(", ", AccountDetailTypes)}.");
         }
     }
 

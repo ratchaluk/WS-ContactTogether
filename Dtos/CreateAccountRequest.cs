@@ -60,4 +60,19 @@ public class CreateAccountRequest
 
     [MaxLength(10)]
     public string IsEnable { get; set; } = "T";
+
+    /// <summary>
+    /// เบอร์โทร (หรืออีเมลเมื่อ <see cref="DetailType"/> เป็น <c>MAIL</c>) บันทึกลง
+    /// <c>TblAccountDetail.Detail</c> โดยผูก <c>AccountId</c> กับบัญชีที่สร้าง ไม่ส่งมาก็ได้
+    /// ถ้าไม่ส่งจะไม่เพิ่มแถวใน <c>TblAccountDetail</c>
+    /// </summary>
+    [MaxLength(100)]
+    public string? PhoneNo { get; set; }
+
+    /// <summary>
+    /// <c>TblAccountDetail.DetailType</c>: <c>MOBILE</c> (ค่าเริ่มต้น), <c>HOME</c>, <c>OFFICE</c>,
+    /// <c>FAX</c> หรือ <c>MAIL</c> ใช้เมื่อส่ง <see cref="PhoneNo"/> มาเท่านั้น
+    /// </summary>
+    [MaxLength(50)]
+    public string? DetailType { get; set; }
 }

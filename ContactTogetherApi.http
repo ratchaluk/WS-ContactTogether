@@ -189,7 +189,9 @@ Authorization: Bearer {{token}}
 
 ###
 
-# Add an account (TblAccount only - phone numbers live in TblAccountDetail)
+# Add an account (TblAccount). phoneNo is optional: when given, a TblAccountDetail row is saved too
+# (AccountId = the new account's Id), in the same transaction. detailType is MOBILE (default),
+# HOME, OFFICE, FAX or MAIL; anything else is 400. The 201 response lists it under contacts.
 POST {{ContactTogetherApi_HostAddress}}/Account/AddNewAccount
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -202,7 +204,9 @@ Content-Type: application/json
   "address": "123 ถนนแจ้งวัฒนะ กรุงเทพฯ",
   "zipcode": "10210",
   "isScret": "F",
-  "isEnable": "T"
+  "isEnable": "T",
+  "phoneNo": "0812345678",
+  "detailType": "MOBILE"
 }
 
 ###
