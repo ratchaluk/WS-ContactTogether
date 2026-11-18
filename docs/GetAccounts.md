@@ -71,6 +71,7 @@
 | `zipcode` | string \| null | รหัสไปรษณีย์ |
 | `remark` | string \| null | หมายเหตุ |
 | `isScret` | string \| null | แฟล็กปกปิดข้อมูล `"T"` / `"F"` (สะกดตาม DB) ตอนนี้ทุกคนเป็น `"F"` |
+| `isEnable` | string \| null | `"T"` เสมอ (endpoint นี้ค้นเฉพาะผู้ติดต่อที่เปิดใช้งาน) เพิ่มเมื่อ 18 พ.ย. 2026 |
 | `created` | string \| null | วันที่สร้าง **ข้อความแบบเดิม** เดือน/วัน/ปี ค.ศ. เช่น `10/22/2012 15:07` (ดู 3.3) |
 | `contacts` | array | เบอร์/อีเมลที่เปิดใช้งานของคนนี้ (ดู 3.2) เป็น `[]` ถ้าไม่มี |
 
@@ -194,6 +195,7 @@ export interface AccountSearchResult {
   zipcode: string | null;
   remark: string | null;
   isScret: string | null;
+  isEnable: string | null; // "T" / "F" (GetAccountById ส่งคนที่ปิดใช้งานมาด้วย)
   created: string | null; // "MM/dd/yyyy HH:mm" แบบเดิม เดือนขึ้นก่อน
   contacts: AccountContact[];
 }

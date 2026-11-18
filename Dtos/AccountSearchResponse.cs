@@ -36,6 +36,9 @@ public class AccountSearchResponse
 
     public string IsScret { get; set; } = string.Empty;
 
+    /// <summary><c>T</c> or <c>F</c>. Always <c>T</c> from <c>GetAccounts</c>, which finds enabled accounts only.</summary>
+    public string? IsEnable { get; set; }
+
     /// <summary>Stored as text in the legacy format <c>M/d/yyyy H:mm</c>.</summary>
     public string? Created { get; set; }
 

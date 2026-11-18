@@ -29,6 +29,11 @@ public class ServicesController : ControllerBase
 
     private const int MaxDailyRunningNumber = 99999;
 
+    /// <summary>
+    /// เพดานจำนวนชั้นของ path ประเภทบริการ/หน่วยงาน ข้อมูลจริงลึกไม่เกิน 4 ชั้น ที่ตั้งเพดานไว้ก็เพื่อกันข้อมูลที่ชี้วนกันเอง
+    /// </summary>
+    private const int MaxPathDepth = 10;
+
     private readonly ApplicationDbContext _db;
     private readonly ILogger<ServicesController> _logger;
 
@@ -277,6 +282,190 @@ public class ServicesController : ControllerBase
         }).ToList();
 
         return Ok(Paged(results, total, request));
+    }
+
+    /// <summary>
+    /// คืนเรื่อง (<c>TblService</c>) ที่เปิดใช้งานหนึ่งเรื่องตาม <c>Id</c> สำหรับหน้ารายละเอียดเรื่อง พร้อมชื่อของ
+    /// lookup ทุกตัว และ path ของประเภทบริการและหน่วยงาน (ดู <see cref="ServiceDetailResponse"/>)
+    /// </summary>
+    [HttpGet("GetServiceById")]
+    [ProducesResponseType(typeof(ServiceDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetServiceById(
+        [FromQuery] string? id,
+        CancellationToken cancellationToken)
+    {
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var serviceId = Normalize(id)?.ToUpperInvariant();
+        if (serviceId is null)
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        // None of these columns has an FK constraint, hence the subqueries. The lookup ids are unique,
+        // except TblAccount.Id, which has legacy duplicates: FirstOrDefault() picks one of them.
+        var row = await (
+            from service in _db.TblServices.AsNoTracking()
+            where service.Id == serviceId && service.IsEnable == "T"
+            let status = _db.TblStatuses
+                .Where(s => s.Id == service.StatusId)
+                .Select(s => new { s.NameTh, s.NameEn, s.IsType })
+                .FirstOrDefault()
+            let owner = _db.TblEmployees
+                .Where(e => e.Id == service.OwnerId)
+                .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                .FirstOrDefault()
+            let createdBy = _db.TblEmployees
+                .Where(e => e.Id == service.CreatedBy)
+                .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                .FirstOrDefault()
+            let updatedBy = _db.TblEmployees
+                .Where(e => e.Id == service.UpdatedBy)
+                .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                .FirstOrDefault()
+            select new
+            {
+                Service = service,
+                StatusNameTh = status != null ? status.NameTh : null,
+                StatusNameEn = status != null ? status.NameEn : null,
+                StatusIsType = status != null ? status.IsType : null,
+                Owner = owner,
+                CreatedBy = createdBy,
+                UpdatedBy = updatedBy,
+                ChannelIncomingName = _db.TblChannels
+                    .Where(c => c.Id == service.ChannelIncomingId).Select(c => c.NameTh).FirstOrDefault(),
+                ChannelOutgoingName = _db.TblChannels
+                    .Where(c => c.Id == service.ChannelOutgoingId).Select(c => c.NameTh).FirstOrDefault(),
+                ServiceReferenceName = _db.TblReferences
+                    .Where(r => r.Id == service.ServiceReference).Select(r => r.NameTh).FirstOrDefault(),
+                LevelSeverityName = _db.TblLevels
+                    .Where(l => l.Id == service.LevelSeverityId).Select(l => l.NameTh).FirstOrDefault(),
+                LevelPriorityName = _db.TblLevels
+                    .Where(l => l.Id == service.LevelPriorityId).Select(l => l.NameTh).FirstOrDefault(),
+                LevelSecretName = _db.TblLevels
+                    .Where(l => l.Id == service.LevelSecretId).Select(l => l.NameTh).FirstOrDefault(),
+            }).FirstOrDefaultAsync(cancellationToken);
+
+        if (row is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลเรื่อง"));
+        }
+
+        var found = row.Service;
+
+        // TblServiceTitles.Id is a uniqueidentifier, so parse it rather than compare text.
+        string? serviceTitleText = null;
+        if (Guid.TryParse(found.ServiceTitleId, out var titleId))
+        {
+            serviceTitleText = await _db.TblServiceTitles.AsNoTracking()
+                .Where(t => t.Id == titleId)
+                .Select(t => t.ServiceTitleText)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var categoryPath = await BuildPathAsync(
+            _db.TblCategories.Select(c => new PathNode(c.Id, c.RefId, c.NameTh)),
+            found.CategoryId,
+            cancellationToken);
+        var organizationPath = await BuildPathAsync(
+            _db.TblOrganizations.Select(o => new PathNode(o.Id, o.RefId, o.NameTh)),
+            found.OrganizationId,
+            cancellationToken);
+
+        var account = await _db.LoadAccountAsync(found.AccountId, cancellationToken);
+
+        return Ok(new ServiceDetailResponse
+        {
+            Id = found.Id,
+            Code = found.Code,
+            CategoryId = found.CategoryId,
+            StatusId = found.StatusId,
+            StatusNameTh = row.StatusNameTh,
+            StatusNameEn = row.StatusNameEn,
+            ServiceTitleId = found.ServiceTitleId,
+            OwnerId = found.OwnerId,
+            DateOpened = found.DateOpened,
+            DateClosed = found.DateClosed,
+            ChannelIncomingId = found.ChannelIncomingId,
+            CallBack = found.CallBack,
+            ChannelOutgoingId = found.ChannelOutgoingId,
+            AccountId = found.AccountId,
+            Summary = found.Summary,
+            Detail = found.Detail,
+            ServiceArea = found.ServiceArea,
+            OrganizationId = found.OrganizationId,
+            OnScene = found.OnScene,
+            ServiceReference = found.ServiceReference,
+            ServiceReferenceLink = found.ServiceReferenceLink,
+            AreaId = found.AreaId,
+            Remark = found.Remark,
+            LevelSeverityId = found.LevelSeverityId,
+            LevelPriorityId = found.LevelPriorityId,
+            LevelSecretId = found.LevelSecretId,
+            IsEnable = found.IsEnable,
+            Created = found.Created,
+            CreatedBy = found.CreatedBy,
+            Updated = found.Updated,
+            UpdatedBy = found.UpdatedBy,
+            StatusIsType = row.StatusIsType,
+            ServiceTitleText = serviceTitleText,
+            OwnerName = row.Owner is { } o ? BuildFullName(o.SalutationTh, o.FirstnameTh, o.LastnameTh) : null,
+            CreatedByName = row.CreatedBy is { } c ? BuildFullName(c.SalutationTh, c.FirstnameTh, c.LastnameTh) : null,
+            UpdatedByName = row.UpdatedBy is { } u ? BuildFullName(u.SalutationTh, u.FirstnameTh, u.LastnameTh) : null,
+            AccountFullName = account?.FullName,
+            Account = account,
+            ChannelIncomingName = row.ChannelIncomingName,
+            ChannelOutgoingName = row.ChannelOutgoingName,
+            ServiceReferenceName = row.ServiceReferenceName,
+            LevelSeverityName = row.LevelSeverityName,
+            LevelPriorityName = row.LevelPriorityName,
+            LevelSecretName = row.LevelSecretName,
+            CategoryPath = categoryPath,
+            OrganizationPath = organizationPath,
+        });
+    }
+
+    /// <summary>One row of a self-referencing lookup table (<c>TblCategory</c>, <c>TblOrganization</c>).</summary>
+    private sealed record PathNode(string Id, string RefId, string NameTh);
+
+    /// <summary>
+    /// Walks <c>RefId</c> up from <paramref name="id"/> and returns the chain top level first. A top-level
+    /// row points <c>RefId</c> at itself. The tables are small (under a hundred rows), so they are loaded
+    /// whole rather than queried once per level. The walk also stops at a missing id or after
+    /// <see cref="MaxPathDepth"/> levels, in case bad data forms a cycle.
+    /// </summary>
+    private static async Task<List<LookupItemResponse>> BuildPathAsync(
+        IQueryable<PathNode> nodes,
+        string? id,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return [];
+        }
+
+        var byId = (await nodes.AsNoTracking().ToListAsync(cancellationToken))
+            .GroupBy(n => n.Id)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var path = new List<LookupItemResponse>();
+        var currentId = id;
+        while (path.Count < MaxPathDepth && byId.TryGetValue(currentId, out var node))
+        {
+            path.Add(new LookupItemResponse { Id = node.Id, NameTh = node.NameTh });
+            if (node.RefId == node.Id)
+            {
+                break;
+            }
+
+            currentId = node.RefId;
+        }
+
+        path.Reverse();
+        return path;
     }
 
     /// <summary>ห่อผลลัพธ์หนึ่งหน้าของ <see cref="GetServices"/> แบบเดียวกับ <c>GetReportXX</c></summary>
