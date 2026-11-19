@@ -122,6 +122,25 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Areas (TblArea) as [{ id, refId, nameTh, nameEn, areaType, zipcode, isDefault }], one level at a time.
+# areaType (required) = PROVINCE | DISTRICT | SUBDISTRICT; refId (optional) = the parent's id.
+# The "--ไม่ระบุ…--" row (isDefault "T") comes first. Send id back as areaId.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetArea?areaType=PROVINCE
+Authorization: Bearer {{token}}
+
+###
+
+# Districts of นครนายก, then sub-districts of อำเภอเมืองนครนายก.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetArea?areaType=DISTRICT&refId=81DEE3BDDF62528B9DEB9C1C6D74CEC4
+Authorization: Bearer {{token}}
+
+###
+
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetArea?areaType=SUBDISTRICT&refId=49B4AB5B3D754BA2883582DDAB76AF46
+Authorization: Bearer {{token}}
+
+###
+
 # References (ที่มาข้อมูล) - enabled TblReference rows as [{ id, nameTh, nameEn, isDefault }].
 # Send id back as serviceReference when adding a service.
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetReference
@@ -398,7 +417,7 @@ Content-Type: application/json
 
 ###
 
-# Search services (was GetServices). At least one filter is required (AccountPhoneNo, ServicesStatus,
+# Search services (was GetServices). At least one filter is required (AccountId, AccountPhoneNo, ServicesStatus,
 # ServiceCode, ServiceSummary, ServiceType, ServiceTitleId, ServiceReference, LevelPriorityId,
 # ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
 # SortOrder = desc (newest first, default) | asc (oldest first). PageNumber (default 1) /
@@ -409,13 +428,20 @@ Authorization: Bearer {{token}}
 
 ###
 
-# Search services (was GetServices). At least one filter is required (AccountPhoneNo, ServicesStatus,
+# Search services (was GetServices). At least one filter is required (AccountId, AccountPhoneNo, ServicesStatus,
 # ServiceCode, ServiceSummary, ServiceType, ServiceTitleId, ServiceReference, LevelPriorityId,
 # ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
 # SortOrder = desc (newest first, default) | asc (oldest first). PageNumber (default 1) /
 # PageSize (default 20, max 200) pick the page.
 # 200 = { status, message, data, meta.pagination { current_page, per_page, total, total_pages } }.
 GET {{ContactTogetherApi_HostAddress}}/Services/SearchService?AccountPhoneNo=0934153694&PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
+# Services of one chosen account only (AccountId = TblAccount.Id). 0934153694 belongs to two accounts,
+# so searching by the number above returns both; this returns นาย อาม's service only.
+GET {{ContactTogetherApi_HostAddress}}/Services/SearchService?AccountId=5A15B0A6398344718D6473C1B7DFB7CA&PageNumber=1&PageSize=10
 Authorization: Bearer {{token}}
 
 ###

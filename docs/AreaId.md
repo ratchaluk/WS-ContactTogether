@@ -1,91 +1,164 @@
-# AreaId (พื้นที่ จังหวัด/อำเภอ/ตำบล): สิ่งที่พบ และเรื่องที่ทีมต้องตัดสินใจ
+# พื้นที่ (`areaId`) และรายการพื้นที่ (`GET /ListOfValues/GetArea`) สำหรับ Frontend
 
-> ข้อมูล ณ 17 พ.ย. 2026 ใช้ประกอบการคุยกับทีม ยังไม่มีการแก้โค้ดหรือข้อมูลจากเอกสารนี้
+> อัปเดต 19 พ.ย. 2026: ตาราง `TblArea` มีข้อมูลแล้ว (ย้ายมาจากระบบเดิม 8,437 แถว) จึงเลือกและบันทึก `areaId` ได้
+> เอกสารฉบับเดิม (17 พ.ย.) ที่บอกว่าตารางว่างและบันทึกไม่ได้ ใช้ไม่ได้แล้ว
+
+> อ้างอิงโค้ด: `Controllers/ListOfValuesController.cs` (`GetArea`), `Dtos/AreaResponse.cs`, `Helper/AreaTypes.cs`
+
+---
 
 ## 1. สรุปสั้น
 
-- API ใหม่ **บันทึก `areaId` ไม่ได้เลย** เพราะตาราง `TblArea` ใน GCC1111DB ว่าง (0 แถว) `AddNewAccount` และ `AddNewService` จึงตอบ 400 ทุกค่าที่ส่งมา
-- ระบบ GCC เดิมเก็บพื้นที่ในตาราง `tbl_area` ของ MySQL `db_gcc_new` แต่ข้อมูลชุดนี้ยังไม่ได้ย้ายมา
-- ระบบเดิมแทบไม่ได้ใช้พื้นที่ของ **เรื่อง**: ทั้งตาราง `tbl_service` มีแค่ 1 เรื่องที่ใส่ `Area_ID` (ปี 2557)
+- `areaId` คือ id ของ **จังหวัด อำเภอ หรือตำบล** ในตาราง `TblArea` ใช้กับ:
+  - ผู้ติดต่อ: `POST /Account/AddNewAccount`, `PUT /Account/UpdateAccountById`
+  - เรื่อง: `POST /Services/AddNewService`
+- ดึงรายการด้วย `GET /ListOfValues/GetArea` ทีละชั้น ทำ drop-down 3 ตัวต่อกัน: จังหวัด → อำเภอ → ตำบล
+- ส่ง id ที่ไม่มีใน `TblArea` = 400 (`errors.AreaId`)
+- **คนละชุดกับ** `GetProvince` / `GetDistrict` / `GetSubdistrict` / `GetAddressDataset` (ตาราง `TblProvince` ฯลฯ ใช้กรอกที่อยู่)
+  id จากชุดนั้นส่งเป็น `areaId` ไม่ได้
 
-## 2. ตัวอย่างที่ไล่มา
+## 2. ข้อมูลใน `TblArea`
 
-AreaId `980459C35241E273D6AB6550DD47D4D0` (ค่าเดียวที่มีใน `db_gcc_new.tbl_service.Area_ID`)
+ข้อมูล 3 ชั้น เชื่อมกันด้วย `refId` (ชี้ไปที่ชั้นบน)
 
-| ชั้น | `Area_Type` | `Name_TH` | `Zipcode` |
-|---|---|---|---|
-| ตัว id นี้ | `SUBDISTRICT` | เขาพระ | NULL |
-| แม่ | `DISTRICT` | เมือง | 26000 |
-| บนสุด | `PROVINCE` | นครนายก | |
+| `areaType` | ความหมาย | จำนวน | `refId` ชี้ไปที่ | `zipcode` |
+|---|---|---|---|---|
+| `PROVINCE` | จังหวัด | 79 | **ตัวเอง** | มีเกือบทุกจังหวัด |
+| `DISTRICT` | อำเภอ / เขต | 928 | จังหวัด | มี |
+| `SUBDISTRICT` | ตำบล / แขวง | 7,430 | อำเภอ | ว่าง (ใช้ของอำเภอ) |
 
-คือ **ตำบลเขาพระ อำเภอเมืองนครนายก จังหวัดนครนายก 26000**
+- **แถว "ไม่ระบุ":** แต่ละชั้นมี 1 แถวที่ `isDefault = "T"` คือ `--ไม่ระบุจังหวัด--` → `--ไม่ระบุอำเภอ--` → `--ไม่ระบุตำบล--` ต่อกันเป็นสาย endpoint ส่งแถวนี้มาเป็นแถวแรกเสมอ
+- **ทุกแถวเปิดใช้งาน** และไม่มีชื่อภาษาอังกฤษ (`nameEn` เป็น `null`)
+- **ชื่อซ้ำ:** อำเภอ "สูงเนิน" มี 2 แถวในจังหวัดเดียวกัน (ข้อมูลเดิม) ใช้ `id` เป็นค่าที่ส่ง ไม่ใช่ชื่อ
 
-เรื่องที่ใช้: `Code 57020600020` "สอบถาม การตั้งผู้จัดการมรดก" เปิดเมื่อ 2014-02-06 13:23:19, `Service_Area` เป็น NULL
+## 3. `GET /ListOfValues/GetArea`
 
-## 3. ระบบเดิม: `db_gcc_new.tbl_area` (MySQL)
-
-อ้างอิงโค้ด: `2022GCC_Production/ClassCode/Repository/AreaRepo.cs`, `ClassCode/TOTCMModel.edmx`
-
-| คอลัมน์ | ความหมาย |
+| | |
 |---|---|
-| `ID` | varchar(32) |
-| `Ref_ID` | ชั้นบน (จังหวัดชี้ที่ตัวเอง) |
-| `Name_TH` / `Name_EN` | ชื่อ |
-| `Area_Type` | `PROVINCE` / `DISTRICT` / `SUBDISTRICT` |
-| `Zipcode` | มีค่าที่ชั้นอำเภอ |
-| `Remark`, `Is_Default`, `Is_Enable`, `Created…`, `Updated…` | |
+| Method | `GET` |
+| Auth | **ต้องใช้ token**: `Authorization: Bearer <token>` |
+| Query | `areaType` (**บังคับ**) = `PROVINCE` / `DISTRICT` / `SUBDISTRICT` ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
+| | `refId` (ไม่บังคับ) = id ของชั้นบน เพื่อเอาเฉพาะลูกของมัน |
+| Backend (dev) | `http://localhost:5018/ListOfValues/GetArea?areaType=PROVINCE` |
+| URL จาก Next.js | `/api/backend/ListOfValues/GetArea?areaType=PROVINCE` |
 
-- เป็นข้อมูล 3 ชั้น: จังหวัด → อำเภอ → ตำบล เชื่อมกันด้วย `Ref_ID`
-- ข้อมูลจริงใช้ `Area_Type` เป็นคำเต็ม แม้ `AreaRepo.Add()` จะเขียนเป็น `P` / `D` / `S`
-- ระบบเดิมแสดงพื้นที่ด้วย `AreaRepo.GetAreaText()` ซึ่งไล่ `Ref_ID` ขึ้นไปแล้วต่อชื่อ จังหวัด อำเภอ ตำบล
+**ลำดับการเรียก**
 
-## 4. GCC1111DB (DB ของ API ใหม่)
+| drop-down | เรียก | ได้ |
+|---|---|---|
+| จังหวัด | `GetArea?areaType=PROVINCE` | 79 แถว |
+| อำเภอ | `GetArea?areaType=DISTRICT&refId=<id จังหวัด>` | อำเภอของจังหวัดนั้น |
+| ตำบล | `GetArea?areaType=SUBDISTRICT&refId=<id อำเภอ>` | ตำบลของอำเภอนั้น |
 
-| ตาราง / คอลัมน์ | สถานะ |
-|---|---|
-| `TblArea` | **0 แถว** |
-| `TblService.Area_ID` | ว่างทั้ง 184 แถว |
-| `TblAccount.AreaId` | มีค่า 61 จาก 19,969 แถว: 59 แถวเป็น id แบบ `tbl_area` เดิม (43 ค่าไม่ซ้ำ) และ 2 แถวเป็นข้อความ " ราขเทวี" ทุกค่าชี้ไปไหนไม่ได้ เพราะ `TblArea` ว่าง |
-| `TblProvince` / `TblDistrict` / `TblSubDistrict` | มีข้อมูลและมี endpoint แล้ว: `GetProvince`, `GetDistrict`, `GetSubdistrict`, `GetAddressDataset` |
+ไม่ส่ง `refId` = ได้ทุกแถวของชั้นนั้น (อำเภอ 928, ตำบล 7,430) ใช้ได้ แต่สำหรับ drop-down ควรส่ง `refId`
 
-- **การตรวจของ API:** `AddNewAccount` ([AccountController.cs](../Controllers/AccountController.cs)) และ `AddNewService` ([ServicesController.cs](../Controllers/ServicesController.cs)) ตรวจ `areaId` กับ `TblArea`
-- **เรื่องนี้บันทึกไว้แล้ว:** [HANDOFF.md](../HANDOFF.md) ข้อ "บันทึก 'พื้นที่' ไม่ได้" และ "ต้องตัดสินใจ" ข้อ 1
+### 3.1 Response (200)
 
-## 5. คำถามถึงทีม
+array เรียงให้แถว "ไม่ระบุ" ขึ้นก่อน แล้วตามชื่อ ไม่พบ = `[]` ตัวอย่าง: อำเภอของจังหวัดนครนายก (ตัดมาแถวเดียว ชื่ออำเภอเมืองเก็บเป็น "เมือง" ทุกจังหวัด)
 
-1. **เรื่อง (`AddNewService`) ยังต้องเก็บพื้นที่ไหม**
-   ระบบเดิมใช้ครั้งเดียวในปี 2557 ถ้าไม่ต้อง ฝั่ง frontend ก็ไม่ต้องส่ง `areaId` และไม่ต้องทำ drop-down พื้นที่ในหน้าเปิดเรื่อง
-2. **ผู้ติดต่อ (`AddNewAccount`) ต้องเก็บจังหวัด/อำเภอ/ตำบลไหม** ถ้าต้อง จะใช้แบบไหน
-
-   | | ก. ย้าย `tbl_area` จากระบบเดิมมาใส่ `TblArea` | ข. ใช้ `TblSubDistrict` ที่มีอยู่ |
-   |---|---|---|
-   | id เดิมใน `TblAccount` (43 ค่า) | ใช้ได้ทันที | ต้อง map ด้วยชื่อ หรือปล่อยไว้ |
-   | endpoint รายการพื้นที่ | ต้องทำเพิ่มจาก `TblArea` | มีแล้ว |
-   | งานฝั่ง API | ย้ายข้อมูลเข้า DB | เปลี่ยน validation ของ `areaId` ไปตรวจกับ `TblSubDistrict` |
-   | หมายเหตุ | ต้องมีคนย้ายข้อมูลจาก MySQL | HANDOFF.md เสนอแบบนี้ไว้ |
-
-3. **ระบบ GCC เดิมยังอ่าน/เขียน `AreaId` ใน GCC1111DB อยู่ไหม** ถ้ายังใช้อยู่ ต้องเก็บ id แบบ `tbl_area` (ข้อ ก) ไม่งั้นระบบเดิมจะอ่านค่าที่ API ใหม่บันทึกไม่ออก
-
-## 6. ภาคผนวก: SQL ที่ใช้ (รันใน MySQL `db_gcc_new` ของระบบเดิม)
-
-```sql
--- AreaId นี้คือพื้นที่อะไร ไล่ขึ้นไปถึงจังหวัด (MySQL 5.x ไม่มี recursive CTE จึง join 3 ชั้น)
-SELECT a.ID, a.Area_Type, a.Name_TH, a.Zipcode, a.Is_Enable,
-       p1.Name_TH AS parent_name, p1.Area_Type AS parent_type, p1.Zipcode AS parent_zip,
-       p2.Name_TH AS top_name,    p2.Area_Type AS top_type
-FROM `db_gcc_new`.`tbl_area` a
-LEFT JOIN `db_gcc_new`.`tbl_area` p1 ON p1.ID = a.Ref_ID  AND a.Ref_ID  <> a.ID
-LEFT JOIN `db_gcc_new`.`tbl_area` p2 ON p2.ID = p1.Ref_ID AND p1.Ref_ID <> p1.ID
-WHERE a.ID = '980459C35241E273D6AB6550DD47D4D0';
-
--- ค่า Area_ID ทั้งหมดที่เรื่องใช้
-SELECT Area_ID, COUNT(*) AS Total
-FROM `db_gcc_new`.`tbl_service`
-WHERE Area_ID IS NOT NULL AND TRIM(Area_ID) <> ''
-GROUP BY Area_ID;
-
--- เรื่องที่ใช้ AreaId นี้
-SELECT ID, Code, Summary, Service_Area, Date_Opened, Created
-FROM `db_gcc_new`.`tbl_service`
-WHERE Area_ID = '980459C35241E273D6AB6550DD47D4D0';
+```json
+[
+  { "id": "49B4AB5B3D754BA2883582DDAB76AF46", "refId": "81DEE3BDDF62528B9DEB9C1C6D74CEC4", "nameTh": "เมือง", "nameEn": null, "areaType": "DISTRICT", "zipcode": "26000", "isDefault": "F" }
+]
 ```
+
+(แถว "ไม่ระบุ" จะมาเฉพาะเมื่อ `refId` ตรงกับมัน หรือไม่ได้ส่ง `refId`)
+
+| Field | ความหมาย |
+|---|---|
+| `id` | `TblArea.Id` ส่งกลับเป็น `areaId` |
+| `refId` | id ของชั้นบน (จังหวัดชี้ที่ตัวเอง) |
+| `nameTh` / `nameEn` | ชื่อ (`nameEn` ว่างทั้งหมด) |
+| `areaType` | `PROVINCE` / `DISTRICT` / `SUBDISTRICT` |
+| `zipcode` | รหัสไปรษณีย์ มีที่อำเภอ ตำบลไม่มี |
+| `isDefault` | `"T"` = แถว "ไม่ระบุ" ของชั้นนั้น |
+
+| HTTP | เมื่อไร |
+|---|---|
+| 200 | สำเร็จ รวมกรณีไม่พบ (`[]`) |
+| 400 | ไม่ส่ง `areaType` หรือส่งค่าอื่น (`errors.areaType`) |
+| 401 | ไม่มี token, token หมดอายุ หรือ logout แล้ว |
+
+## 4. บันทึก `areaId`
+
+- **ส่ง id ของชั้นที่ลึกที่สุดที่ผู้ใช้เลือก:** ปกติคือตำบล ถ้าเลือกแค่จังหวัดหรืออำเภอ ส่ง id ชั้นนั้นได้ API รับทุกชั้น
+- **ไม่เลือก:** ส่ง `null` หรือ `""` (หรือ id ของแถว "ไม่ระบุ" ถ้าอยากเก็บค่าแบบระบบเดิม)
+- **ผู้ติดต่อเดิม:** มี `areaId` อยู่ 61 คน เป็นตำบล 51, อำเภอ 4, จังหวัด 4 และอีก 2 คนเป็นข้อความ `" ราขเทวี"` ที่ไม่ใช่ id
+  `UpdateAccountById` ยอมให้ส่งค่าเดิมกลับมาได้แม้จะไม่อยู่ใน `TblArea` จะได้ไม่ 400 ตอนกดบันทึกฟอร์มที่ไม่ได้แก้
+- **เรื่อง (`TblService.Area_ID`):** ตอนนี้ยังว่างทุกเรื่อง
+
+## 5. แสดงพื้นที่ของผู้ติดต่อหรือเรื่องที่มีอยู่ (`areaPath`)
+
+ไม่ต้องไล่ `refId` เอง backend ไล่ให้แล้วส่ง `areaPath` มาคู่กับ `areaId`:
+
+| ที่ไหน | field |
+|---|---|
+| `GET /Account/GetAccountById` (และ response ของ `UpdateAccountById`, `Add/Update/DeleteAccountDetail`) | `areaPath` |
+| `GET /Services/GetServiceById` | `account.areaPath` (พื้นที่ของผู้ติดต่อ) และ `areaPath` (พื้นที่ของเรื่อง) |
+| `GET /Account/GetAccounts` | `areaPath` เป็น `null` (ไม่ไล่ให้ในรายการค้นหา) ใช้ `GetAccountById` เมื่อเปิดดูคนนั้น |
+
+- **รูปแบบ:** array ของ object แบบเดียวกับแถวของ `GetArea` เรียง **จังหวัด → อำเภอ → ตำบล**
+- **จำนวน:** `areaId` เป็นตำบลได้ 3 ตัว, อำเภอ 2 ตัว, จังหวัด 1 ตัว, ว่างหรือไม่อยู่ใน `TblArea` (เช่น `" ราขเทวี"`) ได้ `[]`
+- **ตั้งค่า drop-down:** ดู `areaType` ของแต่ละตัว แล้วโหลดรายการของชั้นถัดไปด้วย `refId` = id ของชั้นบน
+- **รหัสไปรษณีย์:** ใช้ `zipcode` ของตัวที่เป็น `DISTRICT`
+
+ตัวอย่าง: ผู้ติดต่อที่ `areaId` = `16AC86F1FC2255923683F632CAC454DA` (ข้อมูลจริง)
+
+```json
+"areaPath": [
+  { "id": "5EF900A3F3430FB51A813C37BA3D2BB4", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "กรุงเทพมหานคร", "nameEn": null, "areaType": "PROVINCE", "zipcode": "10000", "isDefault": "F" },
+  { "id": "4F3A0B8A4272BFEB369CB62889860FC9", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "หลักสี่", "nameEn": null, "areaType": "DISTRICT", "zipcode": "10210", "isDefault": "F" },
+  { "id": "16AC86F1FC2255923683F632CAC454DA", "refId": "4F3A0B8A4272BFEB369CB62889860FC9", "nameTh": "ตลาดบางเขน", "nameEn": null, "areaType": "SUBDISTRICT", "zipcode": null, "isDefault": "F" }
+]
+```
+
+คือ **แขวงตลาดบางเขน เขตหลักสี่ กรุงเทพมหานคร 10210**
+
+## 6. โค้ดตัวอย่าง (TypeScript)
+
+```ts
+export type AreaType = "PROVINCE" | "DISTRICT" | "SUBDISTRICT";
+export interface AreaItem {
+  id: string; refId: string; nameTh: string; nameEn: string | null;
+  areaType: AreaType; zipcode: string | null; isDefault: "T" | "F";
+}
+
+export async function fetchAreas(areaType: AreaType, token: string, refId?: string): Promise<AreaItem[]> {
+  const qs = new URLSearchParams({ areaType });
+  if (refId) qs.set("refId", refId);
+  const res = await fetch(`/api/backend/ListOfValues/GetArea?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`โหลดรายการพื้นที่ไม่สำเร็จ (${res.status})`);
+  return res.json();
+}
+
+// เลือกจังหวัดแล้ว: ล้างอำเภอ/ตำบล แล้วโหลดอำเภอของจังหวัดนั้น
+// const districts = await fetchAreas("DISTRICT", token, provinceId);
+// areaId ที่ส่งไปบันทึก = subdistrictId ?? districtId ?? provinceId ?? null
+
+/** แปลง areaPath เป็นค่าเริ่มต้นของ drop-down 3 ตัว */
+export function areaSelection(path: AreaItem[] | null | undefined) {
+  const pick = (t: AreaType) => path?.find((a) => a.areaType === t)?.id ?? null;
+  return { provinceId: pick("PROVINCE"), districtId: pick("DISTRICT"), subdistrictId: pick("SUBDISTRICT") };
+}
+
+/** ข้อความแสดงผล เช่น "ตลาดบางเขน หลักสี่ กรุงเทพมหานคร 10210" */
+export function areaText(path: AreaItem[] | null | undefined): string {
+  if (!path?.length) return "";
+  const zip = path.find((a) => a.areaType === "DISTRICT")?.zipcode ?? "";
+  return [...path].reverse().map((a) => a.nameTh).concat(zip ? [zip] : []).join(" ");
+}
+```
+
+- **เก็บรายการจังหวัดไว้ใน memory ได้:** ข้อมูลแทบไม่เปลี่ยน
+- **zipcode:** ถ้าจะเติมรหัสไปรษณีย์อัตโนมัติ ใช้ `zipcode` ของอำเภอ (ตำบลไม่มี)
+
+## 7. ทดสอบด้วย REST Client / curl
+
+```http
+GET http://localhost:5018/ListOfValues/GetArea?areaType=DISTRICT&refId=81DEE3BDDF62528B9DEB9C1C6D74CEC4
+Authorization: Bearer <token>
+```
+
+ใน `ContactTogetherApi.http` มีตัวอย่าง จังหวัด → อำเภอของนครนายก → ตำบลของอำเภอเมืองนครนายก

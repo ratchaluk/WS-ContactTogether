@@ -10,7 +10,8 @@
 >
 > - **เปลี่ยนชื่อ:** `GET /Services/GetServices` เป็น `GET /Services/SearchService` ชื่อเดิมใช้ไม่ได้แล้ว (ได้ 404)
 >   parameter และ response เหมือนเดิมทุกอย่าง แก้แค่ URL
-> - **เงื่อนไขใหม่:** `ServiceReference` (ที่มาข้อมูล) และ `LevelPriorityId` (ความสำคัญ)
+> - **เงื่อนไขใหม่:** `ServiceReference` (ที่มาข้อมูล), `LevelPriorityId` (ความสำคัญ) และ `AccountId` (ผู้ติดต่อ ดูข้อ 2.4)
+> - **field ใหม่ใน `data`:** `accountId` ของผู้ติดต่อในแต่ละเรื่อง
 > - **เรียงลำดับ:** `SortOrder=desc` (ล่าสุดก่อน ค่าเริ่มต้น) หรือ `SortOrder=asc` (เก่าสุดก่อน)
 
 > **เปลี่ยนแปลง (16 พ.ย. 2026):** เดิม response เป็น array ตรง ๆ และตัดไว้ที่ 200 แถว
@@ -45,6 +46,7 @@ GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 
 | Parameter | Type | การค้นหา | ความหมาย |
 |---|---|---|---|
+| `AccountId` | string | ตรงทั้งค่า | id ผู้ติดต่อ (`TblAccount.Id`) ตัวพิมพ์เล็กหรือใหญ่ก็ได้ **ใช้ตัวนี้เมื่อเลือกผู้ติดต่อแล้ว** (ข้อ 2.4) |
 | `AccountPhoneNo` | string | ตรงทั้งค่า | เบอร์โทรของผู้ติดต่อ (MOBILE / HOME / OFFICE / FAX) เช่น `0909840822` |
 | `ServiceCode` | string | **บางส่วน** | เลขที่เรื่อง เช่น `690702` เจอเรื่องที่มี `690702` อยู่ในเลขที่ (เรื่องของวันที่ 2 ก.ค. 2569) |
 | `ServiceSummary` | string | **บางส่วน** | หัวเรื่อง |
@@ -95,6 +97,27 @@ GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 - **ความสำคัญ:** ทุกเรื่องเป็น `3-Medium` ค้นด้วยระดับอื่นจึงยังได้ `ไม่พบข้อมูล`
 - **ที่มาข้อมูล:** ส่วนใหญ่เป็น `Joomla` (152 เรื่อง) มี 22 เรื่องที่ไม่ได้ระบุที่มา ค้นด้วยเงื่อนไขนี้ไม่เจอเรื่องกลุ่มนั้น
 
+### 2.4 เบอร์เดียวมีผู้ติดต่อหลายคน: ใช้ `AccountId`
+
+`AccountPhoneNo` ค้นจากเบอร์ จึงได้เรื่องของ **ทุกคนที่มีเบอร์นั้น** ข้อมูลจริงมีเบอร์ที่ผูกกับผู้ติดต่อมากกว่า 1 คนถึง 2,015 เบอร์
+
+ตัวอย่าง (ข้อมูลจริง ณ 19 พ.ย. 2026): เบอร์ `0934153694` มี 2 คน
+
+| ค้นด้วย | ได้ |
+|---|---|
+| `AccountPhoneNo=0934153694` | 14 เรื่อง: นาย อาม 1 + นาย อินดี้ 13 |
+| `AccountId=5A15B0A6398344718D6473C1B7DFB7CA` | 1 เรื่อง ของนาย อาม เท่านั้น |
+
+**Flow ที่แนะนำ (หน้ารับสาย → หน้าค้นหาบริการ)**
+
+1. หน้ารับสายเรียก `GetAccountByPhoneNo` ได้ผู้ติดต่อหลายคน (แต่ละแถวมี `accountId`) ให้ผู้ใช้เลือกคนที่โทรเข้า
+2. ส่ง `accountId` ของคนที่เลือกไปหน้าค้นหา แล้วเรียก `SearchService?AccountId=<accountId>` **ไม่ต้องส่ง `AccountPhoneNo`**
+3. เบอร์ที่มีคนเดียวก็ใช้ `AccountId` ได้เหมือนกัน (ผลเท่ากับค้นด้วยเบอร์) จะได้มี flow เดียว
+
+- **ส่งคู่กันได้:** ถ้าส่ง `AccountId` คู่กับ `AccountPhoneNo` ต้องตรงทั้งสองอย่าง (AND) ถ้าเบอร์ไม่ใช่ของคนนั้นจะได้ `ไม่พบข้อมูล`
+- **อยากดูทุกเรื่องของเบอร์นี้:** ค้นด้วย `AccountPhoneNo` อย่างเดียวเหมือนเดิม แล้วใช้ `accountId` ของแต่ละแถว
+  แยกกลุ่มหรือไฮไลต์เรื่องของคนที่เลือก อย่าแยกด้วย `accountFullname` เพราะชื่อซ้ำกันได้
+
 ---
 
 ## 3. Response
@@ -127,6 +150,7 @@ GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 | `serviceId` | string | id ของเรื่อง (`TblService.Id`) ใช้อ้างถึงเรื่องนี้ในการเรียกครั้งต่อไป |
 | `serviceCode` | string \| null | เลขที่เรื่อง 11 หลัก: `yyMMdd` (พ.ศ.) + เลขรัน 5 หลัก เช่น `69070200055` |
 | `serviceOwner` | string | ชื่อเต็มเจ้าหน้าที่เจ้าของเรื่อง (คำนำหน้า ชื่อ นามสกุล) เป็น `""` ถ้าไม่มีข้อมูล |
+| `accountId` | string \| null | id ผู้ติดต่อ (`TblAccount.Id`) ใช้แยกว่าเรื่องไหนเป็นของใครเมื่อค้นด้วยเบอร์ (ข้อ 2.4) |
 | `accountFullname` | string | ชื่อเต็มผู้ติดต่อ เป็น `""` ถ้าไม่มีข้อมูล |
 | `serviceType` | string \| null | ชื่อประเภทบริการ (ภาษาไทย) |
 | `serviceTitleId` | string \| null | id หัวข้อเรื่อง (ตัวพิมพ์ใหญ่) แปลงเป็นชื่อด้วย [GetServiceTitle.md](GetServiceTitle.md) |
@@ -235,6 +259,7 @@ GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 ```ts
 // lib/api/services.ts
 export interface ServiceSearchParams {
+  accountId?: string;      // ผู้ติดต่อที่เลือก (ข้อ 2.4)
   accountPhoneNo?: string;
   serviceCode?: string;
   serviceSummary?: string;
@@ -257,6 +282,7 @@ export interface ServiceSearchRow {
   serviceId: string;
   serviceCode: string | null;
   serviceOwner: string;
+  accountId: string | null;
   accountFullname: string;
   serviceType: string | null;
   serviceTitleId: string | null;
@@ -290,7 +316,7 @@ export class ServicesApiError extends Error {
 }
 
 const FILTER_KEYS: (keyof ServiceSearchParams)[] = [
-  "accountPhoneNo", "serviceCode", "serviceSummary", "servicesStatus", "serviceType",
+  "accountId", "accountPhoneNo", "serviceCode", "serviceSummary", "servicesStatus", "serviceType",
   "serviceTitleId", "serviceReference", "levelPriorityId",
   "serviceOwner", "organizationGroup", "organization", "serviceCreatedFrom", "serviceCreatedTo",
 ]; // sortOrder / pageNumber / pageSize ไม่นับเป็นเงื่อนไข

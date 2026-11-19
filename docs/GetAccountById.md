@@ -24,7 +24,7 @@
 **ได้ `id` มาจากไหน**
 
 - `id` ของแถวใน `GET /Account/GetAccounts`
-- `accountId` ของเรื่อง (`SearchService` ไม่มี field นี้ ต้องใช้ `GetServiceById` หรือ response ของ `AddNewService`)
+- `accountId` ของเรื่อง: มีในแถวของ `SearchService`, `GetServiceById` และ response ของ `AddNewService`
 - `id` ใน response ของ `POST /Account/AddNewAccount`
 
 ---
@@ -44,7 +44,8 @@
 | `genderId` / `gender` | id และชื่อเพศ |
 | `birthdate`, `created` | **ข้อความแบบเดิม เดือนขึ้นก่อน** เช่น `5/19/2026 0:00` ใช้ `parseLegacyDate` ใน GetAccounts.md |
 | `address`, `zipcode` | ที่อยู่เป็นข้อความอิสระ และรหัสไปรษณีย์ |
-| `areaId` | ค่าพื้นที่จากระบบเดิม ใช้ต่อไม่ได้ ([AreaId.md](AreaId.md)) |
+| `areaId` | id พื้นที่ (`TblArea`) จังหวัด/อำเภอ/ตำบล |
+| `areaPath` | `areaId` ไล่ขึ้นไปถึงจังหวัด เรียง จังหวัด → อำเภอ → ตำบล (`[]` ถ้าไม่มีหรือหาไม่เจอ) ดู [AreaId.md ข้อ 5](AreaId.md) |
 | `remark`, `isScret` | หมายเหตุ และแฟล็กปกปิดข้อมูล |
 | `isEnable` | `"T"` = เปิดใช้งาน, `"F"` = ปิดใช้งาน (endpoint นี้ส่งคนที่ปิดใช้งานมาด้วย) |
 | `contacts` | `{ id, detailType, detail }[]` เบอร์/อีเมลที่เปิดใช้งาน (`MOBILE` / `HOME` / `OFFICE` / `FAX` / `MAIL`) `id` ใช้กับ [AccountDetail.md](AccountDetail.md) (แก้/ลบรายการ) |
@@ -68,6 +69,11 @@
   "birthdate": "5/19/2026 0:00",
   "address": "456/456",
   "areaId": "16AC86F1FC2255923683F632CAC454DA",
+  "areaPath": [
+    { "id": "5EF900A3F3430FB51A813C37BA3D2BB4", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "กรุงเทพมหานคร", "nameEn": null, "areaType": "PROVINCE", "zipcode": "10000", "isDefault": "F" },
+    { "id": "4F3A0B8A4272BFEB369CB62889860FC9", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "หลักสี่", "nameEn": null, "areaType": "DISTRICT", "zipcode": "10210", "isDefault": "F" },
+    { "id": "16AC86F1FC2255923683F632CAC454DA", "refId": "4F3A0B8A4272BFEB369CB62889860FC9", "nameTh": "ตลาดบางเขน", "nameEn": null, "areaType": "SUBDISTRICT", "zipcode": null, "isDefault": "F" }
+  ],
   "zipcode": "10210",
   "remark": "",
   "isScret": "F",

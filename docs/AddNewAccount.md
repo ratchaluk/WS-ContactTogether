@@ -33,7 +33,7 @@
 | `genderId` | string \| null | | 50 | `id` จาก `GET /ListOfValues/GetGender` ส่ง id ที่ไม่มีอยู่ = 400 |
 | `birthdate` | string \| null | | 50 | **ข้อความแบบเดิม เดือนขึ้นก่อน** เช่น `5/14/1988 0:00` (ระบบเดิมอ่านรูปแบบนี้) |
 | `address` | string \| null | | | ที่อยู่ ข้อความอิสระ |
-| `areaId` | string \| null | | 50 | **อย่าส่ง** ตารางพื้นที่ใน DB ว่าง ส่งค่าอะไรมาก็ได้ 400 ดู [AreaId.md](AreaId.md) |
+| `areaId` | string \| null | | 50 | `id` จาก `GET /ListOfValues/GetArea` (จังหวัด/อำเภอ/ตำบล) ส่ง id ที่ไม่มีอยู่ = 400 ดู [AreaId.md](AreaId.md) |
 | `zipcode` | string \| null | | 100 | รหัสไปรษณีย์ |
 | `remark` | string \| null | | | หมายเหตุ |
 | `isScret` | `"T"` \| `"F"` | | 10 | แฟล็กปกปิดข้อมูล (สะกดตาม DB) ไม่ส่ง = `"F"` |
@@ -146,7 +146,7 @@ Authorization: Bearer <token>
 | เรื่อง | ผลกับ frontend |
 |---|---|
 | **ไม่ตรวจซ้ำ** | ชื่อหรือเบอร์เดียวกันสร้างซ้ำได้ ให้ค้นด้วย `GetAccountByPhoneNo` / `GetAccounts` ก่อน แล้วถามผู้ใช้ |
-| **`areaId` ใช้ไม่ได้** | ไม่ต้องทำ drop-down พื้นที่ เก็บที่อยู่เป็นข้อความใน `address` |
+| **`areaId`** | ทำ drop-down จังหวัด → อำเภอ → ตำบล จาก `GetArea` ([AreaId.md](AreaId.md)) ส่ง id ชั้นที่ลึกที่สุดที่เลือก |
 | **ไม่ส่ง `contacts`** | สร้างผู้ติดต่อโดยไม่มีเบอร์ (ผู้ติดต่อเดิมทุกคนมีอย่างน้อย 1 รายการ แนะนำให้ฟอร์มบังคับกรอกอย่างน้อย 1 ช่อง) |
 | **ข้อความไม่ถูกตัดช่องว่าง** | ยกเว้น `detail` ใน `contacts` ที่ตัดให้ ฟิลด์อื่นให้ตัดช่องว่างก่อนส่ง |
 | **ข้อมูลส่วนบุคคล** | อย่าเก็บ response ลง `localStorage` หรือ log |

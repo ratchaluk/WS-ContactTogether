@@ -59,7 +59,8 @@
 | เรื่องย่อ / รายละเอียด / หมายเหตุ | `summary` / `detail` / `remark` | |
 | วันที่เปิด / ปิดเรื่อง | `dateOpened` / `dateClosed` | |
 | ผู้บันทึก / ผู้แก้ไขล่าสุด | `createdByName` / `updatedByName` และ `created` / `updated` | `createdBy` / `updatedBy` |
-| อื่น ๆ | `serviceArea`, `areaId`, `onScene`, `isEnable` | |
+| พื้นที่ของเรื่อง | `areaPath` จังหวัด → อำเภอ → ตำบล (ตอนนี้ทุกเรื่องยังไม่มี จึงเป็น `[]`) ดู [AreaId.md](AreaId.md) | `areaId` |
+| อื่น ๆ | `serviceArea`, `onScene`, `isEnable` | |
 
 - **วันที่ทุก field:** เป็นเวลาไทย ไม่มี offset เช่น `2026-08-04T12:00:00`
 - **ช่องที่ว่าง:** อาจมาเป็น `""` หรือ `null` ก็ได้ เพราะข้อมูลเก่าเก็บไว้ไม่เหมือนกัน ให้เช็กทั้งสองแบบ
@@ -93,7 +94,8 @@ const categoryText = detail.categoryPath.map((x) => x.nameTh).join(" > ");
 | ที่อยู่ | `address` + `zipcode` (ข้อความอิสระ) |
 | วันเกิด | `birthdate` เป็นข้อความรูปแบบเดิม เดือนขึ้นก่อน เช่น `5/19/2026 0:00` อาจเป็น `""` |
 | หมายเหตุ | `remark` |
-| อื่น ๆ | `id`, `areaId`, `isScret`, `created` (ข้อความรูปแบบเดิม เช่น `05/28/2026 11:06`) |
+| พื้นที่ | `areaId` และ `areaPath` (จังหวัด → อำเภอ → ตำบล) ดู [AreaId.md](AreaId.md) |
+| อื่น ๆ | `id`, `isScret`, `created` (ข้อความรูปแบบเดิม เช่น `05/28/2026 11:06`) |
 
 `contacts` คือรายการ `{ id, detailType, detail }` (`id` ใช้แก้/ลบด้วย [AccountDetail.md](AccountDetail.md)) เฉพาะที่เปิดใช้งาน เรียงตาม `detailType` คนหนึ่งมีได้หลายเบอร์
 
@@ -173,6 +175,11 @@ const email = pick("MAIL");
     "birthdate": "5/19/2026 0:00",
     "address": "456/456",
     "areaId": "16AC86F1FC2255923683F632CAC454DA",
+    "areaPath": [
+      { "id": "5EF900A3F3430FB51A813C37BA3D2BB4", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "กรุงเทพมหานคร", "nameEn": null, "areaType": "PROVINCE", "zipcode": "10000", "isDefault": "F" },
+      { "id": "4F3A0B8A4272BFEB369CB62889860FC9", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "หลักสี่", "nameEn": null, "areaType": "DISTRICT", "zipcode": "10210", "isDefault": "F" },
+      { "id": "16AC86F1FC2255923683F632CAC454DA", "refId": "4F3A0B8A4272BFEB369CB62889860FC9", "nameTh": "ตลาดบางเขน", "nameEn": null, "areaType": "SUBDISTRICT", "zipcode": null, "isDefault": "F" }
+    ],
     "zipcode": "10210",
     "remark": "",
     "isScret": "F",
@@ -187,6 +194,7 @@ const email = pick("MAIL");
   "remark": "",
   "serviceArea": "",
   "areaId": "",
+  "areaPath": [],
   "onScene": null,
   "dateOpened": "2026-08-04T12:00:00",
   "dateClosed": null,
@@ -229,6 +237,7 @@ export interface AccountSearch {
   fullName: string;
   genderId: string | null; gender: string | null;
   birthdate: string | null; address: string | null; areaId: string | null; zipcode: string | null;
+  areaPath: AreaItem[] | null; // AreaItem จาก AreaId.md
   remark: string | null; isScret: string; isEnable: string | null; created: string | null;
   contacts: AccountContact[];
 }
@@ -252,7 +261,7 @@ export interface ServiceDetail {
   accountId: string | null;       accountFullName: string | null;
   account: AccountSearch | null;
   summary: string | null; detail: string | null; remark: string | null;
-  serviceArea: string | null; areaId: string | null; onScene: string | null;
+  serviceArea: string | null; areaId: string | null; areaPath: AreaItem[]; onScene: string | null;
   dateOpened: string | null; dateClosed: string | null; isEnable: string | null;
   created: string | null; createdBy: string | null; createdByName: string | null;
   updated: string | null; updatedBy: string | null; updatedByName: string | null;
@@ -310,7 +319,7 @@ backend ในเครื่อง dev ต้อง restart แอปก่อ�
 | **เรื่องที่ไม่มีผู้ติดต่อ** | บางเรื่องเก่ามี `accountId` เป็น `""` หรือชี้ไปหาผู้ติดต่อที่ไม่มีอยู่ (4 เรื่อง) ได้ `account: null` และ `accountFullName: null` ให้การ์ดแสดง "-" ทุกช่อง |
 | **ผู้ติดต่อที่ถูกปิดใช้งาน** | ยังแสดงใน `account` ตามปกติ เพื่อให้เรื่องเก่ายังเห็นว่าใครติดต่อเข้ามา |
 | **ปุ่ม "ดูประวัติผู้ติดต่อ"** | ยังไม่มี endpoint ดึงรายการเรื่องของผู้ติดต่อคนนี้ |
-| **ที่อยู่แบบจังหวัด/อำเภอ/ตำบล** | ยังทำไม่ได้ ดู [AreaId.md](AreaId.md) |
+| **พื้นที่** | ใช้ `areaPath` / `account.areaPath` ได้เลย ไม่ต้องแปลง `areaId` เอง ([AreaId.md](AreaId.md)) |
 | **ประวัติการปฏิบัติงาน (activity)** | ยังไม่มี endpoint ดึงรายการ เพิ่ม แก้ หรือลบงาน |
 | **ปุ่มแก้ไข / ลบเรื่อง** | ยังไม่มี endpoint แก้ไขหรือลบเรื่อง |
 | **ใช้ข้อมูลชุดเดียวกับ `AddNewService`** | field id และวันที่ตรงกับ response ของ `AddNewService` ทุกตัว ใช้ type ร่วมกันได้ |
