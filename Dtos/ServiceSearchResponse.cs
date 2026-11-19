@@ -10,6 +10,9 @@ public class ServiceSearchResponse
     /// <summary>The owning employee's full name.</summary>
     public string? ServiceOwner { get; set; }
 
+    /// <summary><c>TblAccount.Id</c> ของผู้ติดต่อในเรื่องนี้ (ตัวพิมพ์ใหญ่) ใช้แยกว่าแถวไหนเป็นของใครเมื่อค้นด้วยเบอร์</summary>
+    public string? AccountId { get; set; }
+
     public string? AccountFullname { get; set; }
 
     /// <summary>The <c>TblCategory</c> name.</summary>

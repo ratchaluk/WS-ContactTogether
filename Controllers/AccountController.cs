@@ -179,8 +179,11 @@ public class AccountController : ControllerBase
                 account.Created,
             }).ToListAsync(cancellationToken);
 
-        var results = matches.Select(m => new AccountByPhoneResponse
+        // One row per account: the same account appears more than once when it holds this number in several
+        // TblAccountDetail rows, or when its TblAccount.Id is one of the legacy duplicates.
+        var results = matches.DistinctBy(m => m.AccountId).Select(m => new AccountByPhoneResponse
         {
+            AccountId = m.AccountId,
             PhoneNo = m.PhoneNo,
             FullName = BuildFullName(m.SalutationTh, m.FirstnameTh, m.LastnameTh),
             Gender = m.Gender,
@@ -371,8 +374,8 @@ public class AccountController : ControllerBase
             return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"));
         }
 
-        // TblArea is empty, so the legacy AreaId an account already has cannot pass the lookup check.
-        // Keeping that value is allowed, or saving an unchanged form would fail.
+        // Some accounts hold a legacy AreaId that is not in TblArea (e.g. the text " ราขเทวี"), which cannot
+        // pass the lookup check. Keeping that value is allowed, or saving an unchanged form would fail.
         await ValidateLookupsAsync(request, cancellationToken, keepAreaId: current.AreaId);
         if (!ModelState.IsValid)
         {

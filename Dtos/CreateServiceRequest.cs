@@ -47,7 +47,9 @@ public class CreateServiceRequest
     [MaxLength(500)]
     public string? Summary { get; set; }
 
-    [MaxLength(1000)]
+    /// <summary>
+    /// รายละเอียด ไม่จำกัดความยาว (<c>TblService.Detail</c> เป็น <c>nvarchar(max)</c>) เก็บ emoji และทุกภาษาได้
+    /// </summary>
     public string? Detail { get; set; }
 
     [MaxLength(2000)]

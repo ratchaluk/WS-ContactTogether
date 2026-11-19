@@ -116,6 +116,8 @@ public class ServicesController : ControllerBase
         CancellationToken cancellationToken)
     {
         var phoneNo = Normalize(request.AccountPhoneNo);
+        // TblService stores account ids in upper case and the DB collation is case-sensitive.
+        var accountId = Normalize(request.AccountId)?.ToUpperInvariant();
         var statusId = Normalize(request.ServicesStatus);
         var code = Normalize(request.ServiceCode);
         var summary = Normalize(request.ServiceSummary);
@@ -134,7 +136,7 @@ public class ServicesController : ControllerBase
             ? to.AddDays(1).AddSeconds(-1)
             : request.ServiceCreatedTo;
 
-        if (new[] { phoneNo, statusId, code, summary, categoryId, serviceTitleId, referenceId, priorityId, ownerId, organizationGroupId, organizationId }
+        if (new[] { phoneNo, accountId, statusId, code, summary, categoryId, serviceTitleId, referenceId, priorityId, ownerId, organizationGroupId, organizationId }
                 .All(value => value is null)
             && createdFrom is null
             && createdTo is null)
@@ -181,6 +183,11 @@ public class ServicesController : ControllerBase
             services = services.Where(s => _db.TblAccountDetails.Any(d => d.AccountId == s.AccountId
                 && d.Detail == phoneNo
                 && PhoneDetailTypes.Contains(d.DetailType)));
+        }
+
+        if (accountId is not null)
+        {
+            services = services.Where(s => s.AccountId == accountId);
         }
 
         if (statusId is not null)
@@ -274,6 +281,7 @@ public class ServicesController : ControllerBase
             {
                 service.Id,
                 service.Code,
+                service.AccountId,
                 OwnerSalutation = owner != null ? owner.SalutationTh : null,
                 OwnerFirstname = owner != null ? owner.FirstnameTh : null,
                 OwnerLastname = owner != null ? owner.LastnameTh : null,
@@ -302,6 +310,7 @@ public class ServicesController : ControllerBase
             ServiceId = r.Id,
             ServiceCode = r.Code,
             ServiceOwner = BuildFullName(r.OwnerSalutation, r.OwnerFirstname, r.OwnerLastname),
+            AccountId = r.AccountId,
             AccountFullname = BuildFullName(r.AccountSalutation, r.AccountFirstname, r.AccountLastname),
             ServiceType = r.Category,
             ServiceTitleId = r.ServiceTitleId,
@@ -404,6 +413,8 @@ public class ServicesController : ControllerBase
             found.OrganizationId,
             cancellationToken);
 
+        var areaPath = await _db.LoadAreaPathAsync(found.AreaId, cancellationToken);
+
         var account = await _db.LoadAccountAsync(found.AccountId, cancellationToken);
 
         return Ok(new ServiceDetailResponse
@@ -454,6 +465,7 @@ public class ServicesController : ControllerBase
             LevelSecretName = row.LevelSecretName,
             CategoryPath = categoryPath,
             OrganizationPath = organizationPath,
+            AreaPath = areaPath,
         });
     }
 

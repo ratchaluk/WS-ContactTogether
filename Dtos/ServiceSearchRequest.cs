@@ -13,6 +13,12 @@ public class ServiceSearchRequest
     /// <summary>A telephone number in the account's <c>TblAccountDetail</c> rows.</summary>
     public string? AccountPhoneNo { get; set; }
 
+    /// <summary>
+    /// <c>TblAccount.Id</c> (ผู้ติดต่อ) รับได้ทั้งตัวพิมพ์เล็กและใหญ่ ใช้เมื่อเลือกผู้ติดต่อแล้ว เพราะเบอร์เดียวอาจมีหลายคน
+    /// และ <see cref="AccountPhoneNo"/> จะได้เรื่องของทุกคนที่ใช้เบอร์นั้น
+    /// </summary>
+    public string? AccountId { get; set; }
+
     /// <summary><c>TblStatus.Id</c>.</summary>
     public string? ServicesStatus { get; set; }
 
