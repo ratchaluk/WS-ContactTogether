@@ -549,7 +549,7 @@ public class ListOfValuesController : ControllerBase
 
     /// <summary>
     /// คืนรายการพนักงาน (<c>TblEmployee</c>) ที่เปิดใช้งาน เป็น id และชื่อเต็มภาษาไทย (คำนำหน้า ชื่อ นามสกุล)
-    /// สำหรับ drop-down เจ้าของเรื่อง ส่ง <c>id</c> เป็น <c>serviceOwner</c> ของ <c>GET /Services/GetServices</c>
+    /// สำหรับ drop-down เจ้าของเรื่อง ส่ง <c>id</c> เป็น <c>serviceOwner</c> ของ <c>GET /Services/SearchService</c>
     /// ไม่ส่งรหัสผ่านและข้อมูลส่วนตัวอื่นของพนักงาน
     /// </summary>
     [HttpGet("GetEmployee")]

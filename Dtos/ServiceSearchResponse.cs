@@ -1,6 +1,6 @@
 namespace ContactTogetherApi.Dtos;
 
-/// <summary>One row of a <c>GET /Services/GetServices</c> result. Names are the Thai ones.</summary>
+/// <summary>One row of a <c>GET /Services/SearchService</c> result. Names are the Thai ones.</summary>
 public class ServiceSearchResponse
 {
     public string? ServiceId { get; set; }

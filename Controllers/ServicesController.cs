@@ -24,6 +24,10 @@ public class ServicesController : ControllerBase
     /// <summary>ค่าสูงสุดของ <see cref="ServiceSearchRequest.PageSize"/> ให้แต่ละหน้าไม่หนักเกินไป</summary>
     private const int MaxPageSize = 200;
 
+    /// <summary>ค่าของ <see cref="ServiceSearchRequest.SortOrder"/>: ล่าสุดก่อน (ค่าเริ่มต้น) และเก่าสุดก่อน</summary>
+    private const string SortDescending = "desc";
+    private const string SortAscending = "asc";
+
     /// <summary><c>Code</c> คือ <c>yyMMdd</c> 6 หลัก ตามด้วยเลขรัน 5 หลัก</summary>
     private const int ServiceCodeLength = 11;
 
@@ -100,14 +104,14 @@ public class ServicesController : ControllerBase
 
     /// <summary>
     /// ค้นหาเรื่อง (<c>TblService</c>) ที่เปิดใช้งาน ต้องมีเงื่อนไขอย่างน้อย 1 ตัว และต้องตรงทุกเงื่อนไขที่ส่งมา
-    /// (ดู <see cref="ServiceSearchRequest"/>) เรียงจากใหม่ไปเก่า คืนครั้งละหนึ่งหน้า ห่อด้วย
-    /// <see cref="PagedEnvelope{T}"/> พร้อมจำนวนที่ค้นเจอทั้งหมด
+    /// (ดู <see cref="ServiceSearchRequest"/>) เรียงตามวันที่สร้าง ล่าสุดก่อนเป็นค่าเริ่มต้น หรือเก่าสุดก่อนเมื่อส่ง
+    /// <c>SortOrder=asc</c> คืนครั้งละหนึ่งหน้า ห่อด้วย <see cref="PagedEnvelope{T}"/> พร้อมจำนวนที่ค้นเจอทั้งหมด
     /// </summary>
-    [HttpGet("GetServices")]
+    [HttpGet("SearchService")]
     [ProducesResponseType(typeof(PagedEnvelope<ServiceSearchResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetServices(
+    public async Task<IActionResult> SearchService(
         [FromQuery] ServiceSearchRequest request,
         CancellationToken cancellationToken)
     {
@@ -118,6 +122,8 @@ public class ServicesController : ControllerBase
         var categoryId = Normalize(request.ServiceType);
         // TblService stores it in upper case and the DB collation is case-sensitive.
         var serviceTitleId = Normalize(request.ServiceTitleId)?.ToUpperInvariant();
+        var referenceId = Normalize(request.ServiceReference)?.ToUpperInvariant();
+        var priorityId = Normalize(request.LevelPriorityId)?.ToUpperInvariant();
         var ownerId = Normalize(request.ServiceOwner);
         var organizationGroupId = Normalize(request.OrganizationGroup);
         var organizationId = Normalize(request.Organization);
@@ -128,7 +134,7 @@ public class ServicesController : ControllerBase
             ? to.AddDays(1).AddSeconds(-1)
             : request.ServiceCreatedTo;
 
-        if (new[] { phoneNo, statusId, code, summary, categoryId, serviceTitleId, ownerId, organizationGroupId, organizationId }
+        if (new[] { phoneNo, statusId, code, summary, categoryId, serviceTitleId, referenceId, priorityId, ownerId, organizationGroupId, organizationId }
                 .All(value => value is null)
             && createdFrom is null
             && createdTo is null)
@@ -143,6 +149,14 @@ public class ServicesController : ControllerBase
                 nameof(request.ServiceCreatedFrom),
                 $"{nameof(request.ServiceCreatedFrom)} must not be after {nameof(request.ServiceCreatedTo)}.");
             return ValidationProblem(ModelState);
+        }
+
+        var sortOrder = Normalize(request.SortOrder)?.ToLowerInvariant() ?? SortDescending;
+        if (sortOrder is not (SortDescending or SortAscending))
+        {
+            ModelState.AddModelError(
+                nameof(request.SortOrder),
+                $"{nameof(request.SortOrder)} must be '{SortDescending}' or '{SortAscending}'.");
         }
 
         if (request.PageNumber < 1)
@@ -195,6 +209,16 @@ public class ServicesController : ControllerBase
             services = services.Where(s => s.ServiceTitleId == serviceTitleId);
         }
 
+        if (referenceId is not null)
+        {
+            services = services.Where(s => s.ServiceReference == referenceId);
+        }
+
+        if (priorityId is not null)
+        {
+            services = services.Where(s => s.LevelPriorityId == priorityId);
+        }
+
         if (ownerId is not null)
         {
             services = services.Where(s => s.OwnerId == ownerId);
@@ -234,7 +258,7 @@ public class ServicesController : ControllerBase
         // None of these columns has an FK constraint, hence the manual joins. TblAccount.Id has legacy
         // duplicates, so the account is picked with a TOP 1 subquery rather than joined, which would
         // repeat the service once per duplicate.
-        var rows = await (
+        var projected =
             from service in services
             join owner in _db.TblEmployees.AsNoTracking() on service.OwnerId equals owner.Id into owners
             from owner in owners.DefaultIfEmpty()
@@ -246,8 +270,6 @@ public class ServicesController : ControllerBase
                 .Where(a => a.Id == service.AccountId)
                 .Select(a => new { a.SalutationTh, a.FirstnameTh, a.LastnameTh })
                 .FirstOrDefault()
-            // Id last makes the order total, so a row cannot move between pages.
-            orderby service.Created descending, service.Code descending, service.Id
             select new
             {
                 service.Id,
@@ -263,7 +285,14 @@ public class ServicesController : ControllerBase
                 service.Summary,
                 Status = status != null ? status.NameTh : null,
                 service.Created,
-            })
+            };
+
+        // Created, then Code, then Id makes the order total, so a row cannot move between pages.
+        var ordered = sortOrder == SortAscending
+            ? projected.OrderBy(r => r.Created).ThenBy(r => r.Code).ThenBy(r => r.Id)
+            : projected.OrderByDescending(r => r.Created).ThenByDescending(r => r.Code).ThenBy(r => r.Id);
+
+        var rows = await ordered
             .Skip((int)skip)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
@@ -468,7 +497,7 @@ public class ServicesController : ControllerBase
         return path;
     }
 
-    /// <summary>ห่อผลลัพธ์หนึ่งหน้าของ <see cref="GetServices"/> แบบเดียวกับ <c>GetReportXX</c></summary>
+    /// <summary>ห่อผลลัพธ์หนึ่งหน้าของ <see cref="SearchService"/> แบบเดียวกับ <c>GetReportXX</c></summary>
     private static PagedEnvelope<ServiceSearchResponse> Paged(
         IEnumerable<ServiceSearchResponse> data,
         int total,
