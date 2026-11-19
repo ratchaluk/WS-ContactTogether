@@ -60,7 +60,7 @@ public static class AccountQueries
             .Where(d => d.AccountId == accountId && d.IsEnable == "T")
             .OrderBy(d => d.DetailType)
             .ThenBy(d => d.Detail)
-            .Select(d => new AccountContactResponse { DetailType = d.DetailType, Detail = d.Detail })
+            .Select(d => new AccountContactResponse { Id = d.Id, DetailType = d.DetailType, Detail = d.Detail })
             .ToListAsync(cancellationToken);
 
         return account;

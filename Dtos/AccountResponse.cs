@@ -44,6 +44,6 @@ public class AccountResponse
 
     public string? UpdatedBy { get; set; }
 
-    /// <summary>แถว <c>TblAccountDetail</c> ที่บันทึกพร้อมบัญชีนี้ (ว่างถ้าไม่ได้ส่ง <c>PhoneNo</c>)</summary>
+    /// <summary>แถว <c>TblAccountDetail</c> ที่บันทึกพร้อมบัญชีนี้ (ว่างถ้าไม่ได้ส่ง <c>Contacts</c>)</summary>
     public List<AccountContactResponse> Contacts { get; set; } = [];
 }

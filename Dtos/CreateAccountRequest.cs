@@ -45,10 +45,7 @@ public class CreateAccountRequest
     [MaxLength(50)]
     public string? AreaId { get; set; }
 
-    /// <summary>
-    /// Digits only. The scaffolded model types this column as <c>decimal</c> even though the
-    /// database column is <c>nvarchar(100)</c>, so a non-numeric value cannot be stored today.
-    /// </summary>
+    /// <summary>รหัสไปรษณีย์ ข้อความอิสระ (คอลัมน์ <c>nvarchar(100)</c>)</summary>
     [MaxLength(100)]
     public string? Zipcode { get; set; }
 
@@ -62,17 +59,9 @@ public class CreateAccountRequest
     public string IsEnable { get; set; } = "T";
 
     /// <summary>
-    /// เบอร์โทร (หรืออีเมลเมื่อ <see cref="DetailType"/> เป็น <c>MAIL</c>) บันทึกลง
-    /// <c>TblAccountDetail.Detail</c> โดยผูก <c>AccountId</c> กับบัญชีที่สร้าง ไม่ส่งมาก็ได้
-    /// ถ้าไม่ส่งจะไม่เพิ่มแถวใน <c>TblAccountDetail</c>
+    /// เบอร์โทร/อีเมลของผู้ติดต่อ แต่ละรายการบันทึกเป็น 1 แถวใน <c>TblAccountDetail</c> ผูก <c>AccountId</c>
+    /// กับบัญชีที่สร้าง ไม่ส่งมาก็ได้ (ไม่สร้างแถว) สูงสุด 10 รายการ รายการที่ชนิดและค่าซ้ำกันนับเป็นอันเดียว
+    /// <c>PUT UpdateAccountById</c> ไม่สนใจ field นี้
     /// </summary>
-    [MaxLength(100)]
-    public string? PhoneNo { get; set; }
-
-    /// <summary>
-    /// <c>TblAccountDetail.DetailType</c>: <c>MOBILE</c> (ค่าเริ่มต้น), <c>HOME</c>, <c>OFFICE</c>,
-    /// <c>FAX</c> หรือ <c>MAIL</c> ใช้เมื่อส่ง <see cref="PhoneNo"/> มาเท่านั้น
-    /// </summary>
-    [MaxLength(50)]
-    public string? DetailType { get; set; }
+    public List<AccountContactRequest> Contacts { get; set; } = [];
 }
