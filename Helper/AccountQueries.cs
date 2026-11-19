@@ -62,6 +62,7 @@ public static class AccountQueries
             .ThenBy(d => d.Detail)
             .Select(d => new AccountContactResponse { Id = d.Id, DetailType = d.DetailType, Detail = d.Detail })
             .ToListAsync(cancellationToken);
+        account.AreaPath = await db.LoadAreaPathAsync(account.AreaId, cancellationToken);
 
         return account;
     }

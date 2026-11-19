@@ -49,4 +49,7 @@ public class ServiceDetailResponse : ServiceResponse
 
     /// <summary>The organization and its parents, top level first (กระทรวง, then กรม).</summary>
     public List<LookupItemResponse> OrganizationPath { get; set; } = [];
+
+    /// <summary>The service's area and its parents, top level first (จังหวัด, อำเภอ, ตำบล); empty without one.</summary>
+    public List<AreaResponse> AreaPath { get; set; } = [];
 }
