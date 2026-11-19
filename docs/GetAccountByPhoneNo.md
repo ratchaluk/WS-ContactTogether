@@ -5,8 +5,8 @@
 
 > อ้างอิงโค้ด: `Controllers/AccountController.cs` (`GetAccountByPhoneNo`), `Dtos/AccountByPhoneResponse.cs`
 
-> ถ้าต้องการ **เรื่อง (service)** ของเบอร์นี้ ให้ใช้ `GET /Services/GetServices?AccountPhoneNo=...`
-> (ดู [GetServices.md](GetServices.md)) endpoint นี้คืนแค่ข้อมูลผู้ติดต่อ
+> ถ้าต้องการ **เรื่อง (service)** ของเบอร์นี้ ให้ใช้ `GET /Services/SearchService?AccountPhoneNo=...`
+> (ดู [SearchService.md](SearchService.md)) endpoint นี้คืนแค่ข้อมูลผู้ติดต่อ
 
 ---
 

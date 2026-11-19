@@ -1,7 +1,7 @@
 # รายชื่อพนักงาน (`GET /ListOfValues/GetEmployee`) สำหรับ Frontend
 
 ใช้ทำ drop-down **พนักงาน / เจ้าของเรื่อง** ได้ `id` กับชื่อเต็มภาษาไทยของพนักงานที่เปิดใช้งาน
-ส่ง `id` ที่เลือกไปเป็น `serviceOwner` ของ `GET /Services/GetServices` ([GetServices.md](GetServices.md))
+ส่ง `id` ที่เลือกไปเป็น `serviceOwner` ของ `GET /Services/SearchService` ([SearchService.md](SearchService.md))
 
 > อ้างอิงโค้ด: `Controllers/ListOfValuesController.cs` (`GetEmployee`), `Dtos/LookupItemResponse.cs`
 

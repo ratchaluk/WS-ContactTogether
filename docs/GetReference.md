@@ -2,7 +2,8 @@
 
 ใช้ดึงรายการ **ที่มาข้อมูล** (เรื่องนี้มาจากแหล่งไหน เช่น Joomla, Other Website, เจ้าหน้าที่กระทรวง, อื่นๆ)
 ไปแสดงใน drop-down **"ที่มาข้อมูล"** ของฟอร์มเปิดเรื่อง ค่าที่เลือกคือ `id` ซึ่งต้องส่งกลับไปใน
-`serviceReference` ของ `POST /Services/AddNewService`
+`serviceReference` ของ `POST /Services/AddNewService` และใช้กรองหน้าค้นหาด้วย `ServiceReference` ของ
+`GET /Services/SearchService` ([SearchService.md](SearchService.md))
 
 ชื่อที่เลือกจะไปแสดงในคอลัมน์ "ที่มาข้อมูล" ของรายงาน 01–04 และ 07 ถ้าไม่ได้ส่ง `id` จาก endpoint นี้
 คอลัมน์นั้นในรายงานจะว่าง

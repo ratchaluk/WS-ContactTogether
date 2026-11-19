@@ -1,10 +1,17 @@
-# ค้นหาเรื่อง (`GET /Services/GetServices`) สำหรับ Frontend
+# ค้นหาเรื่อง (`GET /Services/SearchService`) สำหรับ Frontend
 
 ใช้ค้นหา **เรื่อง (service request)** จากเงื่อนไขต่าง ๆ เช่น เบอร์โทรของผู้ติดต่อ เลขที่เรื่อง สถานะ
-ประเภท หรือช่วงวันที่สร้าง ผลลัพธ์แบ่งหน้า และบอกจำนวนทั้งหมดที่ค้นเจอ
+ประเภท ที่มาข้อมูล ความสำคัญ หรือช่วงวันที่สร้าง เรียงล่าสุดก่อนหรือเก่าสุดก่อนได้ ผลลัพธ์แบ่งหน้า และบอกจำนวนทั้งหมดที่ค้นเจอ
 
-> อ้างอิงโค้ด: `Controllers/ServicesController.cs` (`GetServices`), `Dtos/ServiceSearchRequest.cs`,
+> อ้างอิงโค้ด: `Controllers/ServicesController.cs` (`SearchService`), `Dtos/ServiceSearchRequest.cs`,
 > `Dtos/ServiceSearchResponse.cs`, `Dtos/ResponseModel.cs` (`PagedEnvelope<T>`)
+
+> **เปลี่ยนแปลง (19 พ.ย. 2026):**
+>
+> - **เปลี่ยนชื่อ:** `GET /Services/GetServices` เป็น `GET /Services/SearchService` ชื่อเดิมใช้ไม่ได้แล้ว (ได้ 404)
+>   parameter และ response เหมือนเดิมทุกอย่าง แก้แค่ URL
+> - **เงื่อนไขใหม่:** `ServiceReference` (ที่มาข้อมูล) และ `LevelPriorityId` (ความสำคัญ)
+> - **เรียงลำดับ:** `SortOrder=desc` (ล่าสุดก่อน ค่าเริ่มต้น) หรือ `SortOrder=asc` (เก่าสุดก่อน)
 
 > **เปลี่ยนแปลง (16 พ.ย. 2026):** เดิม response เป็น array ตรง ๆ และตัดไว้ที่ 200 แถว
 > ตอนนี้เป็น envelope `{ status, message, data, meta.pagination }` แบบเดียวกับ `GetReportXX`
@@ -18,13 +25,13 @@
 |---|---|
 | Method | `GET` (ไม่มี body ส่งทุกอย่างทาง query string) |
 | Auth | **ต้องใช้ token**: `Authorization: Bearer <token>` (ได้จาก `POST /Auth/login`) |
-| Backend (dev) | `http://localhost:5018/Services/GetServices` |
-| URL จาก Next.js | `/api/backend/Services/GetServices` (ผ่าน `rewrites()` ใน `next.config.ts` เพราะ API ยังไม่เปิด CORS) |
+| Backend (dev) | `http://localhost:5018/Services/SearchService` |
+| URL จาก Next.js | `/api/backend/Services/SearchService` (ผ่าน `rewrites()` ใน `next.config.ts` เพราะ API ยังไม่เปิด CORS) |
 
 ตัวอย่าง:
 
 ```
-GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
+GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 ```
 
 ---
@@ -33,7 +40,7 @@ GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 
 ### 2.1 Parameter
 
-ทุกตัวไม่บังคับ แต่ **ต้องมีเงื่อนไขค้นหาอย่างน้อย 1 ตัว** (`PageNumber`/`PageSize` ไม่นับ)
+ทุกตัวไม่บังคับ แต่ **ต้องมีเงื่อนไขค้นหาอย่างน้อย 1 ตัว** (`SortOrder`/`PageNumber`/`PageSize` ไม่นับ)
 ส่งหลายตัวพร้อมกันได้ ผลลัพธ์ต้องตรง **ทุกเงื่อนไข** (AND) ชื่อ parameter ไม่สนตัวพิมพ์เล็ก/ใหญ่
 
 | Parameter | Type | การค้นหา | ความหมาย |
@@ -43,11 +50,15 @@ GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 | `ServiceSummary` | string | **บางส่วน** | หัวเรื่อง |
 | `ServicesStatus` | string | ตรงทั้งค่า | id สถานะ (`TblStatus.Id`) |
 | `ServiceType` | string | ตรงทั้งค่า | id ประเภทบริการ (`TblCategory.Id`) จาก `GET /ListOfValues/GetServiceType` |
+| `ServiceTitleId` | string | ตรงทั้งค่า | id หัวข้อเรื่อง (`TblServiceTitles.Id`) ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
+| `ServiceReference` | string | ตรงทั้งค่า | id ที่มาข้อมูล (`TblReference.Id`) ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
+| `LevelPriorityId` | string | ตรงทั้งค่า | id ความสำคัญ (`TblLevel.Id` ประเภท `PRIORITY`) ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
 | `ServiceOwner` | string | ตรงทั้งค่า | id เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) |
 | `OrganizationGroup` | string | ตรงทั้งค่า | id หน่วยงานแม่ เจอเรื่องของหน่วยงานนั้นและหน่วยงานย่อยทั้งหมดของมัน |
 | `Organization` | string | ตรงทั้งค่า | id หน่วยงาน (`TblOrganization.Id`) เจอเฉพาะหน่วยงานนั้น |
 | `ServiceCreatedFrom` | date-time | ≥ | วันที่สร้างเรื่อง ตั้งแต่ (รวมค่านี้) |
 | `ServiceCreatedTo` | date-time | ≤ | วันที่สร้างเรื่อง ถึง (รวมค่านี้) |
+| `SortOrder` | string | | `desc` = ล่าสุดก่อน (ค่าเริ่มต้น), `asc` = เก่าสุดก่อน ตัวพิมพ์เล็กหรือใหญ่ก็ได้ ค่าอื่นได้ 400 |
 | `PageNumber` | int | | หน้าที่ต้องการ เริ่มที่ `1` (ค่าเริ่มต้น `1`) |
 | `PageSize` | int | | จำนวนแถวต่อหน้า `1`–`200` (ค่าเริ่มต้น `20`) |
 
@@ -72,7 +83,17 @@ GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 | Parameter | ดึงรายการจาก |
 |---|---|
 | `ServiceType` | `GET /ListOfValues/GetServiceType` (`id`) |
-| `ServicesStatus`, `ServiceOwner`, `OrganizationGroup`, `Organization` | **ยังไม่มี endpoint รายการ** จะแจ้งเมื่อเพิ่มให้ |
+| `ServiceTitleId` | `GET /ListOfValues/GetServiceTitle` ([GetServiceTitle.md](GetServiceTitle.md)) |
+| `ServiceReference` | `GET /ListOfValues/GetReference` ([GetReference.md](GetReference.md)) |
+| `LevelPriorityId` | `GET /ListOfValues/GetLevel?levelType=PRIORITY` ([GetLevel.md](GetLevel.md)) |
+| `ServicesStatus` | `GET /ListOfValues/GetStatus` ([GetStatus.md](GetStatus.md)) |
+| `ServiceOwner` | `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
+| `OrganizationGroup`, `Organization` | `GET /ListOfValues/GetOrganization` ([GetOrganization.md](GetOrganization.md)) หน่วยงานหลัก / หน่วยงานย่อย |
+
+**ข้อมูลจริง ณ 19 พ.ย. 2026** (เรื่องที่เปิดใช้งาน 194 เรื่อง)
+
+- **ความสำคัญ:** ทุกเรื่องเป็น `3-Medium` ค้นด้วยระดับอื่นจึงยังได้ `ไม่พบข้อมูล`
+- **ที่มาข้อมูล:** ส่วนใหญ่เป็น `Joomla` (152 เรื่อง) มี 22 เรื่องที่ไม่ได้ระบุที่มา ค้นด้วยเงื่อนไขนี้ไม่เจอเรื่องกลุ่มนั้น
 
 ---
 
@@ -108,16 +129,18 @@ GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 | `serviceOwner` | string | ชื่อเต็มเจ้าหน้าที่เจ้าของเรื่อง (คำนำหน้า ชื่อ นามสกุล) เป็น `""` ถ้าไม่มีข้อมูล |
 | `accountFullname` | string | ชื่อเต็มผู้ติดต่อ เป็น `""` ถ้าไม่มีข้อมูล |
 | `serviceType` | string \| null | ชื่อประเภทบริการ (ภาษาไทย) |
+| `serviceTitleId` | string \| null | id หัวข้อเรื่อง (ตัวพิมพ์ใหญ่) แปลงเป็นชื่อด้วย [GetServiceTitle.md](GetServiceTitle.md) |
 | `serviceSummary` | string \| null | หัวเรื่อง |
 | `servicesStatus` | string \| null | ชื่อสถานะ (ภาษาไทย) |
 | `serviceCreated` | string \| null | วันเวลาที่สร้างเรื่อง เวลาไทย ไม่มี offset เช่น `2026-07-02T15:01:00` |
 
-- **เรียงจากใหม่ไปเก่า** (`serviceCreated` แล้วตาม `serviceCode`) ลำดับคงที่ เปลี่ยนหน้าแล้วแถวไม่ซ้ำหรือหาย
+- **เรียงตาม `serviceCreated` แล้วตาม `serviceCode`:** ล่าสุดก่อนเป็นค่าเริ่มต้น หรือเก่าสุดก่อนเมื่อส่ง `SortOrder=asc`
+  ลำดับคงที่ เปลี่ยนหน้าแล้วแถวไม่ซ้ำหรือหาย (เปลี่ยน `SortOrder` แล้วให้เริ่มที่หน้า 1)
 - ขอหน้าที่เกินจำนวนหน้า (เช่น `PageNumber=99`) ได้ `200` กับ `data: []` แต่ `total` ยังเป็นจำนวนจริง
 
 ### 3.2 ตัวอย่าง
 
-`GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=3`
+`GET /Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=3`
 
 (เลขที่เรื่อง ประเภท และสถานะเป็นข้อมูลจริง ณ 16 พ.ย. 2026 ส่วนชื่อคนและหัวเรื่องเป็นค่าสมมุติ)
 
@@ -191,14 +214,15 @@ GET /Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 ```
 
 `errors` อาจมี key อื่น เช่น `PageSize` (`PageSize must be between 1 and 200.`),
-`PageNumber`, `ServiceCreatedFrom` (วันที่เริ่มมากกว่าวันที่สิ้นสุด หรือรูปแบบวันที่ผิด)
+`PageNumber`, `SortOrder` (`SortOrder must be 'desc' or 'asc'.`),
+`ServiceCreatedFrom` (วันที่เริ่มมากกว่าวันที่สิ้นสุด หรือรูปแบบวันที่ผิด)
 
 ### 3.3 Status code
 
 | HTTP | เมื่อไร | Body |
 |---|---|---|
 | 200 | สำเร็จ **รวมกรณีไม่พบข้อมูล** (`data: []`) | `PagedEnvelope<ServiceSearchRow>` |
-| 400 | ไม่มีเงื่อนไขค้นหาเลย, `PageNumber`/`PageSize` ผิดช่วง, วันที่ผิดรูปแบบ, วันที่เริ่มมากกว่าวันที่สิ้นสุด | ProblemDetails |
+| 400 | ไม่มีเงื่อนไขค้นหาเลย, `SortOrder` ไม่ใช่ `desc`/`asc`, `PageNumber`/`PageSize` ผิดช่วง, วันที่ผิดรูปแบบ, วันที่เริ่มมากกว่าวันที่สิ้นสุด | ProblemDetails |
 | 401 | ไม่มี token, token หมดอายุ, หรือ logout แล้ว | ว่าง |
 | 500 | ข้อผิดพลาดฝั่ง server | ว่าง หรือ JSON (อย่าพึ่งรูปแบบ) |
 
@@ -216,11 +240,15 @@ export interface ServiceSearchParams {
   serviceSummary?: string;
   servicesStatus?: string;
   serviceType?: string;
+  serviceTitleId?: string;
+  serviceReference?: string; // id จาก GetReference
+  levelPriorityId?: string;  // id จาก GetLevel?levelType=PRIORITY
   serviceOwner?: string;
   organizationGroup?: string;
   organization?: string;
   serviceCreatedFrom?: string; // "yyyy-MM-dd" หรือ "yyyy-MM-ddTHH:mm:ss" เวลาไทย ห้ามมี Z
   serviceCreatedTo?: string;
+  sortOrder?: "desc" | "asc"; // ล่าสุดก่อน (ค่าเริ่มต้น) / เก่าสุดก่อน
   pageNumber?: number;
   pageSize?: number;
 }
@@ -231,6 +259,7 @@ export interface ServiceSearchRow {
   serviceOwner: string;
   accountFullname: string;
   serviceType: string | null;
+  serviceTitleId: string | null;
   serviceSummary: string | null;
   servicesStatus: string | null;
   serviceCreated: string | null;
@@ -262,8 +291,9 @@ export class ServicesApiError extends Error {
 
 const FILTER_KEYS: (keyof ServiceSearchParams)[] = [
   "accountPhoneNo", "serviceCode", "serviceSummary", "servicesStatus", "serviceType",
+  "serviceTitleId", "serviceReference", "levelPriorityId",
   "serviceOwner", "organizationGroup", "organization", "serviceCreatedFrom", "serviceCreatedTo",
-];
+]; // sortOrder / pageNumber / pageSize ไม่นับเป็นเงื่อนไข
 
 /** true เมื่อมีเงื่อนไขค้นหาอย่างน้อย 1 ตัว ใช้ปิดปุ่มค้นหาไว้ก่อน จะได้ไม่ยิงไปแล้วได้ 400 */
 export function hasSearchFilter(params: ServiceSearchParams): boolean {
@@ -280,7 +310,7 @@ export async function searchServices(
     if (text !== "") qs.set(key, text); // ชื่อ parameter ไม่สนตัวพิมพ์ ใช้ camelCase ได้
   }
 
-  const res = await fetch(`/api/backend/Services/GetServices?${qs}`, {
+  const res = await fetch(`/api/backend/Services/SearchService?${qs}`, {
     headers: { Authorization: `Bearer ${opts.token}` },
     signal: opts.signal,
   });
@@ -331,6 +361,13 @@ export function ServiceSearch({ token }: { token: string }) {
         value={filters.accountPhoneNo ?? ""}
         onChange={(e) => setFilters({ ...filters, accountPhoneNo: e.target.value })}
       />
+      <select
+        value={filters.sortOrder ?? "desc"}
+        onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as "desc" | "asc" })}
+      >
+        <option value="desc">ล่าสุด</option>
+        <option value="asc">เก่าสุด</option>
+      </select>
       {/* ค้นใหม่ทุกครั้งให้กลับไปหน้า 1 */}
       <button disabled={!hasSearchFilter(filters)} onClick={() => load(1)}>ค้นหา</button>
 
@@ -367,7 +404,7 @@ export function ServiceSearch({ token }: { token: string }) {
 
 ### 4.3 ข้อแนะนำ
 
-- เปลี่ยนเงื่อนไขค้นหาแล้วให้เริ่มที่ `PageNumber=1` เสมอ
+- เปลี่ยนเงื่อนไขค้นหาหรือ `SortOrder` แล้วให้เริ่มที่ `PageNumber=1` เสมอ
 - แสดง `message` ได้ตรง ๆ แต่ไม่ควรแสดงข้อความใน `errors` ของ 400 ให้ผู้ใช้เห็น
 - `serviceCreated` เป็นเวลาไทยอยู่แล้ว ถ้าจะแปลงเป็น `Date` ให้ถือเป็นเวลาท้องถิ่น
   อย่าต่อ `Z` แล้วค่อย parse เพราะเวลาจะเลื่อนไป 7 ชั่วโมง
@@ -378,12 +415,12 @@ export function ServiceSearch({ token }: { token: string }) {
 ## 5. ทดสอบด้วย REST Client / curl
 
 ```http
-GET http://localhost:5018/Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
+GET http://localhost:5018/Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20
 Authorization: Bearer <token>
 ```
 
 ```bash
-curl "http://localhost:5018/Services/GetServices?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20" \
+curl "http://localhost:5018/Services/SearchService?AccountPhoneNo=0909840822&PageNumber=1&PageSize=20" \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -391,10 +428,16 @@ curl "http://localhost:5018/Services/GetServices?AccountPhoneNo=0909840822&PageN
 
 ```
 # เรื่องของวันที่ 2 ก.ค. 2026 ทั้งวัน
-GET /Services/GetServices?ServiceCreatedFrom=2026-07-02&ServiceCreatedTo=2026-07-02
+GET /Services/SearchService?ServiceCreatedFrom=2026-07-02&ServiceCreatedTo=2026-07-02
 
 # เลขที่เรื่องที่มี 690702 อยู่ หน้า 2 หน้าละ 50
-GET /Services/GetServices?ServiceCode=690702&PageNumber=2&PageSize=50
+GET /Services/SearchService?ServiceCode=690702&PageNumber=2&PageSize=50
+
+# ที่มาข้อมูล Joomla เก่าสุดก่อน
+GET /Services/SearchService?ServiceReference=0199D0ECBE0F08A02BDFDB8460CAB362&SortOrder=asc
+
+# ความสำคัญ 3-Medium ล่าสุดก่อน (ค่าเริ่มต้น)
+GET /Services/SearchService?LevelPriorityId=D550B0AAB78CEEE3E6C027E477932A35
 ```
 
 ใน `ContactTogetherApi.http` ของ backend มี request นี้อยู่แล้ว (รัน `login` ก่อนเพื่อให้ได้ `{{token}}`)

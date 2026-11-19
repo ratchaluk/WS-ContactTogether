@@ -24,7 +24,7 @@
 **ได้ `id` มาจากไหน**
 
 - `id` ของแถวใน `GET /Account/GetAccounts`
-- `accountId` ของเรื่อง (`GetServices` ไม่มี field นี้ ต้องใช้ `GetServiceById` หรือ response ของ `AddNewService`)
+- `accountId` ของเรื่อง (`SearchService` ไม่มี field นี้ ต้องใช้ `GetServiceById` หรือ response ของ `AddNewService`)
 - `id` ใน response ของ `POST /Account/AddNewAccount`
 
 ---

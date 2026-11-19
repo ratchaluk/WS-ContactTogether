@@ -26,7 +26,7 @@
 
 **ได้ `id` มาจากไหน**
 
-- **จากหน้าค้นหา:** ใช้ `serviceId` ของแถวใน `GET /Services/GetServices`
+- **จากหน้าค้นหา:** ใช้ `serviceId` ของแถวใน `GET /Services/SearchService`
 - **หลังเปิดเรื่องใหม่:** ใช้ `id` ใน response ของ `POST /Services/AddNewService`
 - **ห้ามใช้ `code` (เช่น `69080400002`):** จะได้ 404 ถ้า URL ของหน้าต้องการให้คนอ่านรู้เรื่อง ให้ใช้ `id` ตามแบบระบบเดิม เช่น `/services/view?serviceId=427D66AA…`
 

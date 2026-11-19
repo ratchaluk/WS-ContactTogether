@@ -6,7 +6,7 @@
 > อ้างอิงโค้ด: `Controllers/ServicesController.cs` (`AddNewService`), `Dtos/CreateServiceRequest.cs`,
 > `Dtos/ServiceResponse.cs`
 >
-> เอกสารที่ใช้คู่กัน: [GetChannel.md](GetChannel.md) (ช่องทาง), [GetServices.md](GetServices.md) (ค้นหาเรื่องที่เปิดแล้ว)
+> เอกสารที่ใช้คู่กัน: [GetChannel.md](GetChannel.md) (ช่องทาง), [SearchService.md](SearchService.md) (ค้นหาเรื่องที่เปิดแล้ว)
 
 ---
 
@@ -462,5 +462,5 @@ curl -X POST "http://localhost:5018/Services/AddNewService" \
   -d '{"summary":"ทดสอบเปิดเรื่อง","callBack":"N","channelIncomingId":"332E6D76F258C8294B160C20642AB9F5"}'
 ```
 
-เปิดแล้วตรวจได้ด้วย `GET /Services/GetServices?ServiceCode=<code ที่ได้>`
+เปิดแล้วตรวจได้ด้วย `GET /Services/SearchService?ServiceCode=<code ที่ได้>`
 หรือ `GET /Services/GetInProcessServices` (เรื่องที่ยังไม่ปิดของผู้ที่ login)
