@@ -79,6 +79,7 @@
 
 | Field | Type | ความหมาย |
 |---|---|---|
+| `id` | string | id ของรายการ ใช้แก้/ลบด้วย [AccountDetail.md](AccountDetail.md) |
 | `detailType` | string | ประเภท (ตารางด้านล่าง) |
 | `detail` | string | เบอร์หรืออีเมล |
 
@@ -133,8 +134,8 @@
     "isScret": "F",
     "created": "07/02/2026 14:37",
     "contacts": [
-      { "detailType": "MAIL", "detail": "somying@example.com" },
-      { "detailType": "MOBILE", "detail": "0909840822" }
+      { "id": "<id>", "detailType": "MAIL", "detail": "somying@example.com" },
+      { "id": "<id>", "detailType": "MOBILE", "detail": "0909840822" }
     ]
   }
 ]
@@ -174,6 +175,7 @@
 export type DetailType = "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL";
 
 export interface AccountContact {
+  id: string;
   detailType: DetailType | string;
   detail: string;
 }

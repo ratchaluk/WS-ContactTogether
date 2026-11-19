@@ -95,7 +95,7 @@ const categoryText = detail.categoryPath.map((x) => x.nameTh).join(" > ");
 | หมายเหตุ | `remark` |
 | อื่น ๆ | `id`, `areaId`, `isScret`, `created` (ข้อความรูปแบบเดิม เช่น `05/28/2026 11:06`) |
 
-`contacts` คือรายการ `{ detailType, detail }` เฉพาะที่เปิดใช้งาน เรียงตาม `detailType` คนหนึ่งมีได้หลายเบอร์
+`contacts` คือรายการ `{ id, detailType, detail }` (`id` ใช้แก้/ลบด้วย [AccountDetail.md](AccountDetail.md)) เฉพาะที่เปิดใช้งาน เรียงตาม `detailType` คนหนึ่งมีได้หลายเบอร์
 
 | `detailType` | ความหมาย |
 |---|---|
@@ -179,7 +179,7 @@ const email = pick("MAIL");
     "isEnable": "T",
     "created": "05/28/2026 11:06",
     "contacts": [
-      { "detailType": "MOBILE", "detail": "0934153699" }
+      { "id": "<id>", "detailType": "MOBILE", "detail": "0934153699" }
     ]
   },
   "summary": "ร้องเรียน โยนเรื่อง",
@@ -221,7 +221,7 @@ const email = pick("MAIL");
 export interface LookupItem { id: string; nameTh: string; }
 
 // รูปแบบเดียวกับแถวของ GET /Account/GetAccounts ถ้ามี type นี้อยู่แล้วใช้ตัวเดิมได้เลย
-export interface AccountContact { detailType: "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL" | string; detail: string; }
+export interface AccountContact { id: string; detailType: "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL" | string; detail: string; }
 export interface AccountSearch {
   id: string;
   salutationTh: string | null; firstnameTh: string | null; lastnameTh: string | null;

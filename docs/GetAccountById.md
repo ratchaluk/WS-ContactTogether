@@ -47,7 +47,7 @@
 | `areaId` | ค่าพื้นที่จากระบบเดิม ใช้ต่อไม่ได้ ([AreaId.md](AreaId.md)) |
 | `remark`, `isScret` | หมายเหตุ และแฟล็กปกปิดข้อมูล |
 | `isEnable` | `"T"` = เปิดใช้งาน, `"F"` = ปิดใช้งาน (endpoint นี้ส่งคนที่ปิดใช้งานมาด้วย) |
-| `contacts` | `{ detailType, detail }[]` เบอร์/อีเมลที่เปิดใช้งาน (`MOBILE` / `HOME` / `OFFICE` / `FAX` / `MAIL`) |
+| `contacts` | `{ id, detailType, detail }[]` เบอร์/อีเมลที่เปิดใช้งาน (`MOBILE` / `HOME` / `OFFICE` / `FAX` / `MAIL`) `id` ใช้กับ [AccountDetail.md](AccountDetail.md) (แก้/ลบรายการ) |
 
 ### 2.2 ตัวอย่าง (ข้อมูลจริง ณ 18 พ.ย. 2026)
 
@@ -74,7 +74,7 @@
   "isEnable": "T",
   "created": "05/28/2026 11:06",
   "contacts": [
-    { "detailType": "MOBILE", "detail": "0934153699" }
+    { "id": "<TblAccountDetail.Id ตัวพิมพ์ใหญ่>", "detailType": "MOBILE", "detail": "0934153699" }
   ]
 }
 ```

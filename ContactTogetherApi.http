@@ -115,6 +115,13 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Account detail types - fixed list (no table) as [{ id, nameTh }]: MOBILE, HOME, OFFICE, FAX, MAIL.
+# Send id back as detailType when adding an account.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetAccountDetailType
+Authorization: Bearer {{token}}
+
+###
+
 # References (ที่มาข้อมูล) - enabled TblReference rows as [{ id, nameTh, nameEn, isDefault }].
 # Send id back as serviceReference when adding a service.
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetReference
@@ -187,6 +194,13 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Employees - enabled TblEmployee rows as [{ id, nameTh }] (nameTh = salutation + first + last name).
+# Send id as serviceOwner to GetServices. No password or personal data is returned.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetEmployee
+Authorization: Bearer {{token}}
+
+###
+
 # Call types (ประเภทการรับสาย) - the enabled TblCategory rows with CategoryType "CONTACT", as a tree
 # of [{ id, nameTh, nameEn, children[] }]: group (Service / Non Service) > radio > drop-down.
 # Save the id of the leaf the user picked as TblContact.CategoryId (the radio itself if it has no children).
@@ -195,9 +209,9 @@ Authorization: Bearer {{token}}
 
 ###
 
-# Add an account (TblAccount). phoneNo is optional: when given, a TblAccountDetail row is saved too
+# Add an account (TblAccount). contacts is optional (max 10): each item saves a TblAccountDetail row
 # (AccountId = the new account's Id), in the same transaction. detailType is MOBILE (default),
-# HOME, OFFICE, FAX or MAIL; anything else is 400. The 201 response lists it under contacts.
+# HOME, OFFICE, FAX or MAIL; anything else is 400. The 201 response lists them under contacts.
 POST {{ContactTogetherApi_HostAddress}}/Account/AddNewAccount
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -211,9 +225,36 @@ Content-Type: application/json
   "zipcode": "10210",
   "isScret": "F",
   "isEnable": "T",
-  "phoneNo": "0812345678",
-  "detailType": "MOBILE"
+  "contacts": [
+    { "detailType": "MOBILE", "detail": "0812345678" },
+    { "detailType": "MAIL", "detail": "sirapa@example.com" }
+  ]
 }
+
+###
+
+# Add one phone number / e-mail to an account (WRITES TO THE DATABASE). 201 returns the account with
+# all enabled contacts (each has an id). 409 if the same type + value already exists, 400 at 10 contacts.
+POST {{ContactTogetherApi_HostAddress}}/Account/AddAccountDetail?accountId=5BAAE3446A7E456697166D7A59EE7558
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detailType": "HOME", "detail": "021234567" }
+
+###
+
+# Change one contact (WRITES TO THE DATABASE). id = contacts[].id from GetAccountById.
+PUT {{ContactTogetherApi_HostAddress}}/Account/UpdateAccountDetail?id=<contacts[].id>
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "detailType": "OFFICE", "detail": "027654321" }
+
+###
+
+# Disable one contact (WRITES TO THE DATABASE): IsEnable = F, the row is kept. A second call is 404.
+DELETE {{ContactTogetherApi_HostAddress}}/Account/DeleteAccountDetail?id=<contacts[].id>
+Authorization: Bearer {{token}}
 
 ###
 

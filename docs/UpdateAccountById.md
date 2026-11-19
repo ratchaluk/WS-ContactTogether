@@ -1,7 +1,7 @@
 # แก้ไขผู้ติดต่อ (`PUT /Account/UpdateAccountById`) สำหรับ Frontend
 
 ใช้บันทึกฟอร์ม **แก้ไขข้อมูลผู้ติดต่อ (account)**: ชื่อ เพศ วันเกิด ที่อยู่ รหัสไปรษณีย์ หมายเหตุ และแฟล็ก
-**ยังแก้เบอร์โทรและอีเมลไม่ได้** เพราะเก็บแยกไว้ใน `TblAccountDetail` endpoint นี้ไม่แตะเลย
+**ไม่แก้เบอร์โทรและอีเมล** เพราะเก็บแยกไว้ใน `TblAccountDetail` endpoint นี้ไม่แตะเลย ใช้ [AccountDetail.md](AccountDetail.md) แทน
 
 > อ้างอิงโค้ด: `Controllers/AccountController.cs` (`UpdateAccountById`), `Dtos/UpdateAccountRequest.cs`
 > (field เดียวกับ `Dtos/CreateAccountRequest.cs`), `Helper/AccountQueries.cs`
@@ -113,7 +113,7 @@ Authorization: Bearer <token>
 
 | เรื่อง | ผลกับ frontend |
 |---|---|
-| **เบอร์โทร / อีเมลยังแก้ไม่ได้** | ส่ง `contacts` มาก็ไม่มีผล ถ้าต้องการแก้เบอร์ ต้องขอ endpoint เพิ่ม |
+| **เบอร์โทร / อีเมลแก้ที่อื่น** | ส่ง `contacts` มาก็ไม่มีผล ใช้ `AddAccountDetail` / `UpdateAccountDetail` / `DeleteAccountDetail` ([AccountDetail.md](AccountDetail.md)) |
 | **`areaId`** | ตารางพื้นที่ใน DB ว่าง ([AreaId.md](AreaId.md)) ส่ง **ค่าเดิมที่ได้จาก GET** หรือ `null` / `""` ได้ ส่งค่าอื่น = 400 ห้ามทำ drop-down พื้นที่ส่งค่าใหม่มา |
 | **แถวซ้ำในข้อมูลเดิม** | ถ้า `id` นี้มีหลายแถวในระบบเดิม ทุกแถวถูกแก้พร้อมกัน frontend ไม่ต้องทำอะไร |
 | **ปิดใช้งาน = ส่ง `isEnable: "F"`** | ยังไม่มี endpoint ลบผู้ติดต่อ ผู้ติดต่อที่ปิดแล้วยังเปิดดูได้ด้วย `GetAccountById` และยังแสดงในเรื่องเก่า |
