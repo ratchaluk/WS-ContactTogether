@@ -185,7 +185,7 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.NameTh).HasMaxLength(200);
             entity.Property(e => e.RefId).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-            entity.Property(e => e.Zipcode).HasColumnType("decimal(18, 0)");
+            entity.Property(e => e.Zipcode).HasMaxLength(50);
 
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)
                 .HasForeignKey(d => d.RefId)
@@ -729,7 +729,6 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.DateOpened)
                 .HasPrecision(0)
                 .HasColumnName("Date_Opened");
-            entity.Property(e => e.Detail).HasMaxLength(1000);
             entity.Property(e => e.Id)
                 .HasMaxLength(200)
                 .IsUnicode(false);

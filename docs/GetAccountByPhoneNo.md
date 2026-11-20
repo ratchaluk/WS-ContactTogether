@@ -5,8 +5,9 @@
 
 > อ้างอิงโค้ด: `Controllers/AccountController.cs` (`GetAccountByPhoneNo`), `Dtos/AccountByPhoneResponse.cs`
 
-> ถ้าต้องการ **เรื่อง (service)** ของเบอร์นี้ ให้ใช้ `GET /Services/GetServices?AccountPhoneNo=...`
-> (ดู [GetServices.md](GetServices.md)) endpoint นี้คืนแค่ข้อมูลผู้ติดต่อ
+> ถ้าต้องการ **เรื่อง (service)** ของผู้ติดต่อที่ผู้ใช้เลือก ให้ใช้ `GET /Services/SearchService?AccountId=<id ของคนนั้น>`
+> ไม่ใช่ `AccountPhoneNo` เพราะเบอร์เดียวอาจมีหลายคน และจะได้เรื่องของทุกคนปนกัน
+> (ดู [SearchService.md ข้อ 2.4](SearchService.md)) endpoint นี้คืนแค่ข้อมูลผู้ติดต่อ
 
 ---
 
@@ -44,6 +45,7 @@
 
 | Field | Type | ความหมาย |
 |---|---|---|
+| `accountId` | string | id ของผู้ติดต่อ (`TblAccount.Id` ตัวพิมพ์ใหญ่) ส่งต่อเป็น `AccountId` ของ `SearchService` หรือ `accountId` ของ `AddNewService` |
 | `phoneNo` | string | เบอร์ที่ค้นเจอ (เท่ากับที่ส่งไป) |
 | `fullName` | string | คำนำหน้า + ชื่อ + นามสกุล (ภาษาไทย) ส่วนที่ไม่มีจะถูกข้าม เป็น `""` ถ้าไม่มีเลย |
 | `gender` | string \| null | ชื่อเพศภาษาไทย: `ชาย` / `หญิง` / `--ไม่ระบุ--` หรือ `null` ถ้าไม่มีข้อมูล |
@@ -51,6 +53,7 @@
 | `created` | string \| null | วันที่สร้างผู้ติดต่อ เป็น **ข้อความแบบเดิมของระบบเก่า** `เดือน/วัน/ปี ค.ศ. ชั่วโมง:นาที` (ดู 3.3) |
 
 - **เรียงตามชื่อ แล้วตามนามสกุล**
+- **คนละ 1 แถว:** ผู้ติดต่อที่บันทึกเบอร์นี้ไว้หลายแถว (เช่น ทั้งมือถือและบ้าน) ได้แถวเดียว `accountId` ไม่ซ้ำกันในผลเดียว
 - ไม่เจอเลย → `200` กับ `[]`
 - ข้อมูลเดิมส่วนใหญ่ **ไม่มีคำนำหน้า** `fullName` จึงมักเป็นแค่ `ชื่อ นามสกุล`
 
@@ -58,11 +61,12 @@
 
 `GET /Account/GetAccountByPhoneNo?phoneNo=0909840822`
 
-(ตัดมาแสดง 2 จาก 8 แถว เพศและรูปแบบ `created` เป็นข้อมูลจริง ณ 16 พ.ย. 2026 ส่วนชื่อและที่อยู่เป็นค่าสมมุติ)
+(ตัดมาแสดง 2 จาก 8 แถว เพศและรูปแบบ `created` เป็นข้อมูลจริง ณ 16 พ.ย. 2026 ส่วน id ชื่อ และที่อยู่เป็นค่าสมมุติ)
 
 ```json
 [
   {
+    "accountId": "9F8E7D6C5B4A43219F8E7D6C5B4A4321",
     "phoneNo": "0909840822",
     "fullName": "สมหญิง ทดสอบ",
     "gender": "หญิง",
@@ -70,6 +74,7 @@
     "created": "07/02/2026 14:37"
   },
   {
+    "accountId": "1A2B3C4D5E6F47809A1B2C3D4E5F6A7B",
     "phoneNo": "0909840822",
     "fullName": "นาย สมชาย ตัวอย่าง",
     "gender": "ชาย",
@@ -130,6 +135,7 @@
 ```ts
 // lib/api/account.ts
 export interface AccountByPhone {
+  accountId: string; // ส่งต่อเป็น AccountId ของ SearchService / accountId ของ AddNewService
   phoneNo: string;
   fullName: string;
   gender: string | null;
@@ -209,9 +215,8 @@ export function AccountByPhoneSearch({ token }: { token: string }) {
 
       <table>
         <tbody>
-          {rows?.map((r, i) => (
-            // ยังไม่มี id ของผู้ติดต่อ (ดูข้อ 5) จึงใช้ index เป็น key ไปก่อน
-            <tr key={i}>
+          {rows?.map((r) => (
+            <tr key={r.accountId}>
               <td>{r.fullName || "-"}</td>
               <td>{r.gender ?? "-"}</td>
               <td>{r.address || "-"}</td>
@@ -229,17 +234,17 @@ export function AccountByPhoneSearch({ token }: { token: string }) {
 
 ---
 
-## 5. ข้อควรรู้ (สถานะ ณ 16 พ.ย. 2026)
+## 5. ข้อควรรู้ (สถานะ ณ 19 พ.ย. 2026)
 
 | เรื่อง | ผลกับ frontend |
 |---|---|
-| **ยังไม่คืน `id` ของผู้ติดต่อ** | เลือกคนจากรายการนี้แล้วเอาไปใช้ต่อ (เช่น ใส่ `accountId` ตอนเปิดเรื่องด้วย `AddNewService`) ยังทำไม่ได้ ถ้าต้องใช้ แจ้ง backend ให้เพิ่ม field `accountId` |
-| **คนเดียวกันอาจขึ้นซ้ำ** | ถ้าผู้ติดต่อคนหนึ่งบันทึกเบอร์เดียวกันไว้มากกว่า 1 แถว (เช่น ทั้งมือถือและบ้าน) จะได้คนนั้น 2 แถว ใน DB มีกรณีนี้ราว 140 กรณี และยังกรองซ้ำด้วย id ไม่ได้ เพราะไม่มี id |
+| **ใช้ `accountId` ต่อหลังผู้ใช้เลือกคน** | หน้ารับสาย: ให้ผู้ใช้เลือกคนที่โทรเข้า แล้วค้นเรื่องด้วย `SearchService?AccountId=<accountId>` ([SearchService.md ข้อ 2.4](SearchService.md)) และเปิดเรื่องด้วย `accountId` เดียวกัน ([AddNewService.md](AddNewService.md)) อย่าค้นเรื่องด้วยเบอร์ เพราะจะได้เรื่องของทุกคนที่ใช้เบอร์นั้น |
+| **คนเดียวกันไม่ขึ้นซ้ำแล้ว** | ตั้งแต่ 19 พ.ย. 2026 ได้คนละ 1 แถว แม้จะบันทึกเบอร์นี้ไว้หลายแถว (เช่น `0184939775` เดิมได้ 2 แถว ตอนนี้ได้ 1) ใช้ `accountId` เป็น key ได้ |
 | **ไม่แบ่งหน้า ไม่จำกัดจำนวน** | เบอร์ที่ใช้แทนกันบ่อยได้หลายแถว เช่น `0999999999` ได้ 19 คน ถ้ารายการยาว ให้แบ่งหน้าหรือเลื่อนดูที่หน้าเว็บเอง |
 | **ไม่บอกประเภทเบอร์** | response ไม่มีว่าเบอร์ที่เจอเป็นมือถือหรือเบอร์บ้าน |
 | **`created` เป็นข้อความ เดือน/วัน/ปี** | อย่า `new Date(created)` ตรง ๆ ให้ใช้ `parseLegacyDate` |
 
-ถ้า backend เพิ่ม `accountId` หรือแก้เรื่องแถวซ้ำ จะแจ้งและอัปเดตเอกสารนี้
+ถ้า backend ปรับข้อใดข้างบน จะแจ้งและอัปเดตเอกสารนี้
 
 ---
 

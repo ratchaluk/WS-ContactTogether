@@ -5,7 +5,7 @@
 | ใช้ที่ไหน | ส่ง `id` ที่เลือกเป็น |
 |---|---|
 | ฟอร์มเปิดเรื่อง `POST /Services/AddNewService` | `serviceTitleId` (**บังคับ**) |
-| หน้าค้นหา `GET /Services/GetServices` | `ServiceTitleId` (ไม่บังคับ) |
+| หน้าค้นหา `GET /Services/SearchService` | `ServiceTitleId` (ไม่บังคับ) |
 
 ใช้แสดงชื่อหัวข้อของเรื่องที่มีอยู่ได้ด้วย: เทียบ `serviceTitleId` ของเรื่องกับ `id` ในรายการนี้
 (ถ้าใช้ `GET /Services/GetServiceById` มี `serviceTitleText` มาให้แล้ว ไม่ต้องเทียบเอง)
@@ -91,7 +91,7 @@ export async function fetchServiceTitles(opts: { token: string; signal?: AbortSi
 ```
 
 ```ts
-// แสดงชื่อหัวข้อจาก serviceTitleId ของเรื่อง (เช่น แถวของ GetServices)
+// แสดงชื่อหัวข้อจาก serviceTitleId ของเรื่อง (เช่น แถวของ SearchService)
 const titleText = (id?: string | null) =>
   titles.find((t) => t.id === id?.toUpperCase())?.serviceTitleText ?? "-";
 ```

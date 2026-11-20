@@ -30,6 +30,13 @@ public class AccountSearchResponse
 
     public string? AreaId { get; set; }
 
+    /// <summary>
+    /// <see cref="AreaId"/> resolved up its parents, top level first (จังหวัด, อำเภอ, ตำบล); empty when the id is
+    /// not in <c>TblArea</c>. Filled by <c>GetAccountById</c> and everything built on it, <c>null</c> in
+    /// <c>GetAccounts</c> rows.
+    /// </summary>
+    public List<AreaResponse>? AreaPath { get; set; }
+
     public string? Zipcode { get; set; }
 
     public string? Remark { get; set; }

@@ -6,7 +6,7 @@
 > อ้างอิงโค้ด: `Controllers/ServicesController.cs` (`AddNewService`), `Dtos/CreateServiceRequest.cs`,
 > `Dtos/ServiceResponse.cs`
 >
-> เอกสารที่ใช้คู่กัน: [GetChannel.md](GetChannel.md) (ช่องทาง), [GetServices.md](GetServices.md) (ค้นหาเรื่องที่เปิดแล้ว)
+> เอกสารที่ใช้คู่กัน: [GetChannel.md](GetChannel.md) (ช่องทาง), [SearchService.md](SearchService.md) (ค้นหาเรื่องที่เปิดแล้ว)
 
 ---
 
@@ -34,19 +34,19 @@
 |---|---|---|---|
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
 | `statusId` | 200 | สถานะของเรื่อง | `id` จาก `GET /ListOfValues/GetStatus` (สถานะประเภท SERVICE ดู [GetStatus.md](GetStatus.md)) บันทึกตามที่ส่ง ส่งสถานะ ACTIVITY = 400 |
-| `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น (ยังไม่มี endpoint รายชื่อเจ้าหน้าที่) ถ้าต้องใช้ id ของตัวเอง ใช้ `employeeId` จาก `POST /Auth/login` (ค่าเดียวกับ `id` ของ `GET /UserManagement/GetEmployeeProfile`) |
+| `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น โดยใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
 | `channelIncomingId` | 200 | ช่องทางที่ผู้ติดต่อเข้ามา | `id` จาก `GET /ListOfValues/GetChannel` |
 | `channelOutgoingId` | 200 | ช่องทางที่จะติดต่อกลับ | `id` จาก `GET /ListOfValues/GetChannel` |
 | `callBack` | 200 | ต้องการให้ติดต่อกลับไหม | `"Y"` ต้องการ / `"N"` ไม่ต้องการ / `"D"` สายหลุด |
-| `accountId` | 200 | ผู้ติดต่อ | `id` จาก `GET /Account/GetAccounts` หรือจาก response ของ `POST /Account/AddNewAccount` (`GetAccountByPhoneNo` ยังไม่คืน `id`) |
+| `accountId` | 200 | ผู้ติดต่อ | `accountId` จาก `GET /Account/GetAccountByPhoneNo` (คนที่ผู้ใช้เลือกในหน้ารับสาย), `id` จาก `GET /Account/GetAccounts` หรือจาก response ของ `POST /Account/AddNewAccount` |
 | `summary` | 500 | หัวเรื่อง | ผู้ใช้กรอก |
-| `detail` | 1000 | รายละเอียด | ผู้ใช้กรอก |
+| `detail` | ไม่จำกัด | รายละเอียด | ผู้ใช้กรอก |
 | `serviceArea` | 2000 | พื้นที่ที่เกี่ยวข้อง (ข้อความอิสระ) | ผู้ใช้กรอก |
-| `organizationId` | 200 | หน่วยงานที่รับผิดชอบ | ยังไม่มี endpoint รายการ |
+| `organizationId` | 200 | หน่วยงานที่รับผิดชอบ | `id` ของหน่วยงานย่อยจาก `GET /ListOfValues/GetOrganization` ([GetOrganization.md](GetOrganization.md)) |
 | `serviceReference` | 500 | ที่มาข้อมูล (lookup `TblReference`) | `id` จาก `GET /ListOfValues/GetReference` (เช่น Joomla, Other Website, เจ้าหน้าที่กระทรวง, อื่นๆ) ส่ง id ที่ไม่มีในตาราง = 400 |
 | `serviceReferenceLink` | 500 | ลิงก์ที่มาข้อมูล (URL โพสต์/ข่าว) | ผู้ใช้กรอก |
 | `remark` | 500 | หมายเหตุ | ผู้ใช้กรอก |
-| `areaId` | 200 | พื้นที่ (lookup) | ⚠️ **อย่าส่ง** ตอนนี้ส่งค่าอะไรก็ได้ 400 (ดูข้อ 5) |
+| `areaId` | 200 | พื้นที่ (lookup `TblArea`) | `id` จาก `GET /ListOfValues/GetArea` ([AreaId.md](AreaId.md)) ส่ง id ที่ไม่มีอยู่ = 400 |
 | `levelSeverityId` | 500 | ความเร่งด่วน | `id` จาก `GET /ListOfValues/GetLevel?levelType=SEVERITY` (ดู `docs/GetLevel.md`) ส่ง id ผิดประเภท = 400 |
 | `levelPriorityId` | 500 | ความสำคัญ | `id` จาก `GET /ListOfValues/GetLevel?levelType=PRIORITY` |
 | `levelSecretId` | 500 | ชั้นความลับ | `id` จาก `GET /ListOfValues/GetLevel?levelType=SECRET` |
@@ -180,7 +180,7 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 | id ไม่มีอยู่จริง | ชื่อ field นั้น เช่น `CategoryId`, `OwnerId`, `ChannelIncomingId` |
 | ยาวเกินกำหนด | ชื่อ field นั้น เช่น `Summary` (`... maximum length of '500'.`) |
 | `statusId` ไม่มีอยู่ หรือไม่ใช่สถานะประเภท SERVICE (เช่น ส่งสถานะ ACTIVITY มา) | `StatusId` |
-| ส่ง `areaId` (ดูข้อ 5) | `AreaId` |
+| `areaId` ไม่มีในตารางพื้นที่ (ส่ง id จาก `GetArea` ได้ปกติ ดู [AreaId.md](AreaId.md)) | `AreaId` |
 | `level...Id` ไม่มีอยู่ หรือผิดประเภท (เช่น id ชั้นความลับในช่องความเร่งด่วน) | `LevelSeverityId`, `LevelPriorityId`, `LevelSecretId` |
 | JSON พัง หรือวันที่ผิดรูปแบบ | `$.dateOpened` (หรือ path ของ field ที่ผิด) และ/หรือ `request` |
 
@@ -225,7 +225,7 @@ export interface CreateServiceRequest {
   levelSeverityId?: string | null; // GetLevel?levelType=SEVERITY
   levelPriorityId?: string | null; // GetLevel?levelType=PRIORITY
   levelSecretId?: string | null;   // GetLevel?levelType=SECRET
-  // areaId: ยังส่งไม่ได้ (ดูข้อ 5)
+  // areaId: id จาก GET /ListOfValues/GetArea (ดู AreaId.md)
 }
 
 export interface ServiceResponse {
@@ -391,7 +391,6 @@ export function NewServiceForm({ token }: { token: string }) {
 
       <textarea
         placeholder="รายละเอียด"
-        maxLength={1000}
         value={form.detail ?? ""}
         onChange={(e) => setForm({ ...form, detail: e.target.value })}
       />
@@ -419,15 +418,13 @@ export function NewServiceForm({ token }: { token: string }) {
 
 ---
 
-## 5. ข้อควรรู้ (สถานะ ณ 16 พ.ย. 2026)
+## 5. ข้อควรรู้ (สถานะ ณ 19 พ.ย. 2026)
 
 | เรื่อง | ผลกับ frontend |
 |---|---|
-| **ส่ง `areaId` ไม่ได้** | API ตรวจ `areaId` กับตารางพื้นที่ ซึ่งตอนนี้ **ว่าง** ส่งค่าอะไรก็ได้ 400 ให้ซ่อนช่องนี้หรือไม่ส่งไปก่อน |
+| **`areaId` ส่งได้แล้ว** | ตารางพื้นที่มีข้อมูลแล้ว (19 พ.ย. 2026) ใช้ชุดเลือก จังหวัด → อำเภอ → ตำบล จาก `GetArea` ตัวเดียวกับหน้าผู้ติดต่อ แล้วส่ง id ชั้นที่ลึกที่สุดที่เลือก ไม่เลือกก็ส่ง `null` ได้ ([AreaId.md](AreaId.md)) |
 | **API ไม่มี field บังคับ** | frontend ต้องบังคับเอง (ดู 2.3) |
-| **ยังไม่มี endpoint รายการ** หน่วยงาน / เจ้าหน้าที่ | ยังทำ drop-down `organizationId`, `ownerId` จาก API ไม่ได้ ถ้าต้องใช้ แจ้ง backend (สถานะใช้ `GetStatus` ได้แล้ว) |
 | **`GetServiceType` คืนทุกประเภทปนกัน** | กรอง `categoryType === "SERVICE"` เอง |
-| **`GetAccountByPhoneNo` ไม่คืน `id`** | หา `accountId` จากเบอร์โทรด้วย endpoint นั้นยังไม่ได้ ใช้ `GetAccounts` หรือ `AddNewAccount` แทน |
 | **ยังไม่ผูกกับการรับสาย** | ถ้าเปิดเรื่องต่อจากหน้ารับสาย (`AddNewContact`) ตอนนี้ยังไม่มี field เชื่อมสองอย่างนี้ |
 | **กดซ้ำ = เรื่องซ้ำ** | ปิดปุ่มระหว่างรอ response |
 
@@ -462,5 +459,5 @@ curl -X POST "http://localhost:5018/Services/AddNewService" \
   -d '{"summary":"ทดสอบเปิดเรื่อง","callBack":"N","channelIncomingId":"332E6D76F258C8294B160C20642AB9F5"}'
 ```
 
-เปิดแล้วตรวจได้ด้วย `GET /Services/GetServices?ServiceCode=<code ที่ได้>`
+เปิดแล้วตรวจได้ด้วย `GET /Services/SearchService?ServiceCode=<code ที่ได้>`
 หรือ `GET /Services/GetInProcessServices` (เรื่องที่ยังไม่ปิดของผู้ที่ login)

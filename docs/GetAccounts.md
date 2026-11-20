@@ -67,7 +67,8 @@
 | `gender` | string \| null | ชื่อเพศภาษาไทย: `ชาย` / `หญิง` / `--ไม่ระบุ--` หรือ `null` |
 | `birthdate` | string \| null | วันเกิด **ข้อความแบบเดิม** เดือน/วัน/ปี ค.ศ. เช่น `5/14/1988 0:00` (ดู 3.3) |
 | `address` | string \| null | ที่อยู่ ส่วนใหญ่ว่าง |
-| `areaId` | string \| null | ค่าพื้นที่จากระบบเดิม ⚠️ ตอนนี้ใช้ค้นต่อไม่ได้ (ดูข้อ 5) |
+| `areaId` | string \| null | id พื้นที่ (`TblArea`) จังหวัด/อำเภอ/ตำบล ([AreaId.md](AreaId.md)) |
+| `areaPath` | null | **เป็น `null` เสมอใน endpoint นี้** ชื่อพื้นที่ได้จาก `GetAccountById` |
 | `zipcode` | string \| null | รหัสไปรษณีย์ |
 | `remark` | string \| null | หมายเหตุ |
 | `isScret` | string \| null | แฟล็กปกปิดข้อมูล `"T"` / `"F"` (สะกดตาม DB) ตอนนี้ทุกคนเป็น `"F"` |
@@ -79,6 +80,7 @@
 
 | Field | Type | ความหมาย |
 |---|---|---|
+| `id` | string | id ของรายการ ใช้แก้/ลบด้วย [AccountDetail.md](AccountDetail.md) |
 | `detailType` | string | ประเภท (ตารางด้านล่าง) |
 | `detail` | string | เบอร์หรืออีเมล |
 
@@ -133,8 +135,8 @@
     "isScret": "F",
     "created": "07/02/2026 14:37",
     "contacts": [
-      { "detailType": "MAIL", "detail": "somying@example.com" },
-      { "detailType": "MOBILE", "detail": "0909840822" }
+      { "id": "<id>", "detailType": "MAIL", "detail": "somying@example.com" },
+      { "id": "<id>", "detailType": "MOBILE", "detail": "0909840822" }
     ]
   }
 ]
@@ -174,6 +176,7 @@
 export type DetailType = "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL";
 
 export interface AccountContact {
+  id: string;
   detailType: DetailType | string;
   detail: string;
 }
@@ -192,6 +195,7 @@ export interface AccountSearchResult {
   birthdate: string | null; // "M/d/yyyy H:mm" แบบเดิม เดือนขึ้นก่อน
   address: string | null;
   areaId: string | null;
+  areaPath: AreaItem[] | null; // null ใน GetAccounts, มีค่าใน GetAccountById (AreaItem จาก AreaId.md)
   zipcode: string | null;
   remark: string | null;
   isScret: string | null;
@@ -345,7 +349,7 @@ export function AccountSearch(props: {
 | **ได้สูงสุด 100 รายการ ไม่มีจำนวนทั้งหมด ไม่แบ่งหน้า** | ถ้าได้ครบ 100 ให้บอกผู้ใช้ระบุเงื่อนไขเพิ่ม ถ้าต้องการ paging หรือจำนวนทั้งหมด แจ้ง backend |
 | **`id` ซ้ำกันได้** | ข้อมูลเดิมมีผู้ติดต่อที่ใช้ `id` ซ้ำกันราว 536 แถว (จาก 19,965) อาจได้ `id` เดียวกัน 2 แถวในผลเดียว และสองแถวนั้นจะได้ `contacts` ชุดเดียวกัน **อย่าใช้ `id` อย่างเดียวเป็น React key** |
 | **แยกตัวพิมพ์เล็ก/ใหญ่** | ชื่อภาษาอังกฤษต้องพิมพ์ตัวพิมพ์ให้ตรง |
-| **`areaId` ใช้ต่อไม่ได้** | ตารางพื้นที่ใน DB ตอนนี้ว่าง ค่าเดิมจึงชี้ไปไหนไม่ได้ ไม่ต้องแสดงหรือแปลงเป็นชื่อพื้นที่ |
+| **ไม่มีชื่อพื้นที่ในรายการ** | `areaPath` เป็น `null` ใน endpoint นี้ ใช้ `areaPath` ของ `GetAccountById` ([AreaId.md](AreaId.md)) |
 | **`isScret` ไม่มีผลกับ API** | API ส่งข้อมูลครบทุกคนไม่ว่าค่านี้จะเป็นอะไร ถ้ามีกติกาว่าต้องปกปิดข้อมูลคนที่เป็น `"T"` ต้องทำที่หน้าเว็บ (ตอนนี้ทุกคนเป็น `"F"`) |
 | **วันที่เป็นข้อความ เดือน/วัน/ปี** | ใช้ `parseLegacyDate` อย่า `new Date()` ตรง ๆ |
 | **ข้อมูลส่วนบุคคล** | response มีชื่อ เบอร์ อีเมล ที่อยู่ วันเกิด อย่าเก็บลง `localStorage` หรือ log |

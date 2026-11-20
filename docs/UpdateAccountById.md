@@ -1,7 +1,7 @@
 # แก้ไขผู้ติดต่อ (`PUT /Account/UpdateAccountById`) สำหรับ Frontend
 
 ใช้บันทึกฟอร์ม **แก้ไขข้อมูลผู้ติดต่อ (account)**: ชื่อ เพศ วันเกิด ที่อยู่ รหัสไปรษณีย์ หมายเหตุ และแฟล็ก
-**ยังแก้เบอร์โทรและอีเมลไม่ได้** เพราะเก็บแยกไว้ใน `TblAccountDetail` endpoint นี้ไม่แตะเลย
+**ไม่แก้เบอร์โทรและอีเมล** เพราะเก็บแยกไว้ใน `TblAccountDetail` endpoint นี้ไม่แตะเลย ใช้ [AccountDetail.md](AccountDetail.md) แทน
 
 > อ้างอิงโค้ด: `Controllers/AccountController.cs` (`UpdateAccountById`), `Dtos/UpdateAccountRequest.cs`
 > (field เดียวกับ `Dtos/CreateAccountRequest.cs`), `Helper/AccountQueries.cs`
@@ -45,7 +45,7 @@
 | `genderId` | string \| null | | 50 | `id` จาก `GET /ListOfValues/GetGender` ส่ง id ที่ไม่มีอยู่ = 400 |
 | `birthdate` | string \| null | | 50 | **ข้อความแบบเดิม เดือนขึ้นก่อน** เช่น `5/14/1988 0:00` (ระบบเดิมอ่านรูปแบบนี้) |
 | `address` | string \| null | | | ที่อยู่ ข้อความอิสระ |
-| `areaId` | string \| null | | 50 | ให้ส่ง **ค่าเดิมที่ได้จาก GET** หรือส่ง `null` / `""` ดูข้อ 4 |
+| `areaId` | string \| null | | 50 | `id` จาก `GET /ListOfValues/GetArea` หรือค่าเดิมที่ได้จาก GET หรือ `null` / `""` ดูข้อ 4 |
 | `zipcode` | string \| null | | 100 | รหัสไปรษณีย์ |
 | `remark` | string \| null | | | หมายเหตุ |
 | `isScret` | `"T"` \| `"F"` | | 10 | แฟล็กปกปิดข้อมูล (สะกดตาม DB) ไม่ส่ง = `"F"` |
@@ -113,8 +113,8 @@ Authorization: Bearer <token>
 
 | เรื่อง | ผลกับ frontend |
 |---|---|
-| **เบอร์โทร / อีเมลยังแก้ไม่ได้** | ส่ง `contacts` มาก็ไม่มีผล ถ้าต้องการแก้เบอร์ ต้องขอ endpoint เพิ่ม |
-| **`areaId`** | ตารางพื้นที่ใน DB ว่าง ([AreaId.md](AreaId.md)) ส่ง **ค่าเดิมที่ได้จาก GET** หรือ `null` / `""` ได้ ส่งค่าอื่น = 400 ห้ามทำ drop-down พื้นที่ส่งค่าใหม่มา |
+| **เบอร์โทร / อีเมลแก้ที่อื่น** | ส่ง `contacts` มาก็ไม่มีผล ใช้ `AddAccountDetail` / `UpdateAccountDetail` / `DeleteAccountDetail` ([AccountDetail.md](AccountDetail.md)) |
+| **`areaId`** | เลือกใหม่จาก `GetArea` ได้ ([AreaId.md](AreaId.md)) ส่งค่าเดิมกลับมาได้เสมอ แม้ค่าเดิมจะไม่อยู่ในตารางพื้นที่ (ข้อมูลเก่า 2 คน) ส่ง id อื่นที่ไม่มีอยู่ = 400 |
 | **แถวซ้ำในข้อมูลเดิม** | ถ้า `id` นี้มีหลายแถวในระบบเดิม ทุกแถวถูกแก้พร้อมกัน frontend ไม่ต้องทำอะไร |
 | **ปิดใช้งาน = ส่ง `isEnable: "F"`** | ยังไม่มี endpoint ลบผู้ติดต่อ ผู้ติดต่อที่ปิดแล้วยังเปิดดูได้ด้วย `GetAccountById` และยังแสดงในเรื่องเก่า |
 | **ไม่มีตรวจการแก้ชนกัน** | ถ้าสองคนแก้คนเดียวกันพร้อมกัน คนที่บันทึกทีหลังจะทับของคนแรก |

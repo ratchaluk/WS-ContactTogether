@@ -40,8 +40,8 @@ public class AccountController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a <c>TblAccount</c> row and returns it. When <c>PhoneNo</c> is given, also adds a
-    /// <c>TblAccountDetail</c> row with <c>AccountId</c> = the new account's <c>Id</c>; both are saved
+    /// Creates a <c>TblAccount</c> row and returns it. Each item of <c>Contacts</c> also becomes a
+    /// <c>TblAccountDetail</c> row with <c>AccountId</c> = the new account's <c>Id</c>; everything is saved
     /// together or not at all.
     /// </summary>
     [HttpPost("AddNewAccount")]
@@ -62,6 +62,7 @@ public class AccountController : ControllerBase
         }
 
         await ValidateLookupsAsync(request, cancellationToken);
+        var contacts = ValidateContacts(request);
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -95,26 +96,21 @@ public class AccountController : ControllerBase
 
         _db.TblAccounts.Add(account);
 
-        TblAccountDetail? detail = null;
-        var phoneNo = request.PhoneNo?.Trim();
-        if (!string.IsNullOrEmpty(phoneNo))
+        // TblAccountDetail dates are yyyy-MM-dd HH:mm:ss text (every existing row), unlike TblAccount.
+        var detailNow = clock.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
+        var details = contacts.Select(c => new TblAccountDetail
         {
-            // TblAccountDetail dates are yyyy-MM-dd HH:mm:ss text (every existing row), unlike TblAccount.
-            var detailNow = clock.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
-            detail = new TblAccountDetail
-            {
-                // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
-                AccountId = account.Id,
-                Detail = phoneNo,
-                DetailType = NormalizeDetailType(request.DetailType),
-                IsEnable = "T",
-                Created = detailNow,
-                CreatedBy = actingEmployeeId,
-                Updated = detailNow,
-                UpdatedBy = actingEmployeeId,
-            };
-            _db.TblAccountDetails.Add(detail);
-        }
+            // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
+            AccountId = account.Id,
+            Detail = c.Detail,
+            DetailType = c.DetailType,
+            IsEnable = "T",
+            Created = detailNow,
+            CreatedBy = actingEmployeeId,
+            Updated = detailNow,
+            UpdatedBy = actingEmployeeId,
+        }).ToList();
+        _db.TblAccountDetails.AddRange(details);
 
         // One SaveChanges runs in one transaction, so the account and its detail are saved together.
         await _db.SaveChangesAsync(cancellationToken);
@@ -125,10 +121,12 @@ public class AccountController : ControllerBase
             actingEmployeeId);
 
         var response = ToResponse(account);
-        if (detail is not null)
+        response.Contacts.AddRange(details.Select(d => new AccountContactResponse
         {
-            response.Contacts.Add(new AccountContactResponse { DetailType = detail.DetailType, Detail = detail.Detail });
-        }
+            Id = d.Id,
+            DetailType = d.DetailType,
+            Detail = d.Detail,
+        }));
 
         return StatusCode(StatusCodes.Status201Created, response);
     }
@@ -137,7 +135,7 @@ public class AccountController : ControllerBase
     private const string AccountDetailDateFormat = "yyyy-MM-dd HH:mm:ss";
 
     /// <summary>Every <c>TblAccountDetail.DetailType</c> value in use.</summary>
-    private static readonly string[] AccountDetailTypes = ["MOBILE", "HOME", "OFFICE", "FAX", "MAIL"];
+    private static readonly string[] AccountDetailTypes = Helper.AccountDetailTypes.Codes;
 
     /// <summary>Upper-cases the type (the collation is case-sensitive) and defaults a blank one to <c>MOBILE</c>.</summary>
     private static string NormalizeDetailType(string? detailType) =>
@@ -181,8 +179,11 @@ public class AccountController : ControllerBase
                 account.Created,
             }).ToListAsync(cancellationToken);
 
-        var results = matches.Select(m => new AccountByPhoneResponse
+        // One row per account: the same account appears more than once when it holds this number in several
+        // TblAccountDetail rows, or when its TblAccount.Id is one of the legacy duplicates.
+        var results = matches.DistinctBy(m => m.AccountId).Select(m => new AccountByPhoneResponse
         {
+            AccountId = m.AccountId,
             PhoneNo = m.PhoneNo,
             FullName = BuildFullName(m.SalutationTh, m.FirstnameTh, m.LastnameTh),
             Gender = m.Gender,
@@ -285,7 +286,7 @@ public class AccountController : ControllerBase
                 .Where(d => accountIds.Contains(d.AccountId) && d.IsEnable == "T")
                 .OrderBy(d => d.DetailType)
                 .ThenBy(d => d.Detail)
-                .Select(d => new { d.AccountId, d.DetailType, d.Detail })
+                .Select(d => new { d.Id, d.AccountId, d.DetailType, d.Detail })
                 .ToListAsync(cancellationToken))
             .ToLookup(d => d.AccountId);
 
@@ -293,7 +294,7 @@ public class AccountController : ControllerBase
         {
             result.FullName = BuildFullName(result.SalutationTh, result.FirstnameTh, result.LastnameTh);
             result.Contacts = contacts[result.Id]
-                .Select(d => new AccountContactResponse { DetailType = d.DetailType, Detail = d.Detail })
+                .Select(d => new AccountContactResponse { Id = d.Id, DetailType = d.DetailType, Detail = d.Detail })
                 .ToList();
         }
 
@@ -373,8 +374,8 @@ public class AccountController : ControllerBase
             return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"));
         }
 
-        // TblArea is empty, so the legacy AreaId an account already has cannot pass the lookup check.
-        // Keeping that value is allowed, or saving an unchanged form would fail.
+        // Some accounts hold a legacy AreaId that is not in TblArea (e.g. the text " ราขเทวี"), which cannot
+        // pass the lookup check. Keeping that value is allowed, or saving an unchanged form would fail.
         await ValidateLookupsAsync(request, cancellationToken, keepAreaId: current.AreaId);
         if (!ModelState.IsValid)
         {
@@ -436,14 +437,252 @@ public class AccountController : ControllerBase
         {
             ModelState.AddModelError(nameof(request.AreaId), $"No TblArea row with Id '{request.AreaId}'.");
         }
+    }
 
-        if (!string.IsNullOrWhiteSpace(request.PhoneNo)
-            && !AccountDetailTypes.Contains(NormalizeDetailType(request.DetailType)))
+    /// <summary>
+    /// Adds one phone number / e-mail (<c>TblAccountDetail</c> row) to an existing account and returns
+    /// the account with all its enabled contacts.
+    /// </summary>
+    [HttpPost("AddAccountDetail")]
+    [ProducesResponseType(typeof(AccountSearchResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AddAccountDetail(
+        [FromQuery] string? accountId,
+        [FromBody] AccountContactRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the change."));
+        }
+
+        var id = accountId?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(id))
+        {
+            ModelState.AddModelError(nameof(accountId), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var (detailType, detail) = ValidateContact(request);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!await _db.TblAccounts.AsNoTracking().AnyAsync(a => a.Id == id, cancellationToken))
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"));
+        }
+
+        var current = await _db.TblAccountDetails.AsNoTracking()
+            .Where(d => d.AccountId == id && d.IsEnable == "T")
+            .Select(d => new { d.DetailType, d.Detail })
+            .ToListAsync(cancellationToken);
+        if (current.Count >= MaxContactsPerAccount)
+        {
+            ModelState.AddModelError("Contacts", $"At most {MaxContactsPerAccount} contacts are allowed.");
+            return ValidationProblem(ModelState);
+        }
+
+        if (current.Any(d => d.DetailType == detailType && d.Detail == detail))
+        {
+            return Conflict(new MessageResponse(StatusCodes.Status409Conflict, "มีรายการติดต่อนี้อยู่แล้ว"));
+        }
+
+        var now = DateTime.Now.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
+        // Id is left null: Add() assigns a UUID (see ApplicationDbContext.Keys.cs).
+        _db.TblAccountDetails.Add(new TblAccountDetail
+        {
+            AccountId = id,
+            DetailType = detailType,
+            Detail = detail,
+            IsEnable = "T",
+            Created = now,
+            CreatedBy = actingEmployeeId,
+            Updated = now,
+            UpdatedBy = actingEmployeeId,
+        });
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Contact detail added to account {AccountId} by {ActingEmployeeId}.", id, actingEmployeeId);
+
+        var account = await _db.LoadAccountAsync(id, cancellationToken);
+        return account is null
+            ? NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"))
+            : StatusCode(StatusCodes.Status201Created, account);
+    }
+
+    /// <summary>
+    /// Changes the type and value of one enabled <c>TblAccountDetail</c> row and returns its account with
+    /// all enabled contacts. <c>id</c> is <c>contacts[].id</c> from <c>GetAccountById</c>.
+    /// </summary>
+    [HttpPut("UpdateAccountDetail")]
+    [ProducesResponseType(typeof(AccountSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateAccountDetail(
+        [FromQuery] string? id,
+        [FromBody] AccountContactRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the change."));
+        }
+
+        var detailId = id?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(detailId))
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var (detailType, detail) = ValidateContact(request);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var row = await _db.TblAccountDetails.FirstOrDefaultAsync(d => d.Id == detailId && d.IsEnable == "T", cancellationToken);
+        if (row is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบรายการติดต่อ"));
+        }
+
+        if (await _db.TblAccountDetails.AsNoTracking().AnyAsync(
+                d => d.AccountId == row.AccountId && d.IsEnable == "T" && d.Id != detailId
+                    && d.DetailType == detailType && d.Detail == detail,
+                cancellationToken))
+        {
+            return Conflict(new MessageResponse(StatusCodes.Status409Conflict, "มีรายการติดต่อนี้อยู่แล้ว"));
+        }
+
+        row.DetailType = detailType;
+        row.Detail = detail;
+        row.Updated = DateTime.Now.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
+        row.UpdatedBy = actingEmployeeId;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Contact detail {DetailId} updated by {ActingEmployeeId}.", detailId, actingEmployeeId);
+
+        var account = await _db.LoadAccountAsync(row.AccountId, cancellationToken);
+        return account is null
+            ? NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"))
+            : Ok(account);
+    }
+
+    /// <summary>
+    /// Disables one <c>TblAccountDetail</c> row (<c>IsEnable</c> = <c>F</c>); the row is kept, as the legacy
+    /// system does. Returns its account with the remaining enabled contacts.
+    /// </summary>
+    [HttpDelete("DeleteAccountDetail")]
+    [ProducesResponseType(typeof(AccountSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAccountDetail(
+        [FromQuery] string? id,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the change."));
+        }
+
+        var detailId = id?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(detailId))
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var row = await _db.TblAccountDetails.FirstOrDefaultAsync(d => d.Id == detailId && d.IsEnable == "T", cancellationToken);
+        if (row is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบรายการติดต่อ"));
+        }
+
+        row.IsEnable = "F";
+        row.Updated = DateTime.Now.ToString(AccountDetailDateFormat, CultureInfo.InvariantCulture);
+        row.UpdatedBy = actingEmployeeId;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Contact detail {DetailId} disabled by {ActingEmployeeId}.", detailId, actingEmployeeId);
+
+        var account = await _db.LoadAccountAsync(row.AccountId, cancellationToken);
+        return account is null
+            ? NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลผู้ติดต่อ"))
+            : Ok(account);
+    }
+
+    /// <summary>Upper-cases the type and trims the value; errors go to <see cref="ModelState"/>.</summary>
+    private (string DetailType, string Detail) ValidateContact(AccountContactRequest request)
+    {
+        var type = NormalizeDetailType(request.DetailType);
+        if (!AccountDetailTypes.Contains(type))
         {
             ModelState.AddModelError(
                 nameof(request.DetailType),
                 $"DetailType must be one of {string.Join(", ", AccountDetailTypes)}.");
         }
+
+        var detail = request.Detail.Trim();
+        if (detail.Length == 0)
+        {
+            ModelState.AddModelError(nameof(request.Detail), "The Detail field is required.");
+        }
+
+        return (type, detail);
+    }
+
+    /// <summary>Most contact rows one account can be created with (the largest existing account has 9).</summary>
+    private const int MaxContactsPerAccount = 10;
+
+    /// <summary>
+    /// Trims, upper-cases the type and drops repeats of the same type and number. Errors are keyed
+    /// <c>Contacts[i].DetailType</c> by the position the caller sent.
+    /// </summary>
+    private List<(string DetailType, string Detail)> ValidateContacts(CreateAccountRequest request)
+    {
+        if (request.Contacts.Count > MaxContactsPerAccount)
+        {
+            ModelState.AddModelError(nameof(request.Contacts), $"At most {MaxContactsPerAccount} contacts are allowed.");
+        }
+
+        var result = new List<(string DetailType, string Detail)>();
+        for (var i = 0; i < request.Contacts.Count; i++)
+        {
+            var type = NormalizeDetailType(request.Contacts[i].DetailType);
+            if (!AccountDetailTypes.Contains(type))
+            {
+                ModelState.AddModelError(
+                    $"{nameof(request.Contacts)}[{i}].{nameof(AccountContactRequest.DetailType)}",
+                    $"DetailType must be one of {string.Join(", ", AccountDetailTypes)}.");
+                continue;
+            }
+
+            var detail = request.Contacts[i].Detail.Trim();
+            if (detail.Length > 0 && !result.Any(c => c.DetailType == type && c.Detail == detail))
+            {
+                result.Add((type, detail));
+            }
+        }
+
+        return result;
     }
 
     /// <summary>Joins the Thai name parts, skipping the ones that are missing.</summary>

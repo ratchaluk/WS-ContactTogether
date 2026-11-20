@@ -341,6 +341,72 @@ public class ListOfValuesController : ControllerBase
         }));
     }
 
+    /// <summary>
+    /// คืนรายการประเภทการติดต่อของผู้ติดต่อ (<c>TblAccountDetail.DetailType</c>) สำหรับ drop-down เบอร์/อีเมล
+    /// ไม่มีตารางใน DB เป็นรายการคงที่ 5 ค่า ส่ง <c>id</c> กลับไปเป็น <c>detailType</c> ของ
+    /// <c>POST /Account/AddNewAccount</c>
+    /// </summary>
+    [HttpGet("GetAccountDetailType")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<LookupItemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult GetAccountDetailType() => Ok(AccountDetailTypes.Items);
+
+    /// <summary>
+    /// คืนพื้นที่ (<c>TblArea</c>) ที่เปิดใช้งานของชั้นที่ระบุ เป็นรายการเรียบ แถว "ไม่ระบุ" (<c>IsDefault = T</c>) ขึ้นก่อน แล้วเรียงตามชื่อ:
+    /// <c>PROVINCE</c> = จังหวัด, <c>DISTRICT</c> = อำเภอ, <c>SUBDISTRICT</c> = ตำบล
+    /// ส่ง <paramref name="refId"/> เพื่อเอาเฉพาะลูกของพื้นที่นั้น (อำเภอของจังหวัด หรือตำบลของอำเภอ)
+    /// ส่ง <c>id</c> ที่เลือกเป็น <c>areaId</c> ของ <c>AddNewAccount</c> / <c>UpdateAccountById</c> / <c>AddNewService</c>
+    /// </summary>
+    [HttpGet("GetArea")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<AreaResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetArea(
+        [FromQuery, Required] string? areaType,
+        [FromQuery] string? refId,
+        CancellationToken cancellationToken)
+    {
+        // The DB compares case-sensitively and stores types and ids in upper case, so accept any case here.
+        var type = areaType!.Trim().ToUpperInvariant();
+        if (!AreaTypes.All.Contains(type))
+        {
+            ModelState.AddModelError(nameof(areaType),
+                $"Must be one of {string.Join(", ", AreaTypes.All)}.");
+            return ValidationProblem(ModelState);
+        }
+
+        var parentId = string.IsNullOrWhiteSpace(refId) ? null : refId.Trim().ToUpperInvariant();
+
+        var query = _db.TblAreas
+            .AsNoTracking()
+            .Where(a => a.AreaType == type && a.IsEnable == "T");
+        if (parentId is not null)
+        {
+            query = query.Where(a => a.RefId == parentId);
+        }
+
+        // The "--ไม่ระบุ…--" placeholder of each level is the IsDefault row. Thai collation ignores the dashes,
+        // so it would land in the middle of the list; put it first, as a drop-down's default option.
+        var areas = await query
+            .OrderBy(a => a.IsDefault == "T" ? 0 : 1)
+            .ThenBy(a => a.NameTh)
+            .Select(a => new AreaResponse
+            {
+                Id = a.Id,
+                RefId = a.RefId,
+                NameTh = a.NameTh,
+                NameEn = a.NameEn,
+                AreaType = a.AreaType,
+                Zipcode = a.Zipcode,
+                IsDefault = a.IsDefault,
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(areas);
+    }
+
     /// <summary>คืนรายการเพศ (<c>TblGender</c>) ที่เปิดใช้งาน สำหรับ drop-down เพศ</summary>
     [HttpGet("GetGender")]
     [Authorize]
@@ -534,6 +600,35 @@ public class ListOfValuesController : ControllerBase
             .ToListAsync(cancellationToken);
 
         return Ok(roles);
+    }
+
+    /// <summary>
+    /// คืนรายการพนักงาน (<c>TblEmployee</c>) ที่เปิดใช้งาน เป็น id และชื่อเต็มภาษาไทย (คำนำหน้า ชื่อ นามสกุล)
+    /// สำหรับ drop-down เจ้าของเรื่อง ส่ง <c>id</c> เป็น <c>serviceOwner</c> ของ <c>GET /Services/SearchService</c>
+    /// ไม่ส่งรหัสผ่านและข้อมูลส่วนตัวอื่นของพนักงาน
+    /// </summary>
+    [HttpGet("GetEmployee")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<LookupItemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetEmployee(CancellationToken cancellationToken)
+    {
+        var rows = await _db.TblEmployees
+            .AsNoTracking()
+            .Where(e => e.IsEnable == "T")
+            .OrderBy(e => e.FirstnameTh)
+            .ThenBy(e => e.LastnameTh)
+            .Select(e => new { e.Id, e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+            .ToListAsync(cancellationToken);
+
+        var employees = rows.Select(e => new LookupItemResponse
+        {
+            Id = e.Id ?? string.Empty,
+            NameTh = string.Join(' ', new[] { e.SalutationTh, e.FirstnameTh, e.LastnameTh }
+                .Where(part => !string.IsNullOrWhiteSpace(part))),
+        });
+
+        return Ok(employees);
     }
 
     /// <summary>

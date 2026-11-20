@@ -26,7 +26,7 @@
 
 **ได้ `id` มาจากไหน**
 
-- **จากหน้าค้นหา:** ใช้ `serviceId` ของแถวใน `GET /Services/GetServices`
+- **จากหน้าค้นหา:** ใช้ `serviceId` ของแถวใน `GET /Services/SearchService`
 - **หลังเปิดเรื่องใหม่:** ใช้ `id` ใน response ของ `POST /Services/AddNewService`
 - **ห้ามใช้ `code` (เช่น `69080400002`):** จะได้ 404 ถ้า URL ของหน้าต้องการให้คนอ่านรู้เรื่อง ให้ใช้ `id` ตามแบบระบบเดิม เช่น `/services/view?serviceId=427D66AA…`
 
@@ -59,7 +59,7 @@
 | เรื่องย่อ / รายละเอียด / หมายเหตุ | `summary` / `detail` / `remark` | |
 | วันที่เปิด / ปิดเรื่อง | `dateOpened` / `dateClosed` | |
 | ผู้บันทึก / ผู้แก้ไขล่าสุด | `createdByName` / `updatedByName` และ `created` / `updated` | `createdBy` / `updatedBy` |
-| อื่น ๆ | `serviceArea`, `areaId`, `onScene`, `isEnable` | |
+| อื่น ๆ | `serviceArea`, `areaId` (เก็บไว้ pre-fill ฟอร์ม ไม่ได้แปลงเป็นชื่อให้), `onScene`, `isEnable` | |
 
 - **วันที่ทุก field:** เป็นเวลาไทย ไม่มี offset เช่น `2026-08-04T12:00:00`
 - **ช่องที่ว่าง:** อาจมาเป็น `""` หรือ `null` ก็ได้ เพราะข้อมูลเก่าเก็บไว้ไม่เหมือนกัน ให้เช็กทั้งสองแบบ
@@ -93,9 +93,10 @@ const categoryText = detail.categoryPath.map((x) => x.nameTh).join(" > ");
 | ที่อยู่ | `address` + `zipcode` (ข้อความอิสระ) |
 | วันเกิด | `birthdate` เป็นข้อความรูปแบบเดิม เดือนขึ้นก่อน เช่น `5/19/2026 0:00` อาจเป็น `""` |
 | หมายเหตุ | `remark` |
-| อื่น ๆ | `id`, `areaId`, `isScret`, `created` (ข้อความรูปแบบเดิม เช่น `05/28/2026 11:06`) |
+| พื้นที่ | `areaId` และ `areaPath` (จังหวัด → อำเภอ → ตำบล) ดู [AreaId.md](AreaId.md) |
+| อื่น ๆ | `id`, `isScret`, `created` (ข้อความรูปแบบเดิม เช่น `05/28/2026 11:06`) |
 
-`contacts` คือรายการ `{ detailType, detail }` เฉพาะที่เปิดใช้งาน เรียงตาม `detailType` คนหนึ่งมีได้หลายเบอร์
+`contacts` คือรายการ `{ id, detailType, detail }` (`id` ใช้แก้/ลบด้วย [AccountDetail.md](AccountDetail.md)) เฉพาะที่เปิดใช้งาน เรียงตาม `detailType` คนหนึ่งมีได้หลายเบอร์
 
 | `detailType` | ความหมาย |
 |---|---|
@@ -173,13 +174,18 @@ const email = pick("MAIL");
     "birthdate": "5/19/2026 0:00",
     "address": "456/456",
     "areaId": "16AC86F1FC2255923683F632CAC454DA",
+    "areaPath": [
+      { "id": "5EF900A3F3430FB51A813C37BA3D2BB4", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "กรุงเทพมหานคร", "nameEn": null, "areaType": "PROVINCE", "zipcode": "10000", "isDefault": "F" },
+      { "id": "4F3A0B8A4272BFEB369CB62889860FC9", "refId": "5EF900A3F3430FB51A813C37BA3D2BB4", "nameTh": "หลักสี่", "nameEn": null, "areaType": "DISTRICT", "zipcode": "10210", "isDefault": "F" },
+      { "id": "16AC86F1FC2255923683F632CAC454DA", "refId": "4F3A0B8A4272BFEB369CB62889860FC9", "nameTh": "ตลาดบางเขน", "nameEn": null, "areaType": "SUBDISTRICT", "zipcode": null, "isDefault": "F" }
+    ],
     "zipcode": "10210",
     "remark": "",
     "isScret": "F",
     "isEnable": "T",
     "created": "05/28/2026 11:06",
     "contacts": [
-      { "detailType": "MOBILE", "detail": "0934153699" }
+      { "id": "<id>", "detailType": "MOBILE", "detail": "0934153699" }
     ]
   },
   "summary": "ร้องเรียน โยนเรื่อง",
@@ -221,7 +227,7 @@ const email = pick("MAIL");
 export interface LookupItem { id: string; nameTh: string; }
 
 // รูปแบบเดียวกับแถวของ GET /Account/GetAccounts ถ้ามี type นี้อยู่แล้วใช้ตัวเดิมได้เลย
-export interface AccountContact { detailType: "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL" | string; detail: string; }
+export interface AccountContact { id: string; detailType: "MOBILE" | "HOME" | "OFFICE" | "FAX" | "MAIL" | string; detail: string; }
 export interface AccountSearch {
   id: string;
   salutationTh: string | null; firstnameTh: string | null; lastnameTh: string | null;
@@ -229,6 +235,7 @@ export interface AccountSearch {
   fullName: string;
   genderId: string | null; gender: string | null;
   birthdate: string | null; address: string | null; areaId: string | null; zipcode: string | null;
+  areaPath: AreaItem[] | null; // AreaItem จาก AreaId.md
   remark: string | null; isScret: string; isEnable: string | null; created: string | null;
   contacts: AccountContact[];
 }
@@ -310,7 +317,7 @@ backend ในเครื่อง dev ต้อง restart แอปก่อ�
 | **เรื่องที่ไม่มีผู้ติดต่อ** | บางเรื่องเก่ามี `accountId` เป็น `""` หรือชี้ไปหาผู้ติดต่อที่ไม่มีอยู่ (4 เรื่อง) ได้ `account: null` และ `accountFullName: null` ให้การ์ดแสดง "-" ทุกช่อง |
 | **ผู้ติดต่อที่ถูกปิดใช้งาน** | ยังแสดงใน `account` ตามปกติ เพื่อให้เรื่องเก่ายังเห็นว่าใครติดต่อเข้ามา |
 | **ปุ่ม "ดูประวัติผู้ติดต่อ"** | ยังไม่มี endpoint ดึงรายการเรื่องของผู้ติดต่อคนนี้ |
-| **ที่อยู่แบบจังหวัด/อำเภอ/ตำบล** | ยังทำไม่ได้ ดู [AreaId.md](AreaId.md) |
+| **พื้นที่ (ผู้ติดต่อ)** | ใช้ `account.areaPath` ได้เลย ไม่ต้องแปลง `areaId` เอง ([AreaId.md](AreaId.md)) เรื่อง (service) ไม่ได้คืน `areaPath` ให้ มีแค่ `areaId` ดิบ |
 | **ประวัติการปฏิบัติงาน (activity)** | ยังไม่มี endpoint ดึงรายการ เพิ่ม แก้ หรือลบงาน |
 | **ปุ่มแก้ไข / ลบเรื่อง** | ยังไม่มี endpoint แก้ไขหรือลบเรื่อง |
 | **ใช้ข้อมูลชุดเดียวกับ `AddNewService`** | field id และวันที่ตรงกับ response ของ `AddNewService` ทุกตัว ใช้ type ร่วมกันได้ |

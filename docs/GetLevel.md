@@ -9,6 +9,9 @@
 | ความสำคัญ | `PRIORITY` | `levelPriorityId` |
 | ชั้นความลับ | `SECRET` | `levelSecretId` |
 
+หน้าค้นหา `GET /Services/SearchService` กรองด้วยความสำคัญได้: ส่ง `id` ของ `PRIORITY` เป็น `LevelPriorityId`
+([SearchService.md](SearchService.md))
+
 > อ้างอิงโค้ด: `Controllers/ListOfValuesController.cs` (`GetLevel`), `Dtos/LevelResponse.cs`, `Helper/LevelTypes.cs`
 
 ---

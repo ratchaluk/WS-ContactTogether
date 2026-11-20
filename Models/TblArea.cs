@@ -15,7 +15,7 @@ public partial class TblArea
 
     public string AreaType { get; set; } = null!;
 
-    public decimal? Zipcode { get; set; }
+    public string? Zipcode { get; set; }
 
     public string? Remark { get; set; }
 
