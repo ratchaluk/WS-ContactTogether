@@ -413,8 +413,6 @@ public class ServicesController : ControllerBase
             found.OrganizationId,
             cancellationToken);
 
-        var areaPath = await _db.LoadAreaPathAsync(found.AreaId, cancellationToken);
-
         var account = await _db.LoadAccountAsync(found.AccountId, cancellationToken);
 
         return Ok(new ServiceDetailResponse
@@ -465,7 +463,6 @@ public class ServicesController : ControllerBase
             LevelSecretName = row.LevelSecretName,
             CategoryPath = categoryPath,
             OrganizationPath = organizationPath,
-            AreaPath = areaPath,
         });
     }
 

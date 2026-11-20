@@ -59,8 +59,7 @@
 | เรื่องย่อ / รายละเอียด / หมายเหตุ | `summary` / `detail` / `remark` | |
 | วันที่เปิด / ปิดเรื่อง | `dateOpened` / `dateClosed` | |
 | ผู้บันทึก / ผู้แก้ไขล่าสุด | `createdByName` / `updatedByName` และ `created` / `updated` | `createdBy` / `updatedBy` |
-| พื้นที่ของเรื่อง | `areaPath` จังหวัด → อำเภอ → ตำบล (ตอนนี้ทุกเรื่องยังไม่มี จึงเป็น `[]`) ดู [AreaId.md](AreaId.md) | `areaId` |
-| อื่น ๆ | `serviceArea`, `onScene`, `isEnable` | |
+| อื่น ๆ | `serviceArea`, `areaId` (เก็บไว้ pre-fill ฟอร์ม ไม่ได้แปลงเป็นชื่อให้), `onScene`, `isEnable` | |
 
 - **วันที่ทุก field:** เป็นเวลาไทย ไม่มี offset เช่น `2026-08-04T12:00:00`
 - **ช่องที่ว่าง:** อาจมาเป็น `""` หรือ `null` ก็ได้ เพราะข้อมูลเก่าเก็บไว้ไม่เหมือนกัน ให้เช็กทั้งสองแบบ
@@ -194,7 +193,6 @@ const email = pick("MAIL");
   "remark": "",
   "serviceArea": "",
   "areaId": "",
-  "areaPath": [],
   "onScene": null,
   "dateOpened": "2026-08-04T12:00:00",
   "dateClosed": null,
@@ -261,7 +259,7 @@ export interface ServiceDetail {
   accountId: string | null;       accountFullName: string | null;
   account: AccountSearch | null;
   summary: string | null; detail: string | null; remark: string | null;
-  serviceArea: string | null; areaId: string | null; areaPath: AreaItem[]; onScene: string | null;
+  serviceArea: string | null; areaId: string | null; onScene: string | null;
   dateOpened: string | null; dateClosed: string | null; isEnable: string | null;
   created: string | null; createdBy: string | null; createdByName: string | null;
   updated: string | null; updatedBy: string | null; updatedByName: string | null;
@@ -319,7 +317,7 @@ backend ในเครื่อง dev ต้อง restart แอปก่อ�
 | **เรื่องที่ไม่มีผู้ติดต่อ** | บางเรื่องเก่ามี `accountId` เป็น `""` หรือชี้ไปหาผู้ติดต่อที่ไม่มีอยู่ (4 เรื่อง) ได้ `account: null` และ `accountFullName: null` ให้การ์ดแสดง "-" ทุกช่อง |
 | **ผู้ติดต่อที่ถูกปิดใช้งาน** | ยังแสดงใน `account` ตามปกติ เพื่อให้เรื่องเก่ายังเห็นว่าใครติดต่อเข้ามา |
 | **ปุ่ม "ดูประวัติผู้ติดต่อ"** | ยังไม่มี endpoint ดึงรายการเรื่องของผู้ติดต่อคนนี้ |
-| **พื้นที่** | ใช้ `areaPath` / `account.areaPath` ได้เลย ไม่ต้องแปลง `areaId` เอง ([AreaId.md](AreaId.md)) |
+| **พื้นที่ (ผู้ติดต่อ)** | ใช้ `account.areaPath` ได้เลย ไม่ต้องแปลง `areaId` เอง ([AreaId.md](AreaId.md)) เรื่อง (service) ไม่ได้คืน `areaPath` ให้ มีแค่ `areaId` ดิบ |
 | **ประวัติการปฏิบัติงาน (activity)** | ยังไม่มี endpoint ดึงรายการ เพิ่ม แก้ หรือลบงาน |
 | **ปุ่มแก้ไข / ลบเรื่อง** | ยังไม่มี endpoint แก้ไขหรือลบเรื่อง |
 | **ใช้ข้อมูลชุดเดียวกับ `AddNewService`** | field id และวันที่ตรงกับ response ของ `AddNewService` ทุกตัว ใช้ type ร่วมกันได้ |
