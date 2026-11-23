@@ -415,6 +415,45 @@ public class ServicesController : ControllerBase
 
         var account = await _db.LoadAccountAsync(found.AccountId, cancellationToken);
 
+        // ClosedBy/ReOpenedBy have no FK constraint, hence the name subqueries.
+        var reOpenRows = await (
+            from r in _db.TblReOpenServices.AsNoTracking()
+            where r.ServiceId == found.Id
+            orderby r.Line
+            select new
+            {
+                r.Line,
+                r.ReOpenComment,
+                r.Closed,
+                r.ClosedBy,
+                ClosedByEmployee = _db.TblEmployees
+                    .Where(e => e.Id == r.ClosedBy)
+                    .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                    .FirstOrDefault(),
+                r.ReOpened,
+                r.ReOpenedBy,
+                ReOpenedByEmployee = _db.TblEmployees
+                    .Where(e => e.Id == r.ReOpenedBy)
+                    .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                    .FirstOrDefault(),
+            }).ToListAsync(cancellationToken);
+
+        var reOpenHistory = reOpenRows.Select(r => new ServiceReOpenResponse
+        {
+            Line = r.Line,
+            ReOpenComment = r.ReOpenComment,
+            Closed = r.Closed,
+            ClosedBy = r.ClosedBy,
+            ClosedByName = r.ClosedByEmployee is { } c
+                ? BuildFullName(c.SalutationTh, c.FirstnameTh, c.LastnameTh)
+                : null,
+            ReOpened = r.ReOpened,
+            ReOpenedBy = r.ReOpenedBy,
+            ReOpenedByName = r.ReOpenedByEmployee is { } o
+                ? BuildFullName(o.SalutationTh, o.FirstnameTh, o.LastnameTh)
+                : null,
+        }).ToList();
+
         return Ok(new ServiceDetailResponse
         {
             Id = found.Id,
@@ -463,6 +502,7 @@ public class ServicesController : ControllerBase
             LevelSecretName = row.LevelSecretName,
             CategoryPath = categoryPath,
             OrganizationPath = organizationPath,
+            ReOpenHistory = reOpenHistory,
         });
     }
 
