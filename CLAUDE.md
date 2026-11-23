@@ -193,8 +193,8 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 `TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
 channel, owner, category, status, severity/priority/secrecy levels, area, organization).
 `TblActivity` is its per-request work log (composite key `ServiceId` + `Line`; `ContactId` →
-`TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
-`SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+`TblContact` holds the caller's number). `TblReOpenService` logs reopenings (`ServiceId` + `Line`, written by `UpdateService`; the older
+`TblReopenedLog`, composite key `SrId` + `Line`, is unused). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
 codes such as service-request numbers. Reports resolve the "main organization" by joining

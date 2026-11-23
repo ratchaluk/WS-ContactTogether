@@ -597,6 +597,17 @@ public class ServicesController : ControllerBase
         }
 
         var now = Now();
+        var dateOpened = request.DateOpened ?? now;
+        var dateClosed = ResolveDateClosed(
+            await LoadStatusIsTypeAsync(request.StatusId, cancellationToken),
+            request.DateClosed,
+            current: null,
+            dateOpened,
+            now);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
 
         var service = new TblService
         {
@@ -627,8 +638,8 @@ public class ServicesController : ControllerBase
             CreatedBy = actingEmployeeId,
             Updated = now,
             UpdatedBy = actingEmployeeId,
-            DateOpened = request.DateOpened ?? now,
-            DateClosed = request.DateClosed,
+            DateOpened = dateOpened,
+            DateClosed = dateClosed,
             OnScene = request.OnScene,
         };
 
@@ -687,9 +698,10 @@ public class ServicesController : ControllerBase
     /// <summary>
     /// แก้ไขเรื่อง (<c>TblService</c>) ตาม <c>id</c> เฉพาะช่องที่ส่งมา (ดู <see cref="UpdateServiceRequest"/>)
     /// <c>Updated</c>/<c>UpdatedBy</c> มาจากเวลาปัจจุบันและ token
-    /// ถ้าเปลี่ยน <c>StatusId</c> เป็น Pending ให้เรื่องที่ปิดไปแล้ว (<c>DateClosed</c> มีค่า) ถือเป็นการเปิดเรื่องซ้ำ:
-    /// เพิ่มแถวใน <c>TblReOpenService</c> (<c>Line</c> ต่อจากแถวล่าสุดของเรื่องนั้น เริ่มที่ 1) และล้าง
-    /// <c>DateClosed</c> ทั้งหมดอยู่ใน transaction เดียว
+    /// <c>DateClosed</c> ตั้งให้เองเมื่อเปลี่ยนเป็นสถานะปิด/ยกเลิก (ดู <see cref="ResolveDateClosed"/>)
+    /// ถ้าส่ง <c>StatusId</c> ที่ <c>IsType</c> เป็น <c>OPEN</c> ให้เรื่องที่ปิดไปแล้ว (<c>DateClosed</c> มีค่า)
+    /// ถือเป็นการเปิดเรื่องซ้ำ: เพิ่มแถวใน <c>TblReOpenService</c> (<c>Line</c> ต่อจากแถวล่าสุดของเรื่องนั้น
+    /// เริ่มที่ 1) และล้าง <c>DateClosed</c> ทั้งหมดอยู่ใน transaction เดียว
     /// </summary>
     [HttpPut("UpdateService")]
     [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status200OK)]
@@ -764,14 +776,26 @@ public class ServicesController : ControllerBase
             LevelPriorityId = Merge(request.LevelPriorityId, current.LevelPriorityId),
             LevelSecretId = Merge(request.LevelSecretId, current.LevelSecretId),
             DateOpened = request.DateOpened ?? current.DateOpened,
-            DateClosed = request.DateClosed ?? current.DateClosed,
             OnScene = request.OnScene ?? current.OnScene,
             Updated = now,
             UpdatedBy = actingEmployeeId,
         };
 
-        // Back to Pending on a closed service is a reopening: log it and clear DateClosed.
-        if (updated.StatusId == PendingStatusId && current.DateClosed is not null)
+        var statusIsType = await LoadStatusIsTypeAsync(updated.StatusId, cancellationToken);
+        updated.DateClosed = ResolveDateClosed(
+            statusIsType, request.DateClosed, current.DateClosed, updated.DateOpened, now);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        // An OPEN status sent for a closed service is a reopening: log it and clear DateClosed. Only
+        // when statusId is in the request, so editing another field of an old service that is open but
+        // still has a DateClosed does not log a reopening.
+        var reopening = !string.IsNullOrWhiteSpace(request.StatusId)
+            && statusIsType == StatusIsTypes.Open
+            && current.DateClosed is not null;
+        if (reopening)
         {
             var lastLine = await _db.TblReOpenServices
                 .Where(r => r.ServiceId == serviceId)
@@ -782,7 +806,7 @@ public class ServicesController : ControllerBase
                 ServiceId = serviceId,
                 Line = (lastLine ?? 0) + 1,
                 ReOpenComment = request.ReOpenComment?.Trim() ?? string.Empty,
-                Closed = current.DateClosed.Value,
+                Closed = current.DateClosed!.Value,
                 // TblService does not record who closed it; the last update before this one is the
                 // closest there is.
                 ClosedBy = current.UpdatedBy,
@@ -818,15 +842,65 @@ public class ServicesController : ControllerBase
             current.Code,
             serviceId,
             actingEmployeeId,
-            current.DateClosed is not null && updated.DateClosed is null);
+            reopening);
 
         var result = await ToResponses(_db.TblServices.AsNoTracking().Where(s => s.Id == serviceId))
             .FirstAsync(cancellationToken);
         return Ok(result);
     }
 
-    /// <summary><c>TblStatus.Id</c> ของสถานะ "อยู่ระหว่างดำเนินการ" (Pending)</summary>
-    private const string PendingStatusId = "19C49E66B6F9EF1BCE11A3B93DED12C8";
+    /// <summary><c>TblStatus.IsType</c> ของสถานะเรื่อง (ชุด SERVICE) ที่ <paramref name="statusId"/> ชี้ไป หรือ <c>null</c></summary>
+    private async Task<string?> LoadStatusIsTypeAsync(string? statusId, CancellationToken cancellationToken) =>
+        string.IsNullOrEmpty(statusId)
+            ? null
+            : await _db.TblStatuses
+                .Where(s => s.Id == statusId && s.StatusType == StatusTypes.Service)
+                .Select(s => s.IsType)
+                .FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>
+    /// <c>DateClosed</c> ที่จะบันทึก ตาม <c>IsType</c> ของสถานะใหม่ ข้อผิดพลาดใส่ใน <c>ModelState</c>
+    /// <list type="bullet">
+    /// <item>ปิด/ยกเลิก (<c>CLOSE</c>/<c>CANCEL</c>): ค่าที่ส่งมา &gt; ค่าเดิม &gt; เวลาปัจจุบัน
+    /// ค่าที่ส่งมาต้องไม่เป็นอนาคตและไม่ก่อน <c>DateOpened</c></item>
+    /// <item>สถานะอื่น: ส่ง <c>DateClosed</c> มาไม่ได้ คงค่าเดิมไว้ (การล้างตอนเปิดเรื่องซ้ำทำแยก)</item>
+    /// </list>
+    /// </summary>
+    private DateTime? ResolveDateClosed(
+        string? statusIsType,
+        DateTime? requested,
+        DateTime? current,
+        DateTime? dateOpened,
+        DateTime now)
+    {
+        const string field = nameof(ServiceFieldsRequest.DateClosed);
+
+        if (!StatusIsTypes.IsFinished(statusIsType))
+        {
+            if (requested is not null)
+            {
+                ModelState.AddModelError(field, "DateClosed can only be sent with a CLOSE or CANCEL status.");
+            }
+
+            return current;
+        }
+
+        if (requested is { } value)
+        {
+            if (value > now)
+            {
+                ModelState.AddModelError(field, "DateClosed cannot be in the future.");
+            }
+            else if (dateOpened is { } opened && value < opened)
+            {
+                ModelState.AddModelError(field, "DateClosed cannot be before DateOpened.");
+            }
+
+            return value;
+        }
+
+        return current ?? now;
+    }
 
     /// <summary>
     /// ค่าที่จะบันทึกของช่องข้อความใน <see cref="UpdateService"/>: <c>null</c> = คงค่าเดิม,
