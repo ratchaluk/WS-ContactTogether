@@ -194,8 +194,9 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 channel, owner, category, status, severity/priority/secrecy levels, area, organization).
 `TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
 `newsequentialid()`, declared as the key in `ApplicationDbContext.Keys.cs` because the table has no
-PK; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
-`SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+PK; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReOpenService` logs reopenings
+(`ServiceId` + `Line`, written by `UpdateService`; the older `TblReopenedLog`, composite key `SrId` +
+`Line`, is unused). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
 codes such as service-request numbers. Reports resolve the "main organization" by joining
