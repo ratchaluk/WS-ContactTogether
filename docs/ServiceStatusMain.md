@@ -56,7 +56,7 @@ const defaultStatus = mainStatuses.find((s) => s.isDefault === "T"); // เป�
 }
 ```
 
-- **`dateClosed` (เปลี่ยน 23 พ.ย. 2569):** **ไม่ต้องส่งแล้ว** ถ้าเลือกสถานะที่ `isType` เป็น `CLOSE` หรือ `CANCEL` backend ตั้งเป็นเวลาที่บันทึกให้ ส่งเองได้เฉพาะตอนลงเวลาย้อนหลัง (ไม่เป็นอนาคต ไม่ก่อน `dateOpened`) ส่ง `dateClosed` คู่กับสถานะอื่น = 400
+- **`dateClosed` (เปลี่ยน 23 พ.ย. 2569):** **server ตั้งเอง ไม่รับจาก client** (ส่งมาจะถูกข้าม) ถ้าเลือกสถานะที่ `isType` เป็น `CLOSE` หรือ `CANCEL` จะได้เวลาของ server ตอนบันทึก
 - **แก้ไข / ปิด / เปิดเรื่องซ้ำภายหลัง:** ใช้ `PUT /Services/UpdateService` กับสถานะหลัก 3 ตัวนี้ได้เลย ([UpdateService.md](UpdateService.md) ข้อ 3)
 
 ---
@@ -92,7 +92,7 @@ const defaultStatus = mainStatuses.find((s) => s.isDefault === "T"); // เป�
 
 | ที่ถาม | คำตอบ |
 |---|---|
-| `dateClosed` ใครตั้ง | backend ตั้งให้เมื่อ `isType` เป็น `CLOSE` / `CANCEL` (ข้อ 4, เปลี่ยน 23 พ.ย. 2569) |
+| `dateClosed` ใครตั้ง | server ตั้งเองเสมอเมื่อ `isType` เป็น `CLOSE` / `CANCEL` ไม่รับจาก client (ข้อ 4, เปลี่ยน 23 พ.ย. 2569) |
 | ข้อความ error `No SERVICE status with Id …` | มาจาก backend เวอร์ชันเก่า เวอร์ชันปัจจุบันตอบ `No row with Id '…'` ([AddNewService.md](AddNewService.md)) |
 | `GetStatus` ไม่ส่ง `statusType` แล้วได้ 200 | ถูกต้อง `statusType` ไม่บังคับ ไม่ส่ง = SERVICE ส่งค่าที่ไม่ใช่ `SERVICE` / `ACTIVITY` = 400 ([GetStatus.md](GetStatus.md) ฉบับปัจจุบัน) |
 | `GetStatus` เป็นรายการแบน ไม่มี `children` | ถูกต้อง เอกสาร [GetStatus.md](GetStatus.md) ฉบับปัจจุบันเขียนเป็นรายการแบนแล้ว |

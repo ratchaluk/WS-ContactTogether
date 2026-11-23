@@ -51,7 +51,6 @@
 | `levelPriorityId` | 500 | ความสำคัญ | `id` จาก `GET /ListOfValues/GetLevel?levelType=PRIORITY` |
 | `levelSecretId` | 500 | ชั้นความลับ | `id` จาก `GET /ListOfValues/GetLevel?levelType=SECRET` |
 | `dateOpened` | – | วันเวลาที่เปิดเรื่อง | ไม่ส่ง = **เวลาที่บันทึก** |
-| `dateClosed` | – | วันเวลาที่ปิดเรื่อง | **ปกติไม่ต้องส่ง:** ถ้า `statusId` เป็นสถานะปิด/ยกเลิก (`isType` `CLOSE`/`CANCEL`) backend ตั้งเป็นเวลาที่บันทึกให้ ส่งเองได้เฉพาะคู่กับสถานะปิด/ยกเลิก (ลงเวลาย้อนหลัง) ส่งกับสถานะอื่น = 400 (เปลี่ยน 23 พ.ย. 2569) |
 | `onScene` | – | วันเวลาที่ถึงหน้างาน | ไม่บังคับ |
 
 **backend ใส่ให้เอง** (ส่งมาก็ไม่มีผล): `id`, `code` (เลขที่เรื่อง), `isEnable` (= `"T"`),
@@ -68,7 +67,8 @@
 - **วันที่** เป็นเวลาไทย รูปแบบ `yyyy-MM-ddTHH:mm:ss` เช่น `2026-11-16T10:30:00`
   (ค่าจาก `<input type="datetime-local">` ที่ไม่มีวินาทีก็ใช้ได้) **ห้ามต่อท้ายด้วย `Z` หรือ `+07:00`**
   และอย่าใช้ `date.toISOString()` เพราะเวลาจะคลาดไป 7 ชั่วโมง เศษวินาทีจะถูกปัดทิ้ง
-- **`dateClosed` ที่ส่งมา** ต้องไม่เป็นอนาคตและไม่ก่อน `dateOpened` ไม่งั้นได้ 400 `errors.DateClosed`
+- **`dateClosed` server ตั้งเอง ไม่รับจาก client** (เปลี่ยน 23 พ.ย. 2569, ส่งมาจะถูกข้าม): ถ้า `statusId` เป็นสถานะปิด/ยกเลิก
+  (`isType` `CLOSE`/`CANCEL`) จะได้เวลาของ server ตอนบันทึก สถานะอื่นได้ `null`
 - **กดซ้ำ = เปิดเรื่องซ้ำ** API ไม่กันรายการซ้ำ ต้องปิดปุ่มระหว่างรอ response
 
 ### 2.3 Field ที่ต้องบังคับกรอก: ให้ frontend ตรวจเอง
@@ -220,7 +220,7 @@ export interface CreateServiceRequest {
   serviceReferenceLink?: string | null;
   remark?: string | null;
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย ห้ามมี Z
-  dateClosed?: string | null;
+  // ไม่มี dateClosed: server ตั้งเอง
   onScene?: string | null;
   levelSeverityId?: string | null; // GetLevel?levelType=SEVERITY
   levelPriorityId?: string | null; // GetLevel?levelType=PRIORITY
