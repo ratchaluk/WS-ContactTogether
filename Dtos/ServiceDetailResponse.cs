@@ -49,4 +49,10 @@ public class ServiceDetailResponse : ServiceResponse
 
     /// <summary>The organization and its parents, top level first (กระทรวง, then กรม).</summary>
     public List<LookupItemResponse> OrganizationPath { get; set; } = [];
+
+    /// <summary>
+    /// ประวัติการเปิดเรื่องซ้ำจาก <c>TblReOpenService</c> (<c>ServiceId</c> = <c>Id</c> ของเรื่องนี้)
+    /// เรียงตาม <c>Line</c> จากครั้งแรก ว่างถ้าไม่เคยเปิดซ้ำ
+    /// </summary>
+    public List<ServiceReOpenResponse> ReOpenHistory { get; set; } = [];
 }
