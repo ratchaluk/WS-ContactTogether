@@ -496,6 +496,24 @@ Content-Type: application/json
 
 ###
 
+# Add an operation (TblActivity row) to a service. Line = the service's last Line + 1 (from 1); Code =
+# yyMMdd (B.E.) + a 5-digit daily running number, counted separately from service codes. statusId is an
+# ACTIVITY status (Open 0A57...04 / Closed CB0A...A1 / Cancel CD64...62). Omitted: categoryId = the
+# service's, ownerId = the caller, isReceived = "F", dateOpened = now. 201 = the row; 400 = bad input;
+# 404 = no enabled service with that id.
+POST {{ContactTogetherApi_HostAddress}}/Services/AddNewServiceOperations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "serviceId": "427D66AA13734763AC1D99775554659B",
+  "statusId": "0A5753389CDCD23F173268D8D46AC004",
+  "summary": "โทรติดต่อผู้ร้องเพื่อสอบถามข้อมูลเพิ่มเติม",
+  "detail": "ผู้ร้องจะส่งเอกสารเพิ่มเติมภายในวันพรุ่งนี้"
+}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
