@@ -53,6 +53,11 @@ Authorization: Bearer {{token}}
 ###
 
 # List of values - enabled channels as { id, nameTh }
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus
+Authorization: Bearer {{token}}
+
+###
+# List of values - enabled channels as { id, nameTh }
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetServiceType
 Authorization: Bearer {{token}}
 
@@ -482,15 +487,28 @@ Content-Type: application/json
 
 ###
 
-# Reopen - statusId back to Pending (19C49E66...C8) on a service whose DateClosed is set adds a
-# TblReOpenService row (Line = the service's last Line + 1, from 1), with reOpenComment, and clears
-# DateClosed. All in one transaction.
+# Close - a CLOSE/CANCEL status (ปิดเรื่อง 67F7...) sets DateClosed to now when it is not sent (send
+# dateClosed to backdate it: not in the future, not before dateOpened). dateClosed with any other
+# status = 400.
 PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
+  "statusId": "67F7D634C1D74FDE512C164D6A2A1EF9"
+}
+
+###
+
+# Reopen - an OPEN status (เปิดเรื่อง 60CD...) sent for a service whose DateClosed is set adds a
+# TblReOpenService row (Line = the service's last Line + 1, from 1), with reOpenComment (max 100), and
+# clears DateClosed. All in one transaction. Pending (isType PENDING) does not reopen.
+PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "60CD725EA4455BA6770FC94BC78F466F",
   "reOpenComment": "ผู้ร้องแจ้งว่าปัญหายังไม่ได้รับการแก้ไข"
 }
 
