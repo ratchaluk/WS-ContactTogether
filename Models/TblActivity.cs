@@ -5,6 +5,8 @@ namespace ContactTogetherApi.Models;
 
 public partial class TblActivity
 {
+    public Guid Id { get; set; }
+
     public string ServiceId { get; set; } = null!;
 
     public int Line { get; set; }
@@ -44,6 +46,4 @@ public partial class TblActivity
     public DateTime Updated { get; set; }
 
     public string UpdatedBy { get; set; } = null!;
-
-    public virtual TblCategory Category { get; set; } = null!;
 }

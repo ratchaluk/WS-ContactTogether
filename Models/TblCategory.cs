@@ -32,6 +32,4 @@ public partial class TblCategory
     public virtual ICollection<TblCategory> InverseRef { get; set; } = new List<TblCategory>();
 
     public virtual TblCategory Ref { get; set; } = null!;
-
-    public virtual ICollection<TblActivity> TblActivities { get; set; } = new List<TblActivity>();
 }

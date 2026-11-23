@@ -950,28 +950,125 @@ public class ServicesController : ControllerBase
             activity.Line,
             actingEmployeeId);
 
-        return StatusCode(StatusCodes.Status201Created, new ServiceOperationResponse
-        {
-            ServiceId = activity.ServiceId,
-            Line = activity.Line,
-            Code = activity.Code,
-            ContactId = activity.ContactId,
-            CategoryId = activity.CategoryId,
-            StatusId = activity.StatusId,
-            DateOpened = activity.DateOpened,
-            DateClosed = activity.DateClosed,
-            Summary = activity.Summary,
-            Detail = activity.Detail,
-            OwnerId = activity.OwnerId,
-            GroupId = activity.GroupId,
-            IsReceived = activity.IsReceived,
-            IsEnable = activity.IsEnable,
-            Created = activity.Created,
-            CreatedBy = activity.CreatedBy,
-            Updated = activity.Updated,
-            UpdatedBy = activity.UpdatedBy,
-        });
+        return StatusCode(StatusCodes.Status201Created, ToOperationResponse(activity));
     }
+
+    /// <summary>
+    /// แก้ไขงาน (<c>TblActivity</c>) ตาม <c>id</c> (<c>TblActivity.Id</c>) เฉพาะช่องที่ส่งมา
+    /// (ดู <see cref="UpdateServiceOperationRequest"/>) <c>ServiceId</c>, <c>Line</c> และ <c>Code</c> แก้ไม่ได้
+    /// <c>Updated</c>/<c>UpdatedBy</c> มาจากเวลาปัจจุบันและ token
+    /// </summary>
+    [HttpPut("UpdateServiceOperations")]
+    [ProducesResponseType(typeof(ServiceOperationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateServiceOperations(
+        [FromQuery] string? id,
+        [FromBody] UpdateServiceOperationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the update."));
+        }
+
+        // TblActivity.Id is a uniqueidentifier, so parse it (any case, with or without dashes).
+        if (!Guid.TryParse(Normalize(id), out var operationId))
+        {
+            ModelState.AddModelError(nameof(id), "A valid operation id (GUID) is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var activity = await _db.TblActivities
+            .FirstOrDefaultAsync(a => a.Id == operationId && a.IsEnable == "T", cancellationToken);
+        if (activity is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลการดำเนินการ"));
+        }
+
+        var statusId = Normalize(request.StatusId);
+        if (statusId is not null && !await _db.TblStatuses.AnyAsync(
+                s => s.Id == statusId && s.StatusType == StatusTypes.Activity, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.StatusId), $"No ACTIVITY TblStatus row with Id '{statusId}'.");
+        }
+
+        var categoryId = Normalize(request.CategoryId);
+        if (categoryId is not null && !await _db.TblCategories.AnyAsync(c => c.Id == categoryId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.CategoryId), $"No row with Id '{categoryId}'.");
+        }
+
+        var ownerId = Normalize(request.OwnerId);
+        if (ownerId is not null && !await _db.TblEmployees.AnyAsync(e => e.Id == ownerId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.OwnerId), $"No row with Id '{ownerId}'.");
+        }
+
+        var contactId = Normalize(request.ContactId);
+        if (contactId is not null && !await _db.TblContacts.AnyAsync(c => c.Id == contactId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.ContactId), $"No row with Id '{contactId}'.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        // NOT NULL columns: a blank value keeps the current one instead of clearing it.
+        activity.StatusId = statusId ?? activity.StatusId;
+        activity.CategoryId = categoryId ?? activity.CategoryId;
+        activity.Summary = Normalize(request.Summary) ?? activity.Summary;
+        activity.IsReceived = request.IsReceived ?? activity.IsReceived;
+        // Nullable columns: null keeps, blank clears.
+        activity.Detail = request.Detail is null ? activity.Detail : string.IsNullOrWhiteSpace(request.Detail) ? null : request.Detail;
+        activity.ContactId = Merge(request.ContactId, activity.ContactId);
+        activity.OwnerId = Merge(request.OwnerId, activity.OwnerId);
+        activity.GroupId = Merge(request.GroupId, activity.GroupId);
+        activity.DateOpened = request.DateOpened ?? activity.DateOpened;
+        activity.DateClosed = request.DateClosed ?? activity.DateClosed;
+        activity.Updated = Now();
+        activity.UpdatedBy = actingEmployeeId;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Operation {OperationCode} ({OperationId}, service {ServiceId}) updated by {ActingEmployeeId}.",
+            activity.Code,
+            activity.Id,
+            activity.ServiceId,
+            actingEmployeeId);
+
+        return Ok(ToOperationResponse(activity));
+    }
+
+    private static ServiceOperationResponse ToOperationResponse(TblActivity activity) => new()
+    {
+        Id = activity.Id,
+        ServiceId = activity.ServiceId,
+        Line = activity.Line,
+        Code = activity.Code,
+        ContactId = activity.ContactId,
+        CategoryId = activity.CategoryId,
+        StatusId = activity.StatusId,
+        DateOpened = activity.DateOpened,
+        DateClosed = activity.DateClosed,
+        Summary = activity.Summary,
+        Detail = activity.Detail,
+        OwnerId = activity.OwnerId,
+        GroupId = activity.GroupId,
+        IsReceived = activity.IsReceived,
+        IsEnable = activity.IsEnable,
+        Created = activity.Created,
+        CreatedBy = activity.CreatedBy,
+        Updated = activity.Updated,
+        UpdatedBy = activity.UpdatedBy,
+    };
 
     /// <summary>
     /// เลขถัดไปของวันนี้ในรูปแบบ <c>yyMMdd</c> (ปี พ.ศ.) + เลขรัน 5 หลัก จากรหัสที่มีอยู่ใน <paramref name="codes"/>

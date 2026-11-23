@@ -3,6 +3,9 @@ namespace ContactTogetherApi.Dtos;
 /// <summary>หนึ่งแถวของ <c>TblActivity</c> (ไม่รวมไฟล์แนบ) เวลาเป็นเวลาไทยแบบไม่มี offset</summary>
 public class ServiceOperationResponse
 {
+    /// <summary><c>TblActivity.Id</c> (uniqueidentifier)</summary>
+    public Guid Id { get; set; }
+
     public string ServiceId { get; set; } = string.Empty;
 
     /// <summary>ลำดับงานภายในเรื่อง เริ่มที่ 1</summary>

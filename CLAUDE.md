@@ -192,8 +192,9 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 
 `TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
 channel, owner, category, status, severity/priority/secrecy levels, area, organization).
-`TblActivity` is its per-request work log (composite key `ServiceId` + `Line`; `ContactId` →
-`TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
+`TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
+`newsequentialid()`, declared as the key in `ApplicationDbContext.Keys.cs` because the table has no
+PK; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
 `SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
@@ -224,7 +225,7 @@ These are quirks of the existing schema. Do not "clean them up" in the models:
   `SalutationTh`/`FirstnameTh`/… on people). The DB collation is `Thai_100_CS_AI` (case-sensitive,
   accent-insensitive), so string comparisons executed in SQL are case-sensitive.
 - Most navigation properties were **not** scaffolded because the schema lacks the corresponding FK
-  constraints — only a handful exist (`TblAccountDetail→TblAccount`, `TblActivity→TblCategory`,
+  constraints — only a handful exist (`TblAccountDetail→TblAccount`,
   `TblService→TblStatus`, `TblRolePage→TblRole`, `TblReportParameter→TblReport`,
   `TblBroadcastGroup→TblBroadcast`, plus the self-references). Expect to join on ID columns
   manually rather than assuming a navigation exists.

@@ -154,26 +154,23 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<TblActivity>(entity =>
         {
-            entity.HasKey(e => new { e.ServiceId, e.Line });
+            entity
+                .HasNoKey()
+                .ToTable("TblActivity");
 
-            entity.ToTable("TblActivity");
-
-            entity.Property(e => e.ServiceId).HasMaxLength(50);
             entity.Property(e => e.CategoryId).HasMaxLength(50);
             entity.Property(e => e.Code).HasMaxLength(50);
             entity.Property(e => e.ContactId).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.FileName).HasMaxLength(255);
             entity.Property(e => e.GroupId).HasMaxLength(50);
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_TblActivityId");
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.IsReceived).HasMaxLength(10);
             entity.Property(e => e.OwnerId).HasMaxLength(50);
+            entity.Property(e => e.ServiceId).HasMaxLength(50);
             entity.Property(e => e.StatusId).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(100);
-
-            entity.HasOne(d => d.Category).WithMany(p => p.TblActivities)
-                .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
         modelBuilder.Entity<TblArea>(entity =>
