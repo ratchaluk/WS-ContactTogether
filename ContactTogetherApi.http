@@ -467,6 +467,34 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Update a service - only the fields sent change; "" clears a text field. Updated/UpdatedBy come from
+# the clock and the token. 200 = the service (same shape as AddNewService); 400 = no id or a bad lookup
+# id; 404 = no enabled service with that id.
+PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "summary": "แก้ไขสรุปเรื่อง",
+  "remark": "หมายเหตุใหม่"
+}
+
+###
+
+# Reopen - statusId back to Pending (19C49E66...C8) on a service whose DateClosed is set adds a
+# TblReOpenService row (Line = the service's last Line + 1, from 1), with reOpenComment, and clears
+# DateClosed. All in one transaction.
+PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
+  "reOpenComment": "ผู้ร้องแจ้งว่าปัญหายังไม่ได้รับการแก้ไข"
+}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
