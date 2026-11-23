@@ -1,5 +1,19 @@
 {
   "enabledPlugins": {
     "ponytail@ponytail": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Loading latest handoff...",
+            "command": "$d=$env:CLAUDE_PROJECT_DIR; if(-not $d){$d='.'}; $f=Get-ChildItem (Join-Path $d 'docs') -Filter 'handoff-*.md' -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1; if($f){$b=Get-Content -Raw $f.FullName; $nl=[Environment]::NewLine; @{hookSpecificOutput=@{hookEventName='SessionStart';additionalContext=('Latest team handoff ('+$f.Name+') - read this before starting work so you know what the team did recently:'+$nl+$nl+$b)}} | ConvertTo-Json -Depth 5 -Compress}"
+          }
+        ]
+      }
+    ]
   }
 }
