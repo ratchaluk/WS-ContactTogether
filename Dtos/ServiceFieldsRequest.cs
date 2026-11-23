@@ -83,8 +83,5 @@ public abstract class ServiceFieldsRequest
     public DateTime? DateOpened { get; set; }
 
     /// <summary>Thai local time.</summary>
-    public DateTime? DateClosed { get; set; }
-
-    /// <summary>Thai local time.</summary>
     public DateTime? OnScene { get; set; }
 }

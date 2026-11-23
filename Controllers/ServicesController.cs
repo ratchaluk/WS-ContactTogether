@@ -599,15 +599,10 @@ public class ServicesController : ControllerBase
         var now = Now();
         var dateOpened = request.DateOpened ?? now;
         var dateClosed = ResolveDateClosed(
-            await LoadStatusIsTypeAsync(request.StatusId, cancellationToken),
-            request.DateClosed,
+            await LoadStatusIsTypeAsync(request.StatusId, StatusTypes.Service, cancellationToken),
+            statusSent: true,
             current: null,
-            dateOpened,
             now);
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
 
         var service = new TblService
         {
@@ -777,20 +772,15 @@ public class ServicesController : ControllerBase
             UpdatedBy = actingEmployeeId,
         };
 
-        var statusIsType = await LoadStatusIsTypeAsync(updated.StatusId, cancellationToken);
         updated.DateClosed = ResolveDateClosed(
-            statusIsType, request.DateClosed, current.DateClosed, updated.DateOpened, now);
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
+            await LoadStatusIsTypeAsync(updated.StatusId, StatusTypes.Service, cancellationToken),
+            statusSent: !string.IsNullOrWhiteSpace(request.StatusId),
+            current.DateClosed,
+            now);
 
-        // An OPEN status sent for a closed service is a reopening: log it and clear DateClosed. Only
-        // when statusId is in the request, so editing another field of an old service that is open but
-        // still has a DateClosed does not log a reopening.
-        var reopening = !string.IsNullOrWhiteSpace(request.StatusId)
-            && statusIsType == StatusIsTypes.Open
-            && current.DateClosed is not null;
+        // An OPEN status sent for a closed service is a reopening: log it (ResolveDateClosed has
+        // already cleared DateClosed).
+        var reopening = current.DateClosed is not null && updated.DateClosed is null;
         if (reopening)
         {
             var lastLine = await _db.TblReOpenServices
@@ -810,8 +800,6 @@ public class ServicesController : ControllerBase
                 ReOpenedBy = actingEmployeeId,
             });
             await _db.SaveChangesAsync(cancellationToken);
-
-            updated.DateClosed = null;
         }
 
         // TblService is keyless in the model, so EF cannot update it; write it with SQL instead.
@@ -846,6 +834,100 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
+    /// รายการงาน (การดำเนินการ, <c>TblActivity</c>) ที่เปิดใช้งานของเรื่อง <c>serviceId</c> เรียงตาม <c>Line</c>
+    /// พร้อมชื่อสถานะ ประเภท ผู้รับผิดชอบ เบอร์ที่รับสาย และผู้บันทึก/ผู้แก้ไข ไม่รวมไฟล์แนบ
+    /// </summary>
+    [HttpGet("GetServiceOperations")]
+    [ProducesResponseType(typeof(List<ServiceOperationListItemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetServiceOperations(
+        [FromQuery] string? serviceId,
+        CancellationToken cancellationToken)
+    {
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var id = Normalize(serviceId)?.ToUpperInvariant();
+        if (id is null)
+        {
+            ModelState.AddModelError(nameof(serviceId), "A serviceId is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        if (!await _db.TblServices.AnyAsync(s => s.Id == id && s.IsEnable == "T", cancellationToken))
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลเรื่อง"));
+        }
+
+        // No FK constraints on these ids, hence the subqueries. Attachment is left out of the projection.
+        var rows = await (
+            from a in _db.TblActivities.AsNoTracking()
+            where a.ServiceId == id && a.IsEnable == "T"
+            orderby a.Line
+            select new
+            {
+                a.Id, a.ServiceId, a.Line, a.Code, a.ContactId, a.CategoryId, a.StatusId,
+                a.DateOpened, a.DateClosed, a.Summary, a.Detail, a.OwnerId, a.GroupId,
+                a.IsReceived, a.IsEnable, a.Created, a.CreatedBy, a.Updated, a.UpdatedBy,
+                Status = _db.TblStatuses
+                    .Where(s => s.Id == a.StatusId)
+                    .Select(s => new { s.NameTh, s.IsType })
+                    .FirstOrDefault(),
+                CategoryNameTh = _db.TblCategories
+                    .Where(c => c.Id == a.CategoryId)
+                    .Select(c => c.NameTh)
+                    .FirstOrDefault(),
+                ContactDetail = _db.TblContacts
+                    .Where(c => c.Id == a.ContactId)
+                    .Select(c => c.ContactDetail)
+                    .FirstOrDefault(),
+                Owner = _db.TblEmployees
+                    .Where(e => e.Id == a.OwnerId)
+                    .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                    .FirstOrDefault(),
+                Creator = _db.TblEmployees
+                    .Where(e => e.Id == a.CreatedBy)
+                    .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                    .FirstOrDefault(),
+                Updater = _db.TblEmployees
+                    .Where(e => e.Id == a.UpdatedBy)
+                    .Select(e => new { e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+                    .FirstOrDefault(),
+            }).ToListAsync(cancellationToken);
+
+        var result = rows.Select(r => new ServiceOperationListItemResponse
+        {
+            Id = r.Id,
+            ServiceId = r.ServiceId,
+            Line = r.Line,
+            Code = r.Code,
+            ContactId = r.ContactId,
+            CategoryId = r.CategoryId,
+            StatusId = r.StatusId,
+            DateOpened = r.DateOpened,
+            DateClosed = r.DateClosed,
+            Summary = r.Summary,
+            Detail = r.Detail,
+            OwnerId = r.OwnerId,
+            GroupId = r.GroupId,
+            IsReceived = r.IsReceived,
+            IsEnable = r.IsEnable,
+            Created = r.Created,
+            CreatedBy = r.CreatedBy,
+            Updated = r.Updated,
+            UpdatedBy = r.UpdatedBy,
+            StatusNameTh = r.Status?.NameTh,
+            StatusIsType = r.Status?.IsType,
+            CategoryNameTh = r.CategoryNameTh,
+            ContactDetail = r.ContactDetail,
+            OwnerName = r.Owner is { } o ? BuildFullName(o.SalutationTh, o.FirstnameTh, o.LastnameTh) : null,
+            CreatedByName = r.Creator is { } c ? BuildFullName(c.SalutationTh, c.FirstnameTh, c.LastnameTh) : null,
+            UpdatedByName = r.Updater is { } u ? BuildFullName(u.SalutationTh, u.FirstnameTh, u.LastnameTh) : null,
+        }).ToList();
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// เพิ่มงาน (การดำเนินการ) ของเรื่องลงใน <c>TblActivity</c> แล้วคืนแถวนั้นกลับไป
     /// <c>Line</c> ต่อจากงานล่าสุดของเรื่องเดียวกัน (งานแรกได้ 1) ส่วน <c>Code</c> ใช้รูปแบบเดียวกับ
     /// <see cref="AddNewService"/>: <c>yyMMdd</c> ปี พ.ศ. ตามด้วยเลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
@@ -872,24 +954,29 @@ public class ServicesController : ControllerBase
 
         // Ids are stored in upper case and the DB collation is case-sensitive.
         var serviceId = request.ServiceId!.Trim().ToUpperInvariant();
-        var service = await _db.TblServices.AsNoTracking()
-            .Where(s => s.Id == serviceId && s.IsEnable == "T")
-            .Select(s => new { s.CategoryId })
-            .FirstOrDefaultAsync(cancellationToken);
-        if (service is null)
+        if (!await _db.TblServices.AnyAsync(s => s.Id == serviceId && s.IsEnable == "T", cancellationToken))
         {
             return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลเรื่อง"));
         }
 
-        var categoryId = Normalize(request.CategoryId) ?? service.CategoryId;
-        if (string.IsNullOrEmpty(categoryId))
+        // An operation's category is an ACTIVITY category; none sent = the default one.
+        var categoryId = Normalize(request.CategoryId);
+        if (categoryId is null)
         {
-            // TblActivity.CategoryId is NOT NULL, and this service has no category to fall back on.
-            ModelState.AddModelError(nameof(request.CategoryId), "A CategoryId is required for this service.");
+            categoryId = await ActivityCategories()
+                .Where(c => c.IsDefault == "T")
+                .OrderBy(c => c.NameTh)
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (categoryId is null)
+            {
+                // TblActivity.CategoryId is NOT NULL.
+                ModelState.AddModelError(nameof(request.CategoryId), "No default ACTIVITY category; send a CategoryId.");
+            }
         }
-        else if (!await _db.TblCategories.AnyAsync(c => c.Id == categoryId, cancellationToken))
+        else
         {
-            ModelState.AddModelError(nameof(request.CategoryId), $"No row with Id '{categoryId}'.");
+            await CheckActivityCategoryAsync(nameof(request.CategoryId), categoryId, cancellationToken);
         }
 
         var statusId = request.StatusId!.Trim();
@@ -951,12 +1038,16 @@ public class ServicesController : ControllerBase
             CategoryId = categoryId!,
             StatusId = statusId,
             DateOpened = request.DateOpened ?? now,
-            DateClosed = request.DateClosed,
+            DateClosed = ResolveDateClosed(
+                await LoadStatusIsTypeAsync(statusId, StatusTypes.Activity, cancellationToken),
+                statusSent: true,
+                current: null,
+                now),
             Summary = request.Summary!.Trim(),
             Detail = request.Detail,
             OwnerId = ownerId,
             GroupId = Normalize(request.GroupId),
-            IsReceived = request.IsReceived ?? "F",
+            IsReceived = Normalize(request.IsReceived) ?? "F",
             IsEnable = "T",
             Created = now,
             CreatedBy = actingEmployeeId,
@@ -1022,9 +1113,9 @@ public class ServicesController : ControllerBase
         }
 
         var categoryId = Normalize(request.CategoryId);
-        if (categoryId is not null && !await _db.TblCategories.AnyAsync(c => c.Id == categoryId, cancellationToken))
+        if (categoryId is not null)
         {
-            ModelState.AddModelError(nameof(request.CategoryId), $"No row with Id '{categoryId}'.");
+            await CheckActivityCategoryAsync(nameof(request.CategoryId), categoryId, cancellationToken);
         }
 
         var ownerId = Normalize(request.OwnerId);
@@ -1048,15 +1139,20 @@ public class ServicesController : ControllerBase
         activity.StatusId = statusId ?? activity.StatusId;
         activity.CategoryId = categoryId ?? activity.CategoryId;
         activity.Summary = Normalize(request.Summary) ?? activity.Summary;
-        activity.IsReceived = request.IsReceived ?? activity.IsReceived;
+        activity.IsReceived = Normalize(request.IsReceived) ?? activity.IsReceived;
         // Nullable columns: null keeps, blank clears.
         activity.Detail = request.Detail is null ? activity.Detail : string.IsNullOrWhiteSpace(request.Detail) ? null : request.Detail;
         activity.ContactId = Merge(request.ContactId, activity.ContactId);
         activity.OwnerId = Merge(request.OwnerId, activity.OwnerId);
         activity.GroupId = Merge(request.GroupId, activity.GroupId);
         activity.DateOpened = request.DateOpened ?? activity.DateOpened;
-        activity.DateClosed = request.DateClosed ?? activity.DateClosed;
-        activity.Updated = Now();
+        var now = Now();
+        activity.DateClosed = ResolveDateClosed(
+            await LoadStatusIsTypeAsync(activity.StatusId, StatusTypes.Activity, cancellationToken),
+            statusSent: statusId is not null,
+            activity.DateClosed,
+            now);
+        activity.Updated = now;
         activity.UpdatedBy = actingEmployeeId;
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -1111,57 +1207,55 @@ public class ServicesController : ControllerBase
         return next > MaxDailyRunningNumber ? null : prefix + next.ToString("D5", CultureInfo.InvariantCulture);
     }
 
-    /// <summary><c>TblStatus.IsType</c> ของสถานะเรื่อง (ชุด SERVICE) ที่ <paramref name="statusId"/> ชี้ไป หรือ <c>null</c></summary>
-    private async Task<string?> LoadStatusIsTypeAsync(string? statusId, CancellationToken cancellationToken) =>
+    /// <summary>ประเภทการดำเนินการ (<c>TblCategory</c> ชุด <c>ACTIVITY</c>) ที่เปิดใช้งาน</summary>
+    private IQueryable<TblCategory> ActivityCategories() =>
+        _db.TblCategories.Where(c => c.CategoryType == CategoryTypes.Activity && c.IsEnable == "T");
+
+    /// <summary>ตรวจว่า <paramref name="categoryId"/> เป็นประเภทการดำเนินการที่เปิดใช้งาน ไม่ใช่ก็ใส่ error ใน <c>ModelState</c></summary>
+    private async Task CheckActivityCategoryAsync(string field, string categoryId, CancellationToken cancellationToken)
+    {
+        if (!await ActivityCategories().AnyAsync(c => c.Id == categoryId, cancellationToken))
+        {
+            ModelState.AddModelError(field, $"No enabled ACTIVITY TblCategory row with Id '{categoryId}'.");
+        }
+    }
+
+    /// <summary>
+    /// <c>TblStatus.IsType</c> ของสถานะชุด <paramref name="statusType"/> (<see cref="StatusTypes"/>) ที่
+    /// <paramref name="statusId"/> ชี้ไป หรือ <c>null</c>
+    /// </summary>
+    private async Task<string?> LoadStatusIsTypeAsync(
+        string? statusId,
+        string statusType,
+        CancellationToken cancellationToken) =>
         string.IsNullOrEmpty(statusId)
             ? null
             : await _db.TblStatuses
-                .Where(s => s.Id == statusId && s.StatusType == StatusTypes.Service)
+                .Where(s => s.Id == statusId && s.StatusType == statusType)
                 .Select(s => s.IsType)
                 .FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>
-    /// <c>DateClosed</c> ที่จะบันทึก ตาม <c>IsType</c> ของสถานะใหม่ ข้อผิดพลาดใส่ใน <c>ModelState</c>
+    /// <c>DateClosed</c> ที่จะบันทึก ใช้ทั้งเรื่องและงาน server เป็นคนกำหนดเสมอ ไม่รับเวลาจาก client
+    /// (นาฬิกาฝั่ง client เชื่อไม่ได้)
     /// <list type="bullet">
-    /// <item>ปิด/ยกเลิก (<c>CLOSE</c>/<c>CANCEL</c>): ค่าที่ส่งมา &gt; ค่าเดิม &gt; เวลาปัจจุบัน
-    /// ค่าที่ส่งมาต้องไม่เป็นอนาคตและไม่ก่อน <c>DateOpened</c></item>
-    /// <item>สถานะอื่น: ส่ง <c>DateClosed</c> มาไม่ได้ คงค่าเดิมไว้ (การล้างตอนเปิดเรื่องซ้ำทำแยก)</item>
+    /// <item>สถานะใหม่เป็นปิด/ยกเลิก (<c>CLOSE</c>/<c>CANCEL</c>): ค่าเดิม ถ้ายังไม่มี = <paramref name="now"/></item>
+    /// <item>ส่งสถานะ <c>OPEN</c> มา (<paramref name="statusSent"/>) ให้รายการที่ปิดแล้ว: ล้างเป็น <c>null</c> (เปิดซ้ำ)</item>
+    /// <item>อื่น ๆ: คงค่าเดิม (แก้ช่องอื่นของรายการเก่าที่ <c>DateClosed</c> ค้างอยู่จึงไม่ถือเป็นการเปิดซ้ำ)</item>
     /// </list>
     /// </summary>
-    private DateTime? ResolveDateClosed(
+    private static DateTime? ResolveDateClosed(
         string? statusIsType,
-        DateTime? requested,
+        bool statusSent,
         DateTime? current,
-        DateTime? dateOpened,
         DateTime now)
     {
-        const string field = nameof(ServiceFieldsRequest.DateClosed);
-
-        if (!StatusIsTypes.IsFinished(statusIsType))
+        if (StatusIsTypes.IsFinished(statusIsType))
         {
-            if (requested is not null)
-            {
-                ModelState.AddModelError(field, "DateClosed can only be sent with a CLOSE or CANCEL status.");
-            }
-
-            return current;
+            return current ?? now;
         }
 
-        if (requested is { } value)
-        {
-            if (value > now)
-            {
-                ModelState.AddModelError(field, "DateClosed cannot be in the future.");
-            }
-            else if (dateOpened is { } opened && value < opened)
-            {
-                ModelState.AddModelError(field, "DateClosed cannot be before DateOpened.");
-            }
-
-            return value;
-        }
-
-        return current ?? now;
+        return statusSent && statusIsType == StatusIsTypes.Open ? null : current;
     }
 
     /// <summary>

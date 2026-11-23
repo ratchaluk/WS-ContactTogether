@@ -19,7 +19,7 @@ public class UpdateServiceOperationRequest
     /// <summary>ไม่จำกัดความยาว (<c>nvarchar(max)</c>)</summary>
     public string? Detail { get; set; }
 
-    /// <summary><c>TblCategory.Id</c></summary>
+    /// <summary><c>TblCategory.Id</c> ชุด <c>ACTIVITY</c> ที่เปิดใช้งาน</summary>
     [MaxLength(50)]
     public string? CategoryId { get; set; }
 
@@ -40,7 +40,4 @@ public class UpdateServiceOperationRequest
 
     /// <summary>เวลาไทย</summary>
     public DateTime? DateOpened { get; set; }
-
-    /// <summary>เวลาไทย</summary>
-    public DateTime? DateClosed { get; set; }
 }

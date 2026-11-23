@@ -7,8 +7,9 @@ namespace ContactTogetherApi.Dtos;
 /// <list type="bullet">
 /// <item>ช่องที่ไม่ส่ง (<c>null</c>) คงค่าเดิม</item>
 /// <item>ช่องข้อความที่ส่งเป็น <c>""</c> ล้างค่าเป็น NULL (ยกเว้น <see cref="ServiceTitleId"/> ซึ่งล้างไม่ได้)</item>
-/// <item>วันที่ล้างไม่ได้ ยกเว้น <c>DateClosed</c> ที่ระบบล้างให้เองเมื่อเปิดเรื่องซ้ำ (ดู <see cref="ReOpenComment"/>)</item>
-/// <item><c>DateClosed</c> ส่งได้เฉพาะคู่กับสถานะปิด/ยกเลิก ถ้าไม่ส่ง ระบบตั้งเป็นเวลาปัจจุบันให้ตอนปิดเรื่อง</item>
+/// <item>วันที่ (<c>DateOpened</c>/<c>OnScene</c>) ล้างไม่ได้</item>
+/// <item><c>DateClosed</c> รับจาก client ไม่ได้ server ตั้งให้เมื่อเปลี่ยนเป็นสถานะปิด/ยกเลิก และล้างให้เมื่อเปิดเรื่องซ้ำ
+/// (ดู <see cref="ReOpenComment"/>)</item>
 /// </list>
 /// </summary>
 public class UpdateServiceRequest : ServiceFieldsRequest
