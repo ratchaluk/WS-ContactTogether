@@ -639,19 +639,15 @@ public class ServicesController : ControllerBase
             "EXEC sp_getapplock @Resource = 'TblService.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
             cancellationToken);
 
-        var prefix = ServiceCodePrefix(now);
-        var lastCode = await _db.TblServices.AsNoTracking()
-            .Where(s => s.Code!.StartsWith(prefix) && s.Code.Length == ServiceCodeLength)
-            .MaxAsync(s => s.Code, cancellationToken);
-        var next = lastCode is null ? 1 : int.Parse(lastCode[prefix.Length..], CultureInfo.InvariantCulture) + 1;
-        if (next > MaxDailyRunningNumber)
+        var code = await NextDailyCodeAsync(_db.TblServices.Select(s => s.Code!), now, cancellationToken);
+        if (code is null)
         {
             return Conflict(new MessageResponse(
                 StatusCodes.Status409Conflict,
                 "The daily limit of service codes has been reached."));
         }
 
-        service.Code = prefix + next.ToString("D5", CultureInfo.InvariantCulture);
+        service.Code = code;
 
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO TblService (
@@ -823,6 +819,175 @@ public class ServicesController : ControllerBase
         var result = await ToResponses(_db.TblServices.AsNoTracking().Where(s => s.Id == serviceId))
             .FirstAsync(cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// เพิ่มงาน (การดำเนินการ) ของเรื่องลงใน <c>TblActivity</c> แล้วคืนแถวนั้นกลับไป
+    /// <c>Line</c> ต่อจากงานล่าสุดของเรื่องเดียวกัน (งานแรกได้ 1) ส่วน <c>Code</c> ใช้รูปแบบเดียวกับ
+    /// <see cref="AddNewService"/>: <c>yyMMdd</c> ปี พ.ศ. ตามด้วยเลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
+    /// (นับแยกจากเลขของ <c>TblService</c>) <c>IsEnable</c> เป็น <c>T</c> เสมอ ส่วน
+    /// <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token
+    /// </summary>
+    [HttpPost("AddNewServiceOperations")]
+    [ProducesResponseType(typeof(ServiceOperationResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AddNewServiceOperations(
+        [FromBody] CreateServiceOperationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the new operation."));
+        }
+
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var serviceId = request.ServiceId!.Trim().ToUpperInvariant();
+        var service = await _db.TblServices.AsNoTracking()
+            .Where(s => s.Id == serviceId && s.IsEnable == "T")
+            .Select(s => new { s.CategoryId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (service is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลเรื่อง"));
+        }
+
+        var categoryId = Normalize(request.CategoryId) ?? service.CategoryId;
+        if (string.IsNullOrEmpty(categoryId))
+        {
+            // TblActivity.CategoryId is NOT NULL, and this service has no category to fall back on.
+            ModelState.AddModelError(nameof(request.CategoryId), "A CategoryId is required for this service.");
+        }
+        else if (!await _db.TblCategories.AnyAsync(c => c.Id == categoryId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.CategoryId), $"No row with Id '{categoryId}'.");
+        }
+
+        var statusId = request.StatusId!.Trim();
+        if (!await _db.TblStatuses.AnyAsync(
+                s => s.Id == statusId && s.StatusType == StatusTypes.Activity, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.StatusId), $"No ACTIVITY TblStatus row with Id '{statusId}'.");
+        }
+
+        var ownerId = Normalize(request.OwnerId) ?? actingEmployeeId;
+        if (!await _db.TblEmployees.AnyAsync(e => e.Id == ownerId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.OwnerId), $"No row with Id '{ownerId}'.");
+        }
+
+        var contactId = Normalize(request.ContactId);
+        if (contactId is not null && !await _db.TblContacts.AnyAsync(c => c.Id == contactId, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.ContactId), $"No row with Id '{contactId}'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Summary))
+        {
+            ModelState.AddModelError(nameof(request.Summary), "The Summary field is required.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var now = Now();
+
+        // The app lock makes concurrent requests take codes and lines one at a time, so no two
+        // operations get the same Code, or the same Line within a service.
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await _db.Database.ExecuteSqlRawAsync(
+            "EXEC sp_getapplock @Resource = 'TblActivity.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
+            cancellationToken);
+
+        var code = await NextDailyCodeAsync(_db.TblActivities.Select(a => a.Code), now, cancellationToken);
+        if (code is null)
+        {
+            return Conflict(new MessageResponse(
+                StatusCodes.Status409Conflict,
+                "The daily limit of operation codes has been reached."));
+        }
+
+        var lastLine = await _db.TblActivities
+            .Where(a => a.ServiceId == serviceId)
+            .MaxAsync(a => (int?)a.Line, cancellationToken);
+
+        var activity = new TblActivity
+        {
+            ServiceId = serviceId,
+            Line = (lastLine ?? 0) + 1,
+            Code = code,
+            ContactId = contactId,
+            CategoryId = categoryId!,
+            StatusId = statusId,
+            DateOpened = request.DateOpened ?? now,
+            DateClosed = request.DateClosed,
+            Summary = request.Summary!.Trim(),
+            Detail = request.Detail,
+            OwnerId = ownerId,
+            GroupId = Normalize(request.GroupId),
+            IsReceived = request.IsReceived ?? "F",
+            IsEnable = "T",
+            Created = now,
+            CreatedBy = actingEmployeeId,
+            Updated = now,
+            UpdatedBy = actingEmployeeId,
+        };
+        _db.TblActivities.Add(activity);
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Operation {OperationCode} (service {ServiceId}, line {Line}) created by {ActingEmployeeId}.",
+            activity.Code,
+            activity.ServiceId,
+            activity.Line,
+            actingEmployeeId);
+
+        return StatusCode(StatusCodes.Status201Created, new ServiceOperationResponse
+        {
+            ServiceId = activity.ServiceId,
+            Line = activity.Line,
+            Code = activity.Code,
+            ContactId = activity.ContactId,
+            CategoryId = activity.CategoryId,
+            StatusId = activity.StatusId,
+            DateOpened = activity.DateOpened,
+            DateClosed = activity.DateClosed,
+            Summary = activity.Summary,
+            Detail = activity.Detail,
+            OwnerId = activity.OwnerId,
+            GroupId = activity.GroupId,
+            IsReceived = activity.IsReceived,
+            IsEnable = activity.IsEnable,
+            Created = activity.Created,
+            CreatedBy = activity.CreatedBy,
+            Updated = activity.Updated,
+            UpdatedBy = activity.UpdatedBy,
+        });
+    }
+
+    /// <summary>
+    /// เลขถัดไปของวันนี้ในรูปแบบ <c>yyMMdd</c> (ปี พ.ศ.) + เลขรัน 5 หลัก จากรหัสที่มีอยู่ใน <paramref name="codes"/>
+    /// คืน <c>null</c> เมื่อเลขรันของวันเต็มแล้ว ผู้เรียกต้องถือ app lock ไว้ ไม่งั้นสอง request อาจได้เลขเดียวกัน
+    /// </summary>
+    private static async Task<string?> NextDailyCodeAsync(
+        IQueryable<string> codes,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var prefix = ServiceCodePrefix(now);
+        var lastCode = await codes
+            .Where(c => c.StartsWith(prefix) && c.Length == ServiceCodeLength)
+            .MaxAsync(cancellationToken);
+        var next = lastCode is null ? 1 : int.Parse(lastCode[prefix.Length..], CultureInfo.InvariantCulture) + 1;
+        return next > MaxDailyRunningNumber ? null : prefix + next.ToString("D5", CultureInfo.InvariantCulture);
     }
 
     /// <summary><c>TblStatus.Id</c> ของสถานะ "อยู่ระหว่างดำเนินการ" (Pending)</summary>
