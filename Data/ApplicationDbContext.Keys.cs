@@ -21,10 +21,15 @@ public partial class ApplicationDbContext
         modelBuilder.Entity<TblAccount>().HasKey(e => e.Id);
         modelBuilder.Entity<TblContact>().HasKey(e => e.Id);
 
+        // TblActivity lost its (ServiceId, Line) primary key on 2026-11-23 and gained a
+        // uniqueidentifier Id defaulting to newsequentialid() (the table was empty, so no duplicates).
+        // Leave Id unset when inserting: the scaffolded HasDefaultValueSql makes the database fill it.
+        modelBuilder.Entity<TblActivity>().HasKey(e => e.Id);
+
         // Every insert gets a UUID primary key: any entity whose key is a single string column is
         // assigned one by GuidStringValueGenerator when it is Add()ed with the key left null. A key
-        // set explicitly is kept. Composite keys (TblActivity, TblReopenedLog) and keyless tables
-        // are skipped - their keys are not ids.
+        // set explicitly is kept. Composite keys (TblReopenedLog), Guid keys (TblActivity) and
+        // keyless tables are skipped.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             var key = entityType.FindPrimaryKey();

@@ -514,6 +514,22 @@ Content-Type: application/json
 
 ###
 
+# Edit an operation by its TblActivity.Id (the "id" AddNewServiceOperations returns). Only the fields sent
+# change; "" clears a nullable field (detail, contactId, ownerId, groupId) and is ignored for statusId,
+# summary, categoryId and isReceived. ServiceId, Line and Code cannot change. 200 = the row; 400 = a bad
+# id or lookup; 404 = no enabled operation with that id.
+PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateServiceOperations?id=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "CB0A973609E8D684F2944D92ED4126A1",
+  "dateClosed": "2026-11-23T16:30:00",
+  "detail": "ได้รับเอกสารครบแล้ว ปิดงาน"
+}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
