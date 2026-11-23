@@ -550,15 +550,13 @@ public class ServicesController : ControllerBase
                 "Token has no sub claim; cannot attribute the new service."));
         }
 
-        await ValidateLookupsAsync(request, cancellationToken);
+        await ValidateLookupsAsync(request, request.ServiceTitleId, cancellationToken);
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        // Thai local time, whole seconds (the columns are datetime2(0)).
-        var now = DateTime.Now;
-        now = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond));
+        var now = Now();
 
         var service = new TblService
         {
@@ -647,6 +645,164 @@ public class ServicesController : ControllerBase
     }
 
     /// <summary>
+    /// แก้ไขเรื่อง (<c>TblService</c>) ตาม <c>id</c> เฉพาะช่องที่ส่งมา (ดู <see cref="UpdateServiceRequest"/>)
+    /// <c>Updated</c>/<c>UpdatedBy</c> มาจากเวลาปัจจุบันและ token
+    /// ถ้าเปลี่ยน <c>StatusId</c> เป็น Pending ให้เรื่องที่ปิดไปแล้ว (<c>DateClosed</c> มีค่า) ถือเป็นการเปิดเรื่องซ้ำ:
+    /// เพิ่มแถวใน <c>TblReOpenService</c> (<c>Line</c> ต่อจากแถวล่าสุดของเรื่องนั้น เริ่มที่ 1) และล้าง
+    /// <c>DateClosed</c> ทั้งหมดอยู่ใน transaction เดียว
+    /// </summary>
+    [HttpPut("UpdateService")]
+    [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateService(
+        [FromQuery] string? id,
+        [FromBody] UpdateServiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the update."));
+        }
+
+        // Ids are stored in upper case and the DB collation is case-sensitive.
+        var serviceId = Normalize(id)?.ToUpperInvariant();
+        if (serviceId is null)
+        {
+            ModelState.AddModelError(nameof(id), "An id is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        await ValidateLookupsAsync(request, request.ServiceTitleId, cancellationToken);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var now = Now();
+
+        // UPDLOCK holds the row until commit, so two updates of the same service run one after the
+        // other: neither overwrites the other's read, and two reopenings cannot take the same Line.
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var current = await _db.TblServices
+            .FromSql($"SELECT * FROM TblService WITH (UPDLOCK, HOLDLOCK) WHERE Id = {serviceId} AND Is_Enable = 'T'")
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken);
+        if (current is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลเรื่อง"));
+        }
+
+        var updated = new TblService
+        {
+            Id = current.Id,
+            Code = current.Code,
+            CategoryId = Merge(request.CategoryId, current.CategoryId),
+            StatusId = Merge(request.StatusId, current.StatusId),
+            // NOT NULL, so a blank value keeps the current one instead of clearing it.
+            ServiceTitleId = string.IsNullOrWhiteSpace(request.ServiceTitleId)
+                ? current.ServiceTitleId
+                : request.ServiceTitleId.Trim().ToUpperInvariant(),
+            OwnerId = Merge(request.OwnerId, current.OwnerId),
+            ChannelIncomingId = Merge(request.ChannelIncomingId, current.ChannelIncomingId),
+            CallBack = Merge(request.CallBack, current.CallBack),
+            ChannelOutgoingId = Merge(request.ChannelOutgoingId, current.ChannelOutgoingId),
+            AccountId = Merge(request.AccountId, current.AccountId),
+            Summary = Merge(request.Summary, current.Summary),
+            Detail = Merge(request.Detail, current.Detail),
+            ServiceArea = Merge(request.ServiceArea, current.ServiceArea),
+            OrganizationId = Merge(request.OrganizationId, current.OrganizationId),
+            ServiceReference = Merge(request.ServiceReference, current.ServiceReference),
+            ServiceReferenceLink = Merge(request.ServiceReferenceLink, current.ServiceReferenceLink),
+            AreaId = Merge(request.AreaId, current.AreaId),
+            Remark = Merge(request.Remark, current.Remark),
+            LevelSeverityId = Merge(request.LevelSeverityId, current.LevelSeverityId),
+            LevelPriorityId = Merge(request.LevelPriorityId, current.LevelPriorityId),
+            LevelSecretId = Merge(request.LevelSecretId, current.LevelSecretId),
+            DateOpened = request.DateOpened ?? current.DateOpened,
+            DateClosed = request.DateClosed ?? current.DateClosed,
+            OnScene = request.OnScene ?? current.OnScene,
+            Updated = now,
+            UpdatedBy = actingEmployeeId,
+        };
+
+        // Back to Pending on a closed service is a reopening: log it and clear DateClosed.
+        if (updated.StatusId == PendingStatusId && current.DateClosed is not null)
+        {
+            var lastLine = await _db.TblReOpenServices
+                .Where(r => r.ServiceId == serviceId)
+                .MaxAsync(r => (int?)r.Line, cancellationToken);
+
+            _db.TblReOpenServices.Add(new TblReOpenService
+            {
+                ServiceId = serviceId,
+                Line = (lastLine ?? 0) + 1,
+                ReOpenComment = request.ReOpenComment?.Trim() ?? string.Empty,
+                Closed = current.DateClosed.Value,
+                // TblService does not record who closed it; the last update before this one is the
+                // closest there is.
+                ClosedBy = current.UpdatedBy,
+                ReOpened = now,
+                ReOpenedBy = actingEmployeeId,
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+
+            updated.DateClosed = null;
+        }
+
+        // TblService is keyless in the model, so EF cannot update it; write it with SQL instead.
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE TblService SET
+                Category_ID = {updated.CategoryId}, Status_ID = {updated.StatusId},
+                ServiceTitleId = {updated.ServiceTitleId}, Owner_ID = {updated.OwnerId},
+                Channel_Incoming_ID = {updated.ChannelIncomingId}, Call_Back = {updated.CallBack},
+                Channel_Outgoing_ID = {updated.ChannelOutgoingId}, Account_ID = {updated.AccountId},
+                Summary = {updated.Summary}, Detail = {updated.Detail}, Service_Area = {updated.ServiceArea},
+                Organization_ID = {updated.OrganizationId}, Service_Reference = {updated.ServiceReference},
+                Service_Reference_Link = {updated.ServiceReferenceLink}, Area_ID = {updated.AreaId},
+                Remark = {updated.Remark}, Level_Severity_ID = {updated.LevelSeverityId},
+                Level_Priority_ID = {updated.LevelPriorityId}, Level_Secret_ID = {updated.LevelSecretId},
+                Date_Opened = {updated.DateOpened}, Date_Closed = {updated.DateClosed},
+                On_Scene = {updated.OnScene}, Updated = {updated.Updated}, Updated_By = {updated.UpdatedBy}
+            WHERE Id = {serviceId}
+            """, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Service {ServiceCode} ({ServiceId}) updated by {ActingEmployeeId}; reopened: {Reopened}.",
+            current.Code,
+            serviceId,
+            actingEmployeeId,
+            current.DateClosed is not null && updated.DateClosed is null);
+
+        var result = await ToResponses(_db.TblServices.AsNoTracking().Where(s => s.Id == serviceId))
+            .FirstAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary><c>TblStatus.Id</c> ของสถานะ "อยู่ระหว่างดำเนินการ" (Pending)</summary>
+    private const string PendingStatusId = "19C49E66B6F9EF1BCE11A3B93DED12C8";
+
+    /// <summary>
+    /// ค่าที่จะบันทึกของช่องข้อความใน <see cref="UpdateService"/>: <c>null</c> = คงค่าเดิม,
+    /// ค่าว่าง = ล้างเป็น NULL, อื่น ๆ = ค่าใหม่ (ตัดช่องว่างหน้า/หลัง)
+    /// </summary>
+    private static string? Merge(string? requested, string? current) =>
+        requested is null ? current : string.IsNullOrWhiteSpace(requested) ? null : requested.Trim();
+
+    /// <summary>เวลาไทยปัจจุบัน ปัดเศษวินาทีทิ้ง (คอลัมน์เป็น <c>datetime2(0)</c>)</summary>
+    private static DateTime Now()
+    {
+        var now = DateTime.Now;
+        return now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond));
+    }
+
+    /// <summary>
     /// <c>yyMMdd</c> โดยใช้เลข 2 หลักท้ายของปี พ.ศ. เช่น <c>690825</c> คือวันที่
     /// 25 ส.ค. 2026 (พ.ศ. 2569)
     /// </summary>
@@ -657,7 +813,10 @@ public class ServicesController : ControllerBase
     /// คอลัมน์เหล่านี้ไม่มี FK constraint ใน DB ถ้าไม่ตรวจ id ที่ผิดก็จะถูกบันทึกลงไปเฉย ๆ
     /// จึงตรวจกับตาราง lookup แต่ละตัว แล้วรายงานเป็น validation error
     /// </summary>
-    private async Task ValidateLookupsAsync(CreateServiceRequest request, CancellationToken cancellationToken)
+    private async Task ValidateLookupsAsync(
+        ServiceFieldsRequest request,
+        string? serviceTitleId,
+        CancellationToken cancellationToken)
     {
         await CheckAsync(nameof(request.CategoryId), request.CategoryId, _db.TblCategories.Select(x => x.Id));
         await CheckAsync(nameof(request.StatusId), request.StatusId,
@@ -670,16 +829,16 @@ public class ServicesController : ControllerBase
         await CheckAsync(nameof(request.ServiceReference), request.ServiceReference, _db.TblReferences.Select(x => x.Id));
         await CheckAsync(nameof(request.AreaId), request.AreaId, _db.TblAreas.Select(x => x.Id));
 
-        // TblServiceTitles.Id is a uniqueidentifier, so parse it rather than compare text. [Required]
-        // has already reported a missing value.
-        if (!string.IsNullOrWhiteSpace(request.ServiceTitleId))
+        // TblServiceTitles.Id is a uniqueidentifier, so parse it rather than compare text. A missing
+        // value is AddNewService's [Required] to report, and means "unchanged" to UpdateService.
+        if (!string.IsNullOrWhiteSpace(serviceTitleId))
         {
-            if (!Guid.TryParse(request.ServiceTitleId.Trim(), out var titleId)
+            if (!Guid.TryParse(serviceTitleId.Trim(), out var titleId)
                 || !await _db.TblServiceTitles.AnyAsync(t => t.Id == titleId && t.IsEnable == "T", cancellationToken))
             {
                 ModelState.AddModelError(
-                    nameof(request.ServiceTitleId),
-                    $"No enabled TblServiceTitles row with Id '{request.ServiceTitleId}'.");
+                    nameof(CreateServiceRequest.ServiceTitleId),
+                    $"No enabled TblServiceTitles row with Id '{serviceTitleId}'.");
             }
         }
         // One table holds all three kinds of level, so the id must also be of the right LevelType.

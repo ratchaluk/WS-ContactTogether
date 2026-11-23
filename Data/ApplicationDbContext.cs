@@ -22,6 +22,8 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblArea> TblAreas { get; set; }
 
+    public virtual DbSet<TblAreaImportFromUat> TblAreaImportFromUats { get; set; }
+
     public virtual DbSet<TblAttachment> TblAttachments { get; set; }
 
     public virtual DbSet<TblBroadcast> TblBroadcasts { get; set; }
@@ -57,6 +59,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<TblPage> TblPages { get; set; }
 
     public virtual DbSet<TblProvince> TblProvinces { get; set; }
+
+    public virtual DbSet<TblReOpenService> TblReOpenServices { get; set; }
 
     public virtual DbSet<TblReference> TblReferences { get; set; }
 
@@ -190,6 +194,40 @@ public partial class ApplicationDbContext : DbContext
             entity.HasOne(d => d.Ref).WithMany(p => p.InverseRef)
                 .HasForeignKey(d => d.RefId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<TblAreaImportFromUat>(entity =>
+        {
+            entity.ToTable("tbl_area_import_from_uat");
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(50)
+                .HasColumnName("ID");
+            entity.Property(e => e.AreaType)
+                .HasMaxLength(50)
+                .HasColumnName("Area_Type");
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(100)
+                .HasColumnName("Created_By");
+            entity.Property(e => e.IsDefault)
+                .HasMaxLength(10)
+                .HasColumnName("Is_Default");
+            entity.Property(e => e.IsEnable)
+                .HasMaxLength(10)
+                .HasColumnName("Is_Enable");
+            entity.Property(e => e.NameEn)
+                .HasMaxLength(200)
+                .HasColumnName("Name_EN");
+            entity.Property(e => e.NameTh)
+                .HasMaxLength(200)
+                .HasColumnName("Name_TH");
+            entity.Property(e => e.RefId)
+                .HasMaxLength(50)
+                .HasColumnName("Ref_ID");
+            entity.Property(e => e.UpdatedBy)
+                .HasMaxLength(100)
+                .HasColumnName("Updated_By");
+            entity.Property(e => e.Zipcode).HasMaxLength(50);
         });
 
         modelBuilder.Entity<TblAttachment>(entity =>
@@ -558,6 +596,19 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.ProvinceName).HasMaxLength(100);
             entity.Property(e => e.Updated).HasMaxLength(50);
             entity.Property(e => e.UpdatedBy).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TblReOpenService>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__TblReOpe__3214EC079B97819F");
+
+            entity.ToTable("TblReOpenService");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_ReOpenServiceId");
+            entity.Property(e => e.ClosedBy).HasMaxLength(50);
+            entity.Property(e => e.ReOpenComment).HasMaxLength(100);
+            entity.Property(e => e.ReOpenedBy).HasMaxLength(50);
+            entity.Property(e => e.ServiceId).HasMaxLength(50);
         });
 
         modelBuilder.Entity<TblReference>(entity =>
