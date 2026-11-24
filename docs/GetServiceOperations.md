@@ -30,7 +30,9 @@
 ### 2.1 รูปแบบ
 
 200 ตอบเป็น **array ตรง ๆ** (ไม่มี envelope ไม่มี paging) **เรียงตาม `line` จากรายการแรก**
-มีเฉพาะการดำเนินการที่เปิดใช้งาน เรื่องที่ยังไม่มีการดำเนินการได้ `[]` ไม่รวมไฟล์แนบ
+มีเฉพาะการดำเนินการที่เปิดใช้งาน ไม่รวมไฟล์แนบ
+เรื่องที่เปิดผ่าน `AddNewService` จะมีรายการแรก (`line` 1, "Call Inbound" / "เริ่มให้บริการ", สถานะปิด) เสมอ
+([AddNewService.md](AddNewService.md) ข้อ 3.2) ส่วนเรื่องเก่าอาจได้ `[]`
 
 แต่ละรายการมีทุก field แบบเดียวกับ response ของ `AddNewServiceOperations`
 ([AddNewServiceOperations.md](AddNewServiceOperations.md) ข้อ 3.1) **บวกชื่อที่แปลงแล้ว**:
@@ -43,6 +45,7 @@
 | `ownerName` | ผู้รับผิดชอบ (คำนำหน้า ชื่อ นามสกุล) | `ownerId` |
 | `contactDetail` | เบอร์ที่รับสาย | `contactId` |
 | `createdByName` / `updatedByName` | ผู้บันทึก / ผู้แก้ไขล่าสุด | `createdBy` / `updatedBy` |
+| `isReceivedText` | `รับงานแล้ว` / `รอการตอบรับ` ตามระบบเดิม เป็น `""` เมื่อผู้รับผิดชอบคือผู้สร้างงานเอง | `isReceived` |
 
 ชื่อเป็น `null` ถ้า id ว่างหรือหาแถวไม่เจอ ให้แสดง "-"
 
@@ -52,7 +55,7 @@
 | หัวข้อ / รายละเอียด | `summary` / `detail` |
 | ประเภท | `categoryNameTh` |
 | สถานะ | `statusNameTh` (+ `statusIsType` สำหรับสี/ไอคอน) |
-| ผู้รับผิดชอบ | `ownerName` |
+| ผู้รับผิดชอบ | `ownerName` + `isReceivedText` (ถ้าไม่ว่าง) |
 | วันที่เริ่ม / เสร็จ | `dateOpened` / `dateClosed` (เวลาไทย ไม่มี offset; `dateClosed` เป็นเวลาที่ server บันทึกตอนปิด) |
 | ผู้บันทึก | `createdByName` + `created` |
 | ปุ่มแก้ไข | ใช้ `id` กับ `PUT /Services/UpdateServiceOperations?id=` |
@@ -67,34 +70,35 @@
     "id": "6a1d0c4e-2f3b-f111-8e93-96f1f7a12f5e",
     "serviceId": "427D66AA13734763AC1D99775554659B",
     "line": 1,
-    "code": "69112300001",
+    "code": "69112400001",
     "contactId": null,
     "contactDetail": null,
-    "categoryId": "1987E8FF8070CEFA483F881ED0CD2170",
-    "categoryNameTh": "Call - Outbound",
+    "categoryId": "1987E8FF8070CEFA483F881ED0CD2171",
+    "categoryNameTh": "Call - Inbound",
     "statusId": "CB0A973609E8D684F2944D92ED4126A1",
     "statusNameTh": "ปิด",
     "statusIsType": "CLOSE",
-    "dateOpened": "2026-11-23T15:10:00",
-    "dateClosed": "2026-11-23T16:30:00",
-    "summary": "โทรติดต่อผู้ร้องเพื่อสอบถามข้อมูลเพิ่มเติม",
-    "detail": "ได้รับเอกสารครบแล้ว ปิดงาน",
+    "dateOpened": "2026-11-23T23:59:56",
+    "dateClosed": "2026-11-24T00:00:24",
+    "summary": "Call Inbound",
+    "detail": "เริ่มให้บริการ",
     "ownerId": "505981F1B7534D56BF4BF2F159322184",
     "ownerName": "นาย กันตณัฐิ์ ประกอบศุขราษฎร์",
     "groupId": null,
-    "isReceived": "F",
+    "isReceived": "T",
+    "isReceivedText": "",
     "isEnable": "T",
-    "created": "2026-11-23T15:10:00",
+    "created": "2026-11-24T00:00:24",
     "createdBy": "505981F1B7534D56BF4BF2F159322184",
     "createdByName": "นาย กันตณัฐิ์ ประกอบศุขราษฎร์",
-    "updated": "2026-11-23T16:30:00",
+    "updated": "2026-11-24T00:00:24",
     "updatedBy": "505981F1B7534D56BF4BF2F159322184",
     "updatedByName": "นาย กันตณัฐิ์ ประกอบศุขราษฎร์"
   }
 ]
 ```
 
-ตัวอย่างนี้ประกอบขึ้นเพื่ออธิบายรูปแบบ (ณ 23 พ.ย. 2569 ยังไม่มีการดำเนินการในระบบ) ลำดับ field อาจไม่ตรง
+ตัวอย่างคือรายการแรกที่ `AddNewService` สร้างให้ (ค่าประกอบขึ้นเพื่ออธิบายรูปแบบ) ลำดับ field อาจไม่ตรง
 
 ### 2.3 Status code
 
@@ -122,6 +126,7 @@ export interface ServiceOperationListItem extends ServiceOperation {
   contactDetail: string | null;
   createdByName: string | null;
   updatedByName: string | null;
+  isReceivedText: "รับงานแล้ว" | "รอการตอบรับ" | "" | string;
 }
 
 export async function fetchServiceOperations(
@@ -155,6 +160,9 @@ export async function fetchServiceOperations(
   </ol>
 )}
 ```
+
+**ตอนเปิดหน้ารายละเอียดเรื่อง ให้เรียก `POST /Services/ReceiveService?id=<serviceId>` ก่อน** ([ReceiveService.md](ReceiveService.md))
+แล้วค่อยเรียก endpoint นี้ งานที่มอบให้ผู้ใช้คนนี้จะได้ขึ้น `รับงานแล้ว` ตามระบบเดิม
 
 หลังเพิ่มหรือแก้ไขการดำเนินการ ให้เรียก `fetchServiceOperations` ใหม่ (หรือ revalidate) เพื่อได้ชื่อที่แปลงแล้วและลำดับล่าสุด
 

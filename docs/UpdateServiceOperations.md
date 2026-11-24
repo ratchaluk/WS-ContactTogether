@@ -10,7 +10,7 @@
 > และ type `ServiceOperation`), [GetServiceOperations.md](GetServiceOperations.md) (รายการ + `id`),
 > [GetStatusByStatusTypeActivity.md](GetStatusByStatusTypeActivity.md)
 >
-> **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `dateClosed` server จัดการเอง, `categoryId` ชุด ACTIVITY, `isReceived: ""` = คงเดิม
+> **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `dateClosed` server จัดการเอง, `categoryId` ชุด ACTIVITY, `isReceived` server จัดการเอง
 
 ---
 
@@ -41,15 +41,14 @@
 | `statusId` | คงเดิม | คงเดิม | id จาก `GetStatusByStatusTypeActivity` เท่านั้น |
 | `summary` | คงเดิม | คงเดิม | ล้างไม่ได้ |
 | `categoryId` | คงเดิม | คงเดิม | ล้างไม่ได้ ต้องเป็นชุด `ACTIVITY` |
-| `isReceived` | คงเดิม | คงเดิม | `"T"` หรือ `"F"` |
 | `detail` | คงเดิม | **ล้างค่า** | |
-| `ownerId` | คงเดิม | **ล้างค่า** | id จาก `GetEmployee` |
+| `ownerId` | คงเดิม | **ล้างค่า** | id จาก `GetEmployee` เปลี่ยนผู้รับ = `isReceived` กลับเป็น `"F"` (ดูข้อ 2.2) |
 | `contactId` | คงเดิม | **ล้างค่า** | id ของ `AddNewContact` |
 | `groupId` | คงเดิม | **ล้างค่า** | ยังไม่ใช้ ไม่ต้องส่ง |
 | `dateOpened` | คงเดิม | – | ล้างไม่ได้ |
 
 แก้ไม่ได้: `serviceId`, `line`, `code` (ส่งมาก็ไม่มีผล)
-**backend ใส่ให้เอง**: `updated` (= เวลาที่บันทึก), `updatedBy` (= ผู้ที่ login อยู่), `dateClosed` (ดูข้อ 2.2 ส่งมาจะถูกข้าม)
+**backend ใส่ให้เอง**: `updated` (= เวลาที่บันทึก), `updatedBy` (= ผู้ที่ login อยู่), `dateClosed`, `isReceived` (ดูข้อ 2.2 ส่งมาจะถูกข้าม)
 
 > ⚠️ ถ้าฟอร์มส่งทุก field ทั้งก้อน ช่อง `detail` / `ownerId` / `contactId` ที่ว่างจะถูกล้าง
 > แนะนำให้ส่งเฉพาะ field ที่ผู้ใช้แก้ (เทียบกับค่าเดิม) ดูโค้ดตัวอย่างข้อ 4
@@ -65,6 +64,8 @@
   | `statusId` ที่ `isType` เป็น `OPEN` | `null` (เปิดงานกลับ) |
   | ไม่ส่ง `statusId` | คงเดิม |
 
+- **`isReceived` server จัดการเอง (ตามระบบเดิม):** เปลี่ยน `ownerId` เป็นคนอื่น (หรือล้าง) → `"F"` รอการตอบรับ
+  ผู้รับใหม่จะรับงานเมื่อเปิดดูเรื่อง ([ReceiveService.md](ReceiveService.md)) ไม่เปลี่ยนผู้รับ = คงเดิม
 - **`categoryId`**: ต้องเป็นประเภทการดำเนินการ (ชุด `ACTIVITY`) ที่เปิดใช้งาน ส่งชุดอื่นได้ 400
 - **วันที่** เป็นเวลาไทย `yyyy-MM-ddTHH:mm:ss` ห้ามมี `Z` / `+07:00` API ไม่ตรวจลำดับวันที่
 - **ไม่มีการกันชนกัน**: สองคนแก้งานเดียวกัน คนที่บันทึกทีหลังทับเฉพาะ field ที่ตัวเองส่ง
@@ -101,7 +102,7 @@ Content-Type: application/json
 | HTTP | เมื่อไร | Body |
 |---|---|---|
 | 200 | แก้ไขสำเร็จ | `ServiceOperation` (ดู [AddNewServiceOperations.md](AddNewServiceOperations.md) ข้อ 3.1) |
-| 400 | ไม่ส่ง `id` หรือไม่ใช่ GUID, id lookup ผิด, `isReceived` ไม่ใช่ `T`/`F`, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>` เช่น `errors.id`, `errors.StatusId`) |
+| 400 | ไม่ส่ง `id` หรือไม่ใช่ GUID, id lookup ผิด, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>` เช่น `errors.id`, `errors.StatusId`) |
 | 401 | ไม่มี token, token หมดอายุ หรือ logout แล้ว | ว่าง |
 | 404 | ไม่มีการดำเนินการที่ `id` นี้ หรือถูกปิดใช้งาน | `{ "statusCode": 404, "message": "ไม่พบข้อมูลการดำเนินการ" }` |
 | 500 | ข้อผิดพลาดฝั่ง server | ว่าง หรือ JSON (อย่าพึ่งรูปแบบ) |
@@ -123,7 +124,6 @@ export interface UpdateServiceOperationBody {
   categoryId?: string | null;
   ownerId?: string | null;
   contactId?: string | null;
-  isReceived?: "T" | "F" | null;
   dateOpened?: string | null;
   // ไม่มี dateClosed: server ตั้งเอง
 }

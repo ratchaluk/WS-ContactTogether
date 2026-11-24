@@ -45,10 +45,9 @@
 | `ownerId` | | 50 | เจ้าหน้าที่ผู้รับผิดชอบ | ไม่ส่ง = **ผู้ที่ login อยู่** ส่งเองใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
 | `contactId` | | 50 | การรับสายที่เกี่ยวข้อง (`TblContact`) | `id` ใน response ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) ไม่มีก็ไม่ต้องส่ง |
 | `groupId` | | 50 | กลุ่มงาน | ยังไม่มี lookup และ API ไม่ตรวจค่า **ไม่ต้องส่ง** จนกว่าจะตกลงกัน |
-| `isReceived` | | – | สถานะ "รับงานแล้ว" | `"T"` หรือ `"F"` เท่านั้น ไม่ส่ง = `"F"` |
 | `dateOpened` | | – | วันเวลาที่เริ่มดำเนินการ | ไม่ส่ง = **เวลาที่บันทึก** |
 
-**backend ใส่ให้เอง** (ส่งมาก็ไม่มีผล): `id`, `line`, `code`, `isEnable` (= `"T"`), `dateClosed` (ดู 2.2),
+**backend ใส่ให้เอง** (ส่งมาก็ไม่มีผล): `id`, `line`, `code`, `isEnable` (= `"T"`), `dateClosed` (ดู 2.2), `isReceived` (ดู 2.2),
 `created` / `updated` (= เวลาที่บันทึก), `createdBy` / `updatedBy` (= ผู้ที่ login อยู่)
 
 ### 2.2 กติกาที่ควรรู้
@@ -59,6 +58,9 @@
   ค่าเริ่มต้นของ drop-down ใช้แถวที่ `isDefault === "T"`
 - **`dateClosed`: server ตั้งเอง ไม่รับจาก client** (ส่งมาจะถูกข้าม) ถ้า `statusId` มี `isType` เป็น `CLOSE` / `CANCEL`
   จะได้ `dateClosed` = เวลาของ server ตอนบันทึก สถานะเปิดได้ `null`
+- **`isReceived` (ผู้รับผิดชอบรับงานแล้วหรือยัง): server ตั้งเอง ตามระบบเดิม** มอบให้ตัวเอง (`ownerId` = ผู้ที่ login
+  หรือไม่ส่ง `ownerId`) = `"T"` รับแล้ว, มอบให้คนอื่น = `"F"` รอการตอบรับ ผู้รับจะรับงานเมื่อเปิดดูเรื่อง
+  ([ReceiveService.md](ReceiveService.md))
 - **`categoryId`: ต้องเป็นประเภทการดำเนินการ (`TblCategory` ชุด `ACTIVITY`) ที่เปิดใช้งาน** ไม่งั้นได้ 400
   ดึงรายการจาก `GET /ListOfValues/GetServiceType` แล้วกรอง `categoryType === "ACTIVITY"` (ตอนนี้มี 12 รายการ เช่น
   Call - Inbound, Call - Outbound, Email-Outbound, Follow Up, Q&A, Other ทั้งหมดเป็นชั้นเดียว)
@@ -108,7 +110,8 @@
 | `code` | string | เลขที่การดำเนินการ `yyMMdd` (ปี พ.ศ.) + เลขรัน 5 หลักของวัน เช่น `69112300001` (นับแยกจากเลขที่เรื่อง) |
 | `statusId`, `categoryId`, `ownerId`, `contactId`, `groupId` | string \| null | ค่าที่บันทึก (รวมค่าเริ่มต้นที่ backend ใส่ให้) |
 | `summary`, `detail` | string / string \| null | |
-| `isReceived`, `isEnable` | string | `"T"` / `"F"` |
+| `isReceived` | string | `"T"` รับงานแล้ว / `"F"` รอการตอบรับ (ข้อ 2.2) |
+| `isEnable` | string | `"T"` |
 | `dateOpened` / `dateClosed` | string / string \| null | เวลาไทย ไม่มี offset |
 | `created`, `createdBy`, `updated`, `updatedBy` | | ผู้บันทึกและเวลา |
 
@@ -127,7 +130,7 @@
   "detail": "ผู้ร้องจะส่งเอกสารเพิ่มเติมภายในวันพรุ่งนี้",
   "ownerId": "505981F1B7534D56BF4BF2F159322184",
   "groupId": null,
-  "isReceived": "F",
+  "isReceived": "T",
   "isEnable": "T",
   "created": "2026-11-23T15:10:00",
   "createdBy": "505981F1B7534D56BF4BF2F159322184",
@@ -143,7 +146,7 @@
 | HTTP | เมื่อไร | Body |
 |---|---|---|
 | 201 | บันทึกสำเร็จ | `ServiceOperation` |
-| 400 | ไม่ส่ง field บังคับ, id lookup ผิด, `isReceived` ไม่ใช่ `T`/`F`, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>`) |
+| 400 | ไม่ส่ง field บังคับ, id lookup ผิด, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>`) |
 | 401 | ไม่มี token, token หมดอายุ หรือ logout แล้ว | ว่าง |
 | 404 | ไม่มีเรื่องที่ `serviceId` นี้ หรือเรื่องถูกปิดใช้งาน | `{ "statusCode": 404, "message": "ไม่พบข้อมูลเรื่อง" }` |
 | 409 | เลขรันของวันเต็ม (99,999 รายการต่อวัน) | `MessageResponse` |
@@ -163,7 +166,7 @@
 }
 ```
 
-key ใน `errors` เป็น PascalCase (`ServiceId`, `StatusId`, `Summary`, `CategoryId`, `OwnerId`, `ContactId`, `IsReceived`)
+key ใน `errors` เป็น PascalCase (`ServiceId`, `StatusId`, `Summary`, `CategoryId`, `OwnerId`, `ContactId`)
 map กลับเป็น camelCase ก่อนแสดงใต้ช่อง
 
 ---
@@ -200,7 +203,6 @@ export interface CreateServiceOperationBody {
   categoryId: string; // ชุด ACTIVITY (ตอนนี้ยังไม่มีค่าเริ่มต้น จึงต้องส่ง)
   ownerId?: string | null;
   contactId?: string | null;
-  isReceived?: "T" | "F";
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย
   // ไม่มี dateClosed: server ตั้งเอง
 }
