@@ -21,4 +21,10 @@ public class ServiceOperationListItemResponse : ServiceOperationResponse
     public string? CreatedByName { get; set; }
 
     public string? UpdatedByName { get; set; }
+
+    /// <summary>
+    /// ข้อความสถานะการรับงานตามระบบเดิม: <c>รับงานแล้ว</c> (<c>IsReceived = T</c>) / <c>รอการตอบรับ</c> (<c>F</c>)
+    /// เป็น <c>""</c> เมื่อผู้รับผิดชอบคือผู้สร้างงานเอง
+    /// </summary>
+    public string IsReceivedText { get; set; } = string.Empty;
 }

@@ -42,10 +42,6 @@ public class CreateServiceOperationRequest
     [MaxLength(50)]
     public string? GroupId { get; set; }
 
-    /// <summary><c>T</c> หรือ <c>F</c>; ไม่ส่งมา = <c>F</c></summary>
-    [RegularExpression("^[TF]$", ErrorMessage = "IsReceived must be 'T' or 'F'.")]
-    public string? IsReceived { get; set; }
-
     /// <summary>เวลาไทย; ไม่ส่งมา = เวลาปัจจุบัน</summary>
     public DateTime? DateOpened { get; set; }
 }

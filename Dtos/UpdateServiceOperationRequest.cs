@@ -5,7 +5,7 @@ namespace ContactTogetherApi.Dtos;
 /// <summary>
 /// ช่องของงาน (<c>TblActivity</c>) ที่แก้ไขได้ ทุกช่องไม่บังคับ: ไม่ส่งมา (<c>null</c>) = คงค่าเดิม
 /// ค่าว่าง = ล้างเป็น NULL สำหรับช่องที่เป็น NULL ได้ ส่วนช่องที่ห้าม NULL (<c>StatusId</c>, <c>Summary</c>,
-/// <c>CategoryId</c>, <c>IsReceived</c>) ค่าว่างถือว่าคงค่าเดิม <c>ServiceId</c>, <c>Line</c>, <c>Code</c>
+/// <c>CategoryId</c>) ค่าว่างถือว่าคงค่าเดิม <c>IsReceived</c> และ <c>DateClosed</c> server ตั้งเอง <c>ServiceId</c>, <c>Line</c>, <c>Code</c>
 /// แก้ไม่ได้ และ <c>Updated</c>/<c>UpdatedBy</c> server เป็นคนกำหนด
 /// </summary>
 public class UpdateServiceOperationRequest
@@ -33,10 +33,6 @@ public class UpdateServiceOperationRequest
 
     [MaxLength(50)]
     public string? GroupId { get; set; }
-
-    /// <summary><c>T</c> หรือ <c>F</c></summary>
-    [RegularExpression("^[TF]$", ErrorMessage = "IsReceived must be 'T' or 'F'.")]
-    public string? IsReceived { get; set; }
 
     /// <summary>เวลาไทย</summary>
     public DateTime? DateOpened { get; set; }
