@@ -53,6 +53,11 @@ Authorization: Bearer {{token}}
 ###
 
 # List of values - enabled channels as { id, nameTh }
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetStatus
+Authorization: Bearer {{token}}
+
+###
+# List of values - enabled channels as { id, nameTh }
 GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetServiceType
 Authorization: Bearer {{token}}
 
@@ -388,7 +393,9 @@ Content-Type: application/json
 # DateOpened to now. Every lookup id is optional but must exist when given (400 otherwise).
 # statusId is any StatusType SERVICE id from GetStatus, stored as sent
 # (e.g. อยู่ระหว่างดำเนินการ 19C49E66B6F9EF1BCE11A3B93DED12C8).
-# NOTE: a 201 writes a real row and uses up one service code of the day.
+# Also adds operation Line 1 (TblActivity), as the legacy app does: Call - Inbound / "Call Inbound" /
+# "เริ่มให้บริการ", status Closed, from DateOpened to now (see GetServiceOperations).
+# NOTE: a 201 writes real rows and uses up one service code and one operation code of the day.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -482,15 +489,27 @@ Content-Type: application/json
 
 ###
 
-# Reopen - statusId back to Pending (19C49E66...C8) on a service whose DateClosed is set adds a
-# TblReOpenService row (Line = the service's last Line + 1, from 1), with reOpenComment, and clears
-# DateClosed. All in one transaction.
+# Close - a CLOSE/CANCEL status (ปิดเรื่อง 67F7...) sets DateClosed to the server's clock. dateClosed is
+# never taken from the client (a dateClosed in the body is ignored).
 PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
+  "statusId": "67F7D634C1D74FDE512C164D6A2A1EF9"
+}
+
+###
+
+# Reopen - an OPEN status (เปิดเรื่อง 60CD...) sent for a service whose DateClosed is set adds a
+# TblReOpenService row (Line = the service's last Line + 1, from 1), with reOpenComment (max 100), and
+# clears DateClosed. All in one transaction. Pending (isType PENDING) does not reopen.
+PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateService?id=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "statusId": "60CD725EA4455BA6770FC94BC78F466F",
   "reOpenComment": "ผู้ร้องแจ้งว่าปัญหายังไม่ได้รับการแก้ไข"
 }
 
@@ -498,9 +517,10 @@ Content-Type: application/json
 
 # Add an operation (TblActivity row) to a service. Line = the service's last Line + 1 (from 1); Code =
 # yyMMdd (B.E.) + a 5-digit daily running number, counted separately from service codes. statusId is an
-# ACTIVITY status (Open 0A57...04 / Closed CB0A...A1 / Cancel CD64...62). Omitted: categoryId = the
-# service's, ownerId = the caller, isReceived = "F", dateOpened = now. 201 = the row; 400 = bad input;
-# 404 = no enabled service with that id.
+# ACTIVITY status (Open 0A57...04 / Closed CB0A...A1 / Cancel CD64...62). categoryId is an enabled
+# ACTIVITY category (Follow Up 1987...79 etc.); omitted = the ACTIVITY row with IsDefault = 'T' (none yet,
+# so 400). Omitted: ownerId = the caller, dateOpened = now. isReceived = "T" when owner = the caller, else "F"; dateClosed = the server's
+# clock when the status is CLOSE/CANCEL. 201 = the row; 400 = bad input; 404 = no enabled service.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewServiceOperations
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -508,6 +528,7 @@ Content-Type: application/json
 {
   "serviceId": "427D66AA13734763AC1D99775554659B",
   "statusId": "0A5753389CDCD23F173268D8D46AC004",
+  "categoryId": "1987E8FF8070CEFA483F881ED0CD2170",
   "summary": "โทรติดต่อผู้ร้องเพื่อสอบถามข้อมูลเพิ่มเติม",
   "detail": "ผู้ร้องจะส่งเอกสารเพิ่มเติมภายในวันพรุ่งนี้"
 }
@@ -516,17 +537,33 @@ Content-Type: application/json
 
 # Edit an operation by its TblActivity.Id (the "id" AddNewServiceOperations returns). Only the fields sent
 # change; "" clears a nullable field (detail, contactId, ownerId, groupId) and is ignored for statusId,
-# summary, categoryId and isReceived. ServiceId, Line and Code cannot change. 200 = the row; 400 = a bad
-# id or lookup; 404 = no enabled operation with that id.
+# summary and categoryId. A new ownerId resets isReceived to "F". ServiceId, Line and Code cannot change. dateClosed comes from the
+# server: set when statusId becomes CLOSE/CANCEL, cleared when an OPEN statusId is sent. 200 = the row;
+# 400 = a bad id or lookup; 404 = no enabled operation with that id.
 PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateServiceOperations?id=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "statusId": "CB0A973609E8D684F2944D92ED4126A1",
-  "dateClosed": "2026-11-23T16:30:00",
   "detail": "ได้รับเอกสารครบแล้ว ปิดงาน"
 }
+
+###
+
+# Operations of a service, by Line, with status (nameTh, isType), category, owner, contact number and
+# created/updated-by names. Enabled ones only, no attachment. 200 = array ([] if none); 400 = no
+# serviceId; 404 = no enabled service with that id.
+GET {{ContactTogetherApi_HostAddress}}/Services/GetServiceOperations?serviceId=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
+
+###
+
+# Receive - mark the caller's waiting operations (IsReceived F) of a service as received (T), as the legacy
+# app did when the owner opened the service. Call when the detail page opens; repeat calls return 0.
+# 200 = { serviceId, receivedCount }; 400 = no id; 404 = no enabled service with that id.
+POST {{ContactTogetherApi_HostAddress}}/Services/ReceiveService?id=427D66AA13734763AC1D99775554659B
+Authorization: Bearer {{token}}
 
 ###
 

@@ -7,7 +7,9 @@ namespace ContactTogetherApi.Dtos;
 /// <list type="bullet">
 /// <item>ช่องที่ไม่ส่ง (<c>null</c>) คงค่าเดิม</item>
 /// <item>ช่องข้อความที่ส่งเป็น <c>""</c> ล้างค่าเป็น NULL (ยกเว้น <see cref="ServiceTitleId"/> ซึ่งล้างไม่ได้)</item>
-/// <item>วันที่ล้างไม่ได้ ยกเว้น <c>DateClosed</c> ที่ระบบล้างให้เองเมื่อเปิดเรื่องซ้ำ (ดู <see cref="ReOpenComment"/>)</item>
+/// <item>วันที่ (<c>DateOpened</c>/<c>OnScene</c>) ล้างไม่ได้</item>
+/// <item><c>DateClosed</c> รับจาก client ไม่ได้ server ตั้งให้เมื่อเปลี่ยนเป็นสถานะปิด/ยกเลิก และล้างให้เมื่อเปิดเรื่องซ้ำ
+/// (ดู <see cref="ReOpenComment"/>)</item>
 /// </list>
 /// </summary>
 public class UpdateServiceRequest : ServiceFieldsRequest
@@ -17,10 +19,10 @@ public class UpdateServiceRequest : ServiceFieldsRequest
     public string? ServiceTitleId { get; set; }
 
     /// <summary>
-    /// เหตุผลที่เปิดเรื่องซ้ำ ใช้เมื่อเปลี่ยน <c>StatusId</c> เป็น Pending (อยู่ระหว่างดำเนินการ) ให้เรื่องที่ปิดไปแล้ว
-    /// (<c>DateClosed</c> มีค่า) ซึ่งระบบจะบันทึกลง <c>TblReOpenService</c> และล้าง <c>DateClosed</c>
-    /// ไม่ส่งก็ได้ (บันทึกเป็นค่าว่าง)
+    /// เหตุผลที่เปิดเรื่องซ้ำ ใช้เมื่อส่ง <c>StatusId</c> ที่ <c>IsType</c> เป็น <c>OPEN</c> (เช่น "เปิดเรื่อง")
+    /// ให้เรื่องที่ปิดไปแล้ว (<c>DateClosed</c> มีค่า) ซึ่งระบบจะบันทึกลง <c>TblReOpenService</c> และล้าง
+    /// <c>DateClosed</c> ไม่ส่งก็ได้ (บันทึกเป็นค่าว่าง) ยาวสุด 100 ตามคอลัมน์
     /// </summary>
-    [MaxLength(200)]
+    [MaxLength(100)]
     public string? ReOpenComment { get; set; }
 }

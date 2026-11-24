@@ -24,7 +24,10 @@ public class CreateServiceOperationRequest
     /// <summary>ไม่จำกัดความยาว (<c>nvarchar(max)</c>)</summary>
     public string? Detail { get; set; }
 
-    /// <summary><c>TblCategory.Id</c>; ไม่ส่งมา = ใช้ <c>CategoryId</c> ของเรื่อง</summary>
+    /// <summary>
+    /// <c>TblCategory.Id</c> ชุด <c>ACTIVITY</c> (ประเภทการดำเนินการ) ที่เปิดใช้งาน; ไม่ส่งมา = แถว ACTIVITY ที่
+    /// <c>IsDefault = 'T'</c> (ไม่มีแถว default = 400)
+    /// </summary>
     [MaxLength(50)]
     public string? CategoryId { get; set; }
 
@@ -39,13 +42,6 @@ public class CreateServiceOperationRequest
     [MaxLength(50)]
     public string? GroupId { get; set; }
 
-    /// <summary><c>T</c> หรือ <c>F</c>; ไม่ส่งมา = <c>F</c></summary>
-    [RegularExpression("^[TF]$", ErrorMessage = "IsReceived must be 'T' or 'F'.")]
-    public string? IsReceived { get; set; }
-
     /// <summary>เวลาไทย; ไม่ส่งมา = เวลาปัจจุบัน</summary>
     public DateTime? DateOpened { get; set; }
-
-    /// <summary>เวลาไทย</summary>
-    public DateTime? DateClosed { get; set; }
 }

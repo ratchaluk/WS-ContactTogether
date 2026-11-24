@@ -8,9 +8,13 @@
 หน้านี้ใช้แทน `ViewService.aspx?ServiceID=…` ของระบบเดิม
 
 > อ้างอิงโค้ด: `Controllers/ServicesController.cs` (`GetServiceById`), `Dtos/ServiceDetailResponse.cs`
-> (สืบทอดจาก `Dtos/ServiceResponse.cs`), `Dtos/LookupItemResponse.cs`, `Dtos/AccountSearchResponse.cs`
+> (สืบทอดจาก `Dtos/ServiceResponse.cs`), `Dtos/LookupItemResponse.cs`, `Dtos/AccountSearchResponse.cs`,
+> `Dtos/ServiceReOpenResponse.cs`
 >
 > **เปลี่ยนแปลง (18 พ.ย. 2026):** เพิ่ม `account` (ข้อมูลผู้ติดต่อทั้งก้อน) ส่วน field เดิมไม่เปลี่ยน
+>
+> **เปลี่ยนแปลง (23 พ.ย. 2569):** เพิ่ม `reOpenHistory` (ประวัติการเปิดเรื่องซ้ำ ดู 2.5) ส่วน field เดิมไม่เปลี่ยน
+> และมี endpoint แก้ไข/เปิดเรื่องซ้ำแล้ว: [UpdateService.md](UpdateService.md)
 
 ---
 
@@ -58,6 +62,7 @@
 | **การ์ดข้อมูลผู้ติดต่อ** | `account` (ดู 2.3) | `account.id` |
 | เรื่องย่อ / รายละเอียด / หมายเหตุ | `summary` / `detail` / `remark` | |
 | วันที่เปิด / ปิดเรื่อง | `dateOpened` / `dateClosed` | |
+| **ประวัติการเปิดเรื่องซ้ำ** | `reOpenHistory` (ดู 2.5) | |
 | ผู้บันทึก / ผู้แก้ไขล่าสุด | `createdByName` / `updatedByName` และ `created` / `updated` | `createdBy` / `updatedBy` |
 | อื่น ๆ | `serviceArea`, `areaId` (เก็บไว้ pre-fill ฟอร์ม ไม่ได้แปลงเป็นชื่อให้), `onScene`, `isEnable` | |
 
@@ -123,7 +128,51 @@ const email = pick("MAIL");
 | `D` | สายหลุด |
 | `E` | แก้ไข |
 
-### 2.5 ตัวอย่าง (ข้อมูลจริง ณ 18 พ.ย. 2026)
+### 2.5 `reOpenHistory` (ประวัติการเปิดเรื่องซ้ำ)
+
+array ของการเปิดเรื่องซ้ำแต่ละครั้ง **เรียงจากครั้งแรก** (`line` 1, 2, …) ได้ `[]` ถ้าไม่เคยเปิดซ้ำ
+แถวใหม่เกิดจาก `PUT /Services/UpdateService` ([UpdateService.md](UpdateService.md) ข้อ 3)
+
+| Field | ความหมาย |
+|---|---|
+| `line` | ครั้งที่เปิดซ้ำ เริ่มที่ 1 |
+| `reOpenComment` | เหตุผลที่เปิดซ้ำ (อาจเป็น `""`) |
+| `closed` | วันเวลาที่ปิดเรื่อง ก่อนถูกเปิดซ้ำครั้งนี้ |
+| `closedBy` / `closedByName` | id / ชื่อผู้ปิดเรื่อง (ค่าประมาณ: ผู้แก้ไขล่าสุดก่อนเปิดซ้ำ) ชื่อเป็น `null` ถ้าหาไม่เจอ |
+| `reOpened` | วันเวลาที่เปิดซ้ำ |
+| `reOpenedBy` / `reOpenedByName` | id / ชื่อผู้เปิดซ้ำ |
+
+วันที่เป็นเวลาไทยไม่มี offset เหมือน field อื่น
+
+```json
+"reOpenHistory": [
+  {
+    "line": 1,
+    "reOpenComment": "ผู้ร้องแจ้งว่าปัญหายังไม่ได้รับการแก้ไข",
+    "closed": "2026-11-20T16:00:00",
+    "closedBy": "04EFF8A54A56F4D240E48E0520C223DB",
+    "closedByName": "นางสาว นิภาพร รัตธนภาส",
+    "reOpened": "2026-11-23T14:30:00",
+    "reOpenedBy": "505981F1B7534D56BF4BF2F159322184",
+    "reOpenedByName": "นาย กันตณัฐิ์ ประกอบศุขราษฎร์"
+  }
+]
+```
+
+```tsx
+{detail.reOpenHistory.length > 0 && (
+  <ul>
+    {detail.reOpenHistory.map((r) => (
+      <li key={r.line}>
+        ครั้งที่ {r.line}: เปิดซ้ำ {r.reOpened} โดย {r.reOpenedByName ?? "-"}
+        (ปิดเมื่อ {r.closed}) {r.reOpenComment || ""}
+      </li>
+    ))}
+  </ul>
+)}
+```
+
+### 2.6 ตัวอย่าง (ข้อมูลจริง ณ 18 พ.ย. 2026)
 
 `GET /Services/GetServiceById?id=427D66AA13734763AC1D99775554659B`
 
@@ -202,13 +251,14 @@ const email = pick("MAIL");
   "createdByName": "นางสาว นิภาพร รัตธนภาส",
   "updated": "2026-08-04T12:05:00",
   "updatedBy": "04EFF8A54A56F4D240E48E0520C223DB",
-  "updatedByName": "นางสาว นิภาพร รัตธนภาส"
+  "updatedByName": "นางสาว นิภาพร รัตธนภาส",
+  "reOpenHistory": []
 }
 ```
 
 ลำดับ field ใน JSON จริงอาจไม่ตรงกับตัวอย่าง อย่าพึ่งลำดับ
 
-### 2.6 Status code
+### 2.7 Status code
 
 | HTTP | เมื่อไร | Body |
 |---|---|---|
@@ -240,6 +290,13 @@ export interface AccountSearch {
   contacts: AccountContact[];
 }
 
+export interface ServiceReOpen {
+  line: number;
+  reOpenComment: string;
+  closed: string;   closedBy: string | null;   closedByName: string | null;
+  reOpened: string; reOpenedBy: string | null; reOpenedByName: string | null;
+}
+
 export interface ServiceDetail {
   id: string;
   code: string;
@@ -263,6 +320,7 @@ export interface ServiceDetail {
   dateOpened: string | null; dateClosed: string | null; isEnable: string | null;
   created: string | null; createdBy: string | null; createdByName: string | null;
   updated: string | null; updatedBy: string | null; updatedByName: string | null;
+  reOpenHistory: ServiceReOpen[];
 }
 
 export async function fetchServiceById(
@@ -319,5 +377,6 @@ backend ในเครื่อง dev ต้อง restart แอปก่อ�
 | **ปุ่ม "ดูประวัติผู้ติดต่อ"** | ยังไม่มี endpoint ดึงรายการเรื่องของผู้ติดต่อคนนี้ |
 | **พื้นที่ (ผู้ติดต่อ)** | ใช้ `account.areaPath` ได้เลย ไม่ต้องแปลง `areaId` เอง ([AreaId.md](AreaId.md)) เรื่อง (service) ไม่ได้คืน `areaPath` ให้ มีแค่ `areaId` ดิบ |
 | **ประวัติการปฏิบัติงาน (activity)** | ยังไม่มี endpoint ดึงรายการ เพิ่ม แก้ หรือลบงาน |
-| **ปุ่มแก้ไข / ลบเรื่อง** | ยังไม่มี endpoint แก้ไขหรือลบเรื่อง |
+| **ปุ่มแก้ไข / เปิดเรื่องซ้ำ** | ใช้ `PUT /Services/UpdateService` ([UpdateService.md](UpdateService.md)) (เพิ่ม 23 พ.ย. 2569) |
+| **ปุ่มลบเรื่อง** | ยังไม่มี endpoint |
 | **ใช้ข้อมูลชุดเดียวกับ `AddNewService`** | field id และวันที่ตรงกับ response ของ `AddNewService` ทุกตัว ใช้ type ร่วมกันได้ |

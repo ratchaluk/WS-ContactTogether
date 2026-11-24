@@ -51,7 +51,6 @@
 | `levelPriorityId` | 500 | ความสำคัญ | `id` จาก `GET /ListOfValues/GetLevel?levelType=PRIORITY` |
 | `levelSecretId` | 500 | ชั้นความลับ | `id` จาก `GET /ListOfValues/GetLevel?levelType=SECRET` |
 | `dateOpened` | – | วันเวลาที่เปิดเรื่อง | ไม่ส่ง = **เวลาที่บันทึก** |
-| `dateClosed` | – | วันเวลาที่ปิดเรื่อง | ส่งเมื่อเปิดแล้วปิดทันที ไม่ส่ง = ยังไม่ปิด |
 | `onScene` | – | วันเวลาที่ถึงหน้างาน | ไม่บังคับ |
 
 **backend ใส่ให้เอง** (ส่งมาก็ไม่มีผล): `id`, `code` (เลขที่เรื่อง), `isEnable` (= `"T"`),
@@ -68,7 +67,8 @@
 - **วันที่** เป็นเวลาไทย รูปแบบ `yyyy-MM-ddTHH:mm:ss` เช่น `2026-11-16T10:30:00`
   (ค่าจาก `<input type="datetime-local">` ที่ไม่มีวินาทีก็ใช้ได้) **ห้ามต่อท้ายด้วย `Z` หรือ `+07:00`**
   และอย่าใช้ `date.toISOString()` เพราะเวลาจะคลาดไป 7 ชั่วโมง เศษวินาทีจะถูกปัดทิ้ง
-- API **ไม่ตรวจ** ว่า `dateClosed` อยู่หลัง `dateOpened` หรือว่าวันที่เป็นอนาคต ให้ตรวจที่หน้าเว็บ
+- **`dateClosed` server ตั้งเอง ไม่รับจาก client** (เปลี่ยน 23 พ.ย. 2569, ส่งมาจะถูกข้าม): ถ้า `statusId` เป็นสถานะปิด/ยกเลิก
+  (`isType` `CLOSE`/`CANCEL`) จะได้เวลาของ server ตอนบันทึก สถานะอื่นได้ `null`
 - **กดซ้ำ = เปิดเรื่องซ้ำ** API ไม่กันรายการซ้ำ ต้องปิดปุ่มระหว่างรอ response
 
 ### 2.3 Field ที่ต้องบังคับกรอก: ให้ frontend ตรวจเอง
@@ -152,12 +152,34 @@
 
 (id และชื่อสถานะในตัวอย่างเป็นค่าสมมุติ)
 
-### 3.2 เลขที่เรื่อง (`code`)
+### 3.2 การดำเนินการแรกที่สร้างให้อัตโนมัติ (เพิ่ม 24 พ.ย. 2569)
+
+ทุกครั้งที่เปิดเรื่องสำเร็จ backend **สร้างการดำเนินการรายการแรก (`line` 1) ให้ด้วย** ใน transaction เดียวกัน
+ตามระบบเดิม ("ประวัติการปฏิบัติงาน" ของหน้าเรื่องจึงมีรายการแรกทันที):
+
+| Field | ค่า |
+|---|---|
+| ประเภท (`categoryNameTh`) | `Call - Inbound` |
+| หัวข้อ (`summary`) | `Call Inbound` |
+| รายละเอียด (`detail`) | `เริ่มให้บริการ` |
+| สถานะ | ปิด (`statusIsType` = `CLOSE`) |
+| วันเริ่ม (`dateOpened`) | `dateOpened` ของเรื่อง (เวลาที่เริ่มรับเรื่อง) |
+| วันจบ (`dateClosed`) | เวลาของ server ตอนบันทึก |
+| ผู้รับผิดชอบ / ผู้สร้าง | ผู้ที่ login อยู่ |
+| `isReceived` | `"T"` (มอบให้ตัวเอง จึงรับงานแล้ว) |
+
+response ของ `AddNewService` ไม่มีรายการนี้ ให้ดึงด้วย `GET /Services/GetServiceOperations?serviceId=<id>`
+([GetServiceOperations.md](GetServiceOperations.md)) **frontend ไม่ต้องเรียก `AddNewServiceOperations` เองสำหรับรายการแรก**
+ไม่งั้นจะได้รายการซ้ำ
+
+เพื่อให้วันเริ่มตรงกับระบบเดิม ให้ส่ง `dateOpened` เป็นเวลาที่เปิดฟอร์มรับเรื่อง (ไม่ส่ง = เวลาบันทึก)
+
+### 3.3 เลขที่เรื่อง (`code`)
 
 `yyMMdd` แบบปี **พ.ศ.** 6 หลัก + เลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
 เช่น `69111600001` = เรื่องแรกของวันที่ 16 พ.ย. 2569 ใช้วันที่ตอนบันทึก ไม่ใช่ `dateOpened`
 
-### 3.3 400: ข้อมูลไม่ถูกต้อง
+### 3.4 400: ข้อมูลไม่ถูกต้อง
 
 ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **PascalCase** (`CategoryId`, `StatusId`, …)
 ข้อความเป็นภาษาอังกฤษ ไม่ควรแสดงให้ผู้ใช้ตรง ๆ (ดูตัวอย่างแปลงข้อความใน 4.1)
@@ -186,7 +208,7 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 
 ถ้ามีทั้งข้อความยาวเกินและ id ผิด จะได้แค่เรื่องความยาวก่อน แก้แล้วส่งใหม่ถึงจะเห็นเรื่อง id
 
-### 3.4 Status code
+### 3.5 Status code
 
 | HTTP | เมื่อไร | Body |
 |---|---|---|
@@ -220,7 +242,7 @@ export interface CreateServiceRequest {
   serviceReferenceLink?: string | null;
   remark?: string | null;
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย ห้ามมี Z
-  dateClosed?: string | null;
+  // ไม่มี dateClosed: server ตั้งเอง
   onScene?: string | null;
   levelSeverityId?: string | null; // GetLevel?levelType=SEVERITY
   levelPriorityId?: string | null; // GetLevel?levelType=PRIORITY

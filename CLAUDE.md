@@ -9,6 +9,18 @@ contact-center / service-request ("Contact Together") system. The EF Core data l
 from the database (database-first); endpoints are hand-written controllers on top of it. There is
 no solution file and no test project (`FilesTest/` is a placeholder, not tests).
 
+## Team handoffs (read first)
+
+Two people work on this backend, so **before starting any task, read the most recent
+`docs/handoff-*.md`** (files are named `handoff-YYYY-MM-DD.md`; the newest date is the latest) and
+skim `git log` to see what the team did recently. A `SessionStart` hook in
+[.claude/settings.json](.claude/settings.json) loads the latest handoff into context automatically,
+but open it directly if you need the full detail.
+
+When you finish a meaningful piece of work, **write or update that day's handoff** (follow the
+format of the existing ones: branch/build status, what was done per area, what is still pending).
+This is how the other developer learns what changed without reading every commit.
+
 ## Commands
 
 ```powershell
@@ -194,8 +206,9 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 channel, owner, category, status, severity/priority/secrecy levels, area, organization).
 `TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
 `newsequentialid()`, declared as the key in `ApplicationDbContext.Keys.cs` because the table has no
-PK; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReopenedLog` tracks reopenings (composite key
-`SrId` + `Line`). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+PK; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReOpenService` logs reopenings
+(`ServiceId` + `Line`, written by `UpdateService`; the older `TblReopenedLog`, composite key `SrId` +
+`Line`, is unused). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. `TblRunning` drives formatted running numbers for
 codes such as service-request numbers. Reports resolve the "main organization" by joining
