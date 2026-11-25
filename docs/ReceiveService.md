@@ -114,10 +114,13 @@ curl -X POST "http://localhost:5018/Services/ReceiveService?id=427D66AA13734763A
 
 ---
 
-## 6. หมายเหตุ: Inbox / งานของฉัน (ยังไม่มี endpoint)
+## 6. หมายเหตุ: Inbox / งานของฉัน
 
-ระบบเดิมใช้ `Is_Received` กรองรายการในหน้าเหล่านี้ **backend ยังไม่ได้ทำ** จะทำเมื่อ frontend ถึงหน้านั้น
-(แจ้ง backend ได้เลย) อ้างอิงจากโค้ดระบบเดิม:
+**หน้าแรก (25 พ.ย. 2569): มี endpoint แล้ว** `GET /Home/GetInboxServices` (รายการรับ) และ
+`GET /Home/GetProcessingServices` (งานดำเนินการ) ดู [HomeServices.md](HomeServices.md)
+รายการรับใช้ `isReceived = "F"` เรียก `ReceiveService` แล้วเรื่องจะหายจากรายการรับ
+
+หน้า Inbox / งานของฉันแยก (ไม่ใช่หน้าแรก) ยังไม่ได้ทำ อ้างอิงจากโค้ดระบบเดิม:
 
 | หน้าในระบบเดิม | เงื่อนไข (ระบบเดิม) |
 |---|---|
@@ -125,6 +128,6 @@ curl -X POST "http://localhost:5018/Services/ReceiveService?id=427D66AA13734763A
 | **หน้าแรก** (`ServiceRepo.GetInbox`, `Home/Default.aspx`) | งานที่สถานะเป็น CLOSE และ `Is_Received = F` และ `Owner_ID` = เรา แล้วแสดงเรื่องที่สถานะ `Is_Type` = OPEN |
 | **งานของฉัน** (`ServiceRepo.SelectMyService`) | งานที่ `Owner_ID` = เรา และ `Is_Received = T` |
 
-ระหว่างนี้ใช้ endpoint ที่มีอยู่แทนได้:
+endpoint ที่มีอยู่ก่อน (ใช้เงื่อนไขต่างจากหน้าแรก):
 - `GET /Services/GetPendingServices`: เรื่องที่มีงานยังไม่ปิดมอบให้เรา (ไม่ได้ดู `isReceived`)
-- `GET /Services/GetInProcessServices`: เรื่องที่เราเป็นเจ้าของและยังไม่ปิด
+- `GET /Services/GetInProcessServices`: เรื่องที่เราเป็นเจ้าของและ `dateClosed` ว่าง

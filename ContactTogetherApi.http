@@ -584,6 +584,22 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Home - รายการรับ (inbox): open services (status IsType OPEN/PENDING) with an operation assigned to the
+# caller that is closed (IsType CLOSE) and not received yet (IsReceived F). ReceiveService removes it.
+# Paged in the DB, Code descending. 200 = { status, message, data, meta.pagination }; 400 = PageNumber < 1,
+# PageSize outside 1-100 or Lang not th/en.
+GET {{ContactTogetherApi_HostAddress}}/Home/GetInboxServices?PageNumber=1&PageSize=10
+Authorization: Bearer {{token}}
+
+###
+
+# Home - งานดำเนินการ (processing): open services the caller owns. Lang=en gives English category and
+# status names (Thai when there is none).
+GET {{ContactTogetherApi_HostAddress}}/Home/GetProcessingServices?PageNumber=1&PageSize=10&Lang=en
+Authorization: Bearer {{token}}
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
