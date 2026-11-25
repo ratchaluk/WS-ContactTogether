@@ -1280,6 +1280,60 @@ public class ServicesController : ControllerBase
         return Ok(ToOperationResponse(activity));
     }
 
+    /// <summary>
+    /// ลบงาน (<c>TblActivity</c>) ตาม <c>id</c> (<c>TblActivity.Id</c>) แบบระบบเดิม คือปิดใช้งาน (<c>IsEnable = F</c>)
+    /// ไม่ลบแถวจริง งานที่ลบจะหายจากทุกรายการที่แสดงงาน ลบซ้ำได้ 404 และยังกู้คืนผ่าน API ไม่ได้
+    /// <c>Line</c> ของงานอื่นไม่เปลี่ยน ระบบเดิมตรวจแค่สิทธิ์ลบของ role (<c>TblRolePage</c>) ซึ่งยังไม่มีข้อมูล
+    /// จึงลบได้ทุกคนที่ login
+    /// </summary>
+    [HttpDelete("DeleteServiceOperations")]
+    [ProducesResponseType(typeof(ServiceOperationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteServiceOperations(
+        [FromQuery] string? id,
+        CancellationToken cancellationToken)
+    {
+        var actingEmployeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(actingEmployeeId))
+        {
+            return Unauthorized(new MessageResponse(
+                StatusCodes.Status401Unauthorized,
+                "Token has no sub claim; cannot attribute the change."));
+        }
+
+        // TblActivity.Id is a uniqueidentifier, so parse it (any case, with or without dashes).
+        if (!Guid.TryParse(Normalize(id), out var operationId))
+        {
+            ModelState.AddModelError(nameof(id), "A valid operation id (GUID) is required.");
+            return ValidationProblem(ModelState);
+        }
+
+        var activity = await _db.TblActivities
+            .FirstOrDefaultAsync(a => a.Id == operationId && a.IsEnable == "T", cancellationToken);
+        if (activity is null)
+        {
+            return NotFound(new MessageResponse(StatusCodes.Status404NotFound, "ไม่พบข้อมูลการดำเนินการ"));
+        }
+
+        // As the legacy ActivityRepo.Delete does: the row is kept and disabled.
+        activity.IsEnable = "F";
+        activity.Updated = Now();
+        activity.UpdatedBy = actingEmployeeId;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Operation {OperationCode} ({OperationId}, service {ServiceId}) disabled by {ActingEmployeeId}.",
+            activity.Code,
+            activity.Id,
+            activity.ServiceId,
+            actingEmployeeId);
+
+        return Ok(ToOperationResponse(activity));
+    }
+
     private static ServiceOperationResponse ToOperationResponse(TblActivity activity) => new()
     {
         Id = activity.Id,

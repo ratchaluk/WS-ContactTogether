@@ -568,6 +568,14 @@ Content-Type: application/json
 
 ###
 
+# Delete an operation by its TblActivity.Id, as the legacy app does: the row is disabled (isEnable "F"),
+# not removed, and drops out of GetServiceOperations and the home lists. Other lines keep their numbers.
+# 200 = the disabled row; 400 = a bad id; 404 = no enabled operation with that id (deleting twice = 404).
+DELETE {{ContactTogetherApi_HostAddress}}/Services/DeleteServiceOperations?id=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+###
+
 # Operations of a service, by Line, with status (nameTh, isType), category, owner, contact number and
 # created/updated-by names. Enabled ones only, no attachment. 200 = array ([] if none); 400 = no
 # serviceId; 404 = no enabled service with that id.
