@@ -608,6 +608,16 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Home - real-time inbox via Server-Sent Events. "event: ready" on connect, then "event: inbox" with
+# { reason, serviceId } (reason: assigned / updated / removed / received) whenever the caller's inbox may
+# have changed; reload GetInboxServices on either. ": ping" every 25 s. Closes on logout, token expiry
+# or after 30 min (EventSource reconnects). Endless stream; cancel the request to stop. 401 = no token.
+GET {{ContactTogetherApi_HostAddress}}/Home/InboxStream
+Authorization: Bearer {{token}}
+Accept: text/event-stream
+
+###
+
 
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.

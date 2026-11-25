@@ -3,6 +3,7 @@ using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using ContactTogetherApi.Helper;
+using ContactTogetherApi.Realtime;
 using ContactTogetherApi.Reports.Export;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -76,6 +77,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Real-time inbox (GET /Home/InboxStream) -------------------------------------
+
+builder.Services.AddSingleton<IInboxNotifier, InboxNotifier>();
 
 // Report export (ExportReport01-07) ----------------------------------------
 

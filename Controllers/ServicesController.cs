@@ -3,6 +3,7 @@ using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using ContactTogetherApi.Helper;
 using ContactTogetherApi.Models;
+using ContactTogetherApi.Realtime;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,12 +41,20 @@ public class ServicesController : ControllerBase
 
     private readonly ApplicationDbContext _db;
     private readonly ILogger<ServicesController> _logger;
+    private readonly IInboxNotifier _inboxNotifier;
 
-    public ServicesController(ApplicationDbContext db, ILogger<ServicesController> logger)
+    public ServicesController(ApplicationDbContext db, ILogger<ServicesController> logger, IInboxNotifier inboxNotifier)
     {
         _db = db;
         _logger = logger;
+        _inboxNotifier = inboxNotifier;
     }
+
+    /// <summary>
+    /// บอกพนักงานที่ระบุว่ารายการรับอาจเปลี่ยน (ไปที่ <c>GET /Home/InboxStream</c> ที่เปิดอยู่) เรียกหลังบันทึกสำเร็จเท่านั้น
+    /// </summary>
+    private void NotifyInbox(string reason, string serviceId, params string?[] employeeIds) =>
+        _inboxNotifier.Notify(employeeIds, new InboxSignal(reason, serviceId));
 
     /// <summary>
     /// คืนเรื่อง (<c>TblService</c>) ที่เปิดใช้งานและยังไม่ปิด ซึ่งพนักงานที่เรียกเป็นเจ้าของ
@@ -873,6 +882,18 @@ public class ServicesController : ControllerBase
             actingEmployeeId,
             reopening);
 
+        // Closing or reopening moves the service's operations still waiting for receipt out of or
+        // back into their owners' inboxes (the inbox lists open services only).
+        if ((current.DateClosed is null) != (updated.DateClosed is null))
+        {
+            var waitingOwners = await _db.TblActivities
+                .Where(a => a.ServiceId == serviceId && a.IsEnable == "T" && a.IsReceived == "F" && a.OwnerId != null)
+                .Select(a => a.OwnerId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+            NotifyInbox(InboxSignalReasons.Updated, serviceId, waitingOwners);
+        }
+
         var result = await ToResponses(_db.TblServices.AsNoTracking().Where(s => s.Id == serviceId))
             .FirstAsync(cancellationToken);
         return Ok(result);
@@ -1028,6 +1049,9 @@ public class ServicesController : ControllerBase
                 receivedCount,
                 serviceId,
                 actingEmployeeId);
+
+            // The employee's other tabs still list the service in their inbox until they reload.
+            NotifyInbox(InboxSignalReasons.Received, serviceId, actingEmployeeId);
         }
 
         return Ok(new ReceiveServiceResponse { ServiceId = serviceId, ReceivedCount = receivedCount });
@@ -1172,6 +1196,12 @@ public class ServicesController : ControllerBase
             activity.Line,
             actingEmployeeId);
 
+        // Sent to someone else, so it waits in their inbox.
+        if (activity.IsReceived == "F")
+        {
+            NotifyInbox(InboxSignalReasons.Assigned, activity.ServiceId, activity.OwnerId);
+        }
+
         return StatusCode(StatusCodes.Status201Created, ToOperationResponse(activity));
     }
 
@@ -1242,6 +1272,10 @@ public class ServicesController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
+        // Kept to tell, after saving, whose inbox the change may touch.
+        var previousOwnerId = activity.OwnerId;
+        var previousStatusId = activity.StatusId;
+
         // NOT NULL columns: a blank value keeps the current one instead of clearing it.
         activity.StatusId = statusId ?? activity.StatusId;
         activity.CategoryId = categoryId ?? activity.CategoryId;
@@ -1276,6 +1310,17 @@ public class ServicesController : ControllerBase
             activity.Id,
             activity.ServiceId,
             actingEmployeeId);
+
+        // A new owner moves the operation from one inbox to another; a status change can move a
+        // waiting operation in or out of its owner's inbox (the inbox lists CLOSE operations only).
+        if (activity.OwnerId != previousOwnerId)
+        {
+            NotifyInbox(InboxSignalReasons.Updated, activity.ServiceId, previousOwnerId, activity.OwnerId);
+        }
+        else if (activity.StatusId != previousStatusId && activity.IsReceived == "F")
+        {
+            NotifyInbox(InboxSignalReasons.Updated, activity.ServiceId, activity.OwnerId);
+        }
 
         return Ok(ToOperationResponse(activity));
     }
@@ -1330,6 +1375,12 @@ public class ServicesController : ControllerBase
             activity.Id,
             activity.ServiceId,
             actingEmployeeId);
+
+        // An operation still waiting for receipt leaves its owner's inbox.
+        if (activity.IsReceived == "F")
+        {
+            NotifyInbox(InboxSignalReasons.Removed, activity.ServiceId, activity.OwnerId);
+        }
 
         return Ok(ToOperationResponse(activity));
     }
