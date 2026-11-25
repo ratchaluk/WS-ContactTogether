@@ -91,7 +91,11 @@ these with free-form Thai messages.
 
 - [Program.cs](Program.cs): controllers, `ApplicationDbContext` on SQL Server, JWT bearer auth,
   Swagger (with a bearer scheme) in Development, QuestPDF licence and font registration, the
-  `report-export` rate limiter, `UseAuthentication()` → `UseAuthorization()` → `UseRateLimiter()`.
+  `report-export` rate limiter, a CORS default policy, and `UseCors()` → `UseAuthentication()` →
+  `UseAuthorization()` → `UseRateLimiter()`. CORS allows **any origin**, header and method (since
+  2026-11-26), without credentials, and exposes `Content-Disposition` for export file names. The
+  frontend itself still calls through its Vercel rewrite (`/api/backend/*`), which needs no CORS.
+  Narrow the policy to the real frontend origins before release if open access is not wanted.
 - [Reports/](Reports/): report export layouts and the PDF/Excel writers (see Exports below).
 - [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
   issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
