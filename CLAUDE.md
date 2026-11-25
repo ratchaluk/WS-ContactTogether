@@ -96,6 +96,8 @@ these with free-form Thai messages.
 - [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
   issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
   `MemoryTokenRevocationStore` holds logged-out `jti` values.
+- [Realtime/](Realtime/): `InboxNotifier` (singleton `IInboxNotifier`) pushes "inbox may have changed"
+  signals to the open `GET /Home/InboxStream` connections of an employee (see `HomeController` below).
 - [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs): a single `partial` DbContext with
   all mapping in `OnModelCreating`. **Put hand-written model configuration in a separate partial
   class implementing `OnModelCreatingPartial`** so re-scaffolding does not clobber it.
@@ -179,6 +181,15 @@ A request the client cancels (`OperationCanceledException`) is not caught and ge
   sort by `Code` descending, and answer `PagedEnvelope<T>`. `POST /Services/ReceiveService` takes a
   service off the inbox. They replace neither `ServicesController.GetPendingServices` nor
   `GetInProcessServices`, which use other rules. Frontend guide: [docs/HomeServices.md](docs/HomeServices.md).
+  `GET InboxStream` makes the inbox real-time: a Server-Sent Events stream (the frontend reaches it
+  through its Vercel rewrite and `proxy.ts`, like `/Helper/time/stream`) that sends `ready` on connect
+  and `inbox` (`InboxSignal`: `reason`, `serviceId`) when the caller's inbox may have changed. It only
+  signals; the client reloads `GetInboxServices`. It pings every 25 s (Vercel cuts proxied streams
+  silent for 120 s) and closes on logout, token expiry or after 30 min. The signals come from
+  `ServicesController.NotifyInbox`, called after the change is saved in `AddNewServiceOperations`,
+  `UpdateServiceOperations`, `DeleteServiceOperations`, `ReceiveService` and `UpdateService` (on close or
+  reopen). **Any new code that changes `TblActivity.OwnerId`/`IsReceived`/`IsEnable`/`StatusId`, or a
+  service's open/closed state, must call it too.** Frontend guide: [docs/InboxStream.md](docs/InboxStream.md).
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
@@ -200,7 +211,8 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 - **Logout** — JWTs are stateless, so logout records the token's `jti` in
   [Auth/MemoryTokenRevocationStore.cs](Auth/MemoryTokenRevocationStore.cs) until its `exp`, and the
   `OnTokenValidated` event in `Program.cs` rejects it from then on. The store is per-process: scaling
-  out to more than one instance requires a shared store (Redis or a table).
+  out to more than one instance requires a shared store (Redis or a table). `InboxNotifier` is
+  per-process too and would need a shared bus (Redis pub/sub) across instances.
 - **Claims** — `sub` = `TblEmployee.Id`, `name` = `UserName`, `role` = `RoleId`, `org` =
   `OrganizationId`, `lang` = `DefaultLanguage`. Inbound claim mapping is disabled, so these arrive
   under exactly those names (constants are in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs)).
