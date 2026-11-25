@@ -26,6 +26,9 @@ public partial class ApplicationDbContext
         // Leave Id unset when inserting: the scaffolded HasDefaultValueSql makes the database fill it.
         modelBuilder.Entity<TblActivity>().HasKey(e => e.Id);
 
+        // TblService needs no entry here: its Id has been the database primary key (PK_TblService)
+        // since 2026-11-26, so the scaffolded model declares it.
+
         // Every insert gets a UUID primary key: any entity whose key is a single string column is
         // assigned one by GuidStringValueGenerator when it is Add()ed with the key left null. A key
         // set explicitly is kept. Composite keys (TblReopenedLog), Guid keys (TblActivity) and

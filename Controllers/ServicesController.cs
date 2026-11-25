@@ -640,8 +640,9 @@ public class ServicesController : ControllerBase
             OnScene = request.OnScene,
         };
 
-        // TblService is keyless in the model, so EF cannot Add() it; insert with SQL instead. The
-        // app lock makes concurrent requests take numbers one at a time, so no two get the same code.
+        // Inserted with SQL, written when TblService had no primary key and EF could not Add() it. It
+        // has one (Id) since 2026-11-26, so this could become Add()/SaveChanges. The app lock makes
+        // concurrent requests take numbers one at a time, so no two get the same code.
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         await _db.Database.ExecuteSqlRawAsync(
             "EXEC sp_getapplock @Resource = 'TblService.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
@@ -847,7 +848,8 @@ public class ServicesController : ControllerBase
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        // TblService is keyless in the model, so EF cannot update it; write it with SQL instead.
+        // Written with SQL from when TblService had no primary key and EF could not update it. It has
+        // one (Id) since 2026-11-26, so this could become a tracked update.
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE TblService SET
                 Category_ID = {updated.CategoryId}, Status_ID = {updated.StatusId},

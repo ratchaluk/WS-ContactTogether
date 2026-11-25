@@ -5,7 +5,7 @@ namespace ContactTogetherApi.Models;
 
 public partial class TblService
 {
-    public string? Id { get; set; }
+    public string Id { get; set; } = null!;
 
     public string? Code { get; set; }
 
