@@ -173,6 +173,12 @@ controllers. Never put `ex.Message` in a response.
 | 500 | Unexpected failure. Log it and answer `เกิดข้อผิดพลาดภายในระบบ` | `MessageResponse` |
 
 A request the client cancels (`OperationCanceledException`) is not caught and gets no body.
+- `HomeController`: the home page's two tabs, `GET GetInboxServices` (open services with an operation
+  assigned to the caller whose status is `CLOSE` and `IsReceived = 'F'`) and `GET GetProcessingServices`
+  (open services the caller owns). "Open" means status `IsType` `OPEN` or `PENDING`. Both page in the DB,
+  sort by `Code` descending, and answer `PagedEnvelope<T>`. `POST /Services/ReceiveService` takes a
+  service off the inbox. They replace neither `ServicesController.GetPendingServices` nor
+  `GetInProcessServices`, which use other rules. Frontend guide: [docs/HomeServices.md](docs/HomeServices.md).
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
