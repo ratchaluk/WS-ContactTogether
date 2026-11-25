@@ -11,6 +11,7 @@
 > [GetStatusByStatusTypeActivity.md](GetStatusByStatusTypeActivity.md)
 >
 > **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `dateClosed` server จัดการเอง, `categoryId` ชุด ACTIVITY, `isReceived` server จัดการเอง
+> · ปรับ 25 พ.ย. 2569: `groupId` ใช้ค่าจาก `GetEmployeeGroup` และเลือก `ownerId` จาก `GetEmployeeByGroup` ได้แล้ว
 
 ---
 
@@ -42,20 +43,22 @@
 | `summary` | คงเดิม | คงเดิม | ล้างไม่ได้ |
 | `categoryId` | คงเดิม | คงเดิม | ล้างไม่ได้ ต้องเป็นชุด `ACTIVITY` |
 | `detail` | คงเดิม | **ล้างค่า** | |
-| `ownerId` | คงเดิม | **ล้างค่า** | id จาก `GetEmployee` เปลี่ยนผู้รับ = `isReceived` กลับเป็น `"F"` (ดูข้อ 2.2) |
+| `ownerId` | คงเดิม | **ล้างค่า** | id จาก `GetEmployeeByGroup` (หรือ `GetEmployee` ถ้าไม่มีช่องกลุ่ม) เปลี่ยนผู้รับ = `isReceived` กลับเป็น `"F"` (ดูข้อ 2.2) |
 | `contactId` | คงเดิม | **ล้างค่า** | id ของ `AddNewContact` |
-| `groupId` | คงเดิม | **ล้างค่า** | ยังไม่ใช้ ไม่ต้องส่ง |
+| `groupId` | คงเดิม | **ล้างค่า** | `id` จาก `GetEmployeeGroup` ([GetEmployeeGroup.md](GetEmployeeGroup.md)) ผู้รับของกลุ่มดูจาก `GetEmployeeByGroup` |
 | `dateOpened` | คงเดิม | – | ล้างไม่ได้ |
 
 แก้ไม่ได้: `serviceId`, `line`, `code` (ส่งมาก็ไม่มีผล)
 **backend ใส่ให้เอง**: `updated` (= เวลาที่บันทึก), `updatedBy` (= ผู้ที่ login อยู่), `dateClosed`, `isReceived` (ดูข้อ 2.2 ส่งมาจะถูกข้าม)
 
-> ⚠️ ถ้าฟอร์มส่งทุก field ทั้งก้อน ช่อง `detail` / `ownerId` / `contactId` ที่ว่างจะถูกล้าง
+> ⚠️ ถ้าฟอร์มส่งทุก field ทั้งก้อน ช่อง `detail` / `ownerId` / `contactId` / `groupId` ที่ว่างจะถูกล้าง
 > แนะนำให้ส่งเฉพาะ field ที่ผู้ใช้แก้ (เทียบกับค่าเดิม) ดูโค้ดตัวอย่างข้อ 4
 
 ### 2.2 กติกาที่ควรรู้
 
 - **id ทุกตัวที่ส่งต้องมีอยู่จริง** ไม่งั้นได้ 400 ที่ field นั้น ส่ง id ตามที่ได้จาก API (ตัวพิมพ์ใหญ่) อย่าแปลงเป็นตัวเล็ก
+  **ยกเว้น `groupId`** ที่ backend ยังไม่ตรวจ บันทึกตามที่ส่งมา จึงต้องส่ง `id` จาก `GetEmployeeGroup` เท่านั้น
+  (เป็น string เช่น `"5"` อย่าแปลงเป็นตัวเลข)
 - **`dateClosed` server จัดการเอง ไม่รับจาก client:**
 
   | ส่ง | ผลกับ `dateClosed` |
@@ -122,8 +125,9 @@ export interface UpdateServiceOperationBody {
   summary?: string | null;
   detail?: string | null;
   categoryId?: string | null;
-  ownerId?: string | null;
+  ownerId?: string | null;    // id จาก GetEmployeeByGroup
   contactId?: string | null;
+  groupId?: string | null;    // id จาก GetEmployeeGroup (string เช่น "5")
   dateOpened?: string | null;
   // ไม่มี dateClosed: server ตั้งเอง
 }
