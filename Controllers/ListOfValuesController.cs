@@ -624,11 +624,89 @@ public class ListOfValuesController : ControllerBase
         var employees = rows.Select(e => new LookupItemResponse
         {
             Id = e.Id ?? string.Empty,
-            NameTh = string.Join(' ', new[] { e.SalutationTh, e.FirstnameTh, e.LastnameTh }
-                .Where(part => !string.IsNullOrWhiteSpace(part))),
+            NameTh = FullNameTh(e.SalutationTh, e.FirstnameTh, e.LastnameTh),
         });
 
         return Ok(employees);
+    }
+
+    /// <summary>คำนำหน้า ชื่อ นามสกุล ภาษาไทย ต่อกันด้วยช่องว่าง ข้ามส่วนที่ไม่มีค่า</summary>
+    private static string FullNameTh(string? salutation, string? firstname, string? lastname) =>
+        string.Join(' ', new[] { salutation, firstname, lastname }.Where(part => !string.IsNullOrWhiteSpace(part)));
+
+    /// <summary>
+    /// คืนกลุ่มพนักงาน (ตาราง <c>TblUserGroup</c>) ที่เปิดใช้งานทั้งหมด เรียงตามชื่อ สำหรับ drop-down กลุ่มในฟอร์มเพิ่มงาน
+    /// เป็น 2 ชั้นผ่าน <c>refId</c> เหมือน <c>GetOrganization</c>: กลุ่มหลักมี <c>refId</c> เท่ากับ <c>id</c> ของตัวเอง
+    /// ส่วนกลุ่มย่อยชี้ไปที่กลุ่มหลัก กลุ่มย่อยที่กลุ่มหลักถูกปิดจะไม่ถูกส่งมา
+    /// ส่ง <c>id</c> ที่เลือกเป็น <c>groupId</c> ของ <c>POST /Services/AddNewServiceOperations</c>
+    /// และของ <c>GET /ListOfValues/GetEmployeeByGroup</c>
+    /// </summary>
+    [HttpGet("GetEmployeeGroup")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<EmployeeGroupResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetEmployeeGroup(CancellationToken cancellationToken)
+    {
+        // A main group points RefGroupId at itself, so joining each group to the row its RefGroupId names
+        // and requiring that row to be an enabled main group keeps the main groups (joined to themselves)
+        // and drops sub-groups under a disabled one, which the legacy picker never showed.
+        // Enable is char(1) 'T'/'F'.
+        var groups = await (
+            from g in _db.TblUserGroups.AsNoTracking()
+            join parent in _db.TblUserGroups.AsNoTracking() on g.RefGroupId equals parent.GroupId
+            where g.Enable == "T" && parent.Enable == "T" && parent.RefGroupId == parent.GroupId
+            orderby g.GroupName
+            select new { g.GroupId, g.RefGroupId, g.GroupName })
+            .ToListAsync(cancellationToken);
+
+        // Strings, because TblActivity.GroupId and TblEmployeeGroup.GroupId hold the id as text.
+        return Ok(groups.Select(g => new EmployeeGroupResponse
+        {
+            Id = g.GroupId.ToString(CultureInfo.InvariantCulture),
+            RefId = g.RefGroupId!.Value.ToString(CultureInfo.InvariantCulture),
+            Name = g.GroupName ?? string.Empty,
+        }));
+    }
+
+    /// <summary>
+    /// คืนพนักงานที่เปิดใช้งานในกลุ่มที่ระบุ (<c>TblEmployeeGroup</c>) สำหรับ drop-down ผู้รับในฟอร์มเพิ่มงาน
+    /// เป็น id และชื่อเต็มภาษาไทยแบบเดียวกับ <c>GetEmployee</c> เรียงตามชื่อ แล้วนามสกุล
+    /// ส่ง <c>id</c> ที่เลือกเป็น <c>ownerId</c> ของ <c>POST /Services/AddNewServiceOperations</c>
+    /// ได้เฉพาะสมาชิกของกลุ่มนั้นโดยตรง ไม่รวมกลุ่มย่อย กลุ่มที่ไม่มีอยู่หรือถูกปิดได้ <c>[]</c>
+    /// </summary>
+    [HttpGet("GetEmployeeByGroup")]
+    [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<LookupItemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetEmployeeByGroup([FromQuery, Required] int? groupId, CancellationToken cancellationToken)
+    {
+        var id = groupId!.Value;
+        var groupKey = id.ToString(CultureInfo.InvariantCulture);
+
+        var groupEnabled = await _db.TblUserGroups.AsNoTracking()
+            .AnyAsync(g => g.GroupId == id && g.Enable == "T", cancellationToken);
+        if (!groupEnabled)
+        {
+            return Ok(Array.Empty<LookupItemResponse>());
+        }
+
+        // TblEmployeeGroup has no key, so a pair could appear twice; Distinct keeps one row per employee.
+        var rows = await (
+            from eg in _db.TblEmployeeGroups.AsNoTracking()
+            join e in _db.TblEmployees.AsNoTracking() on eg.EmployeeId equals e.Id
+            where eg.GroupId == groupKey && e.IsEnable == "T"
+            select new { e.Id, e.SalutationTh, e.FirstnameTh, e.LastnameTh })
+            .Distinct()
+            .OrderBy(e => e.FirstnameTh)
+            .ThenBy(e => e.LastnameTh)
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows.Select(e => new LookupItemResponse
+        {
+            Id = e.Id ?? string.Empty,
+            NameTh = FullNameTh(e.SalutationTh, e.FirstnameTh, e.LastnameTh),
+        }));
     }
 
     /// <summary>

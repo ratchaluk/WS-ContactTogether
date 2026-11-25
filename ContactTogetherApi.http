@@ -225,6 +225,23 @@ Authorization: Bearer {{token}}
 
 ###
 
+# Groups (กลุ่ม) of the operation form - every enabled TblUserGroup row (28), sorted by name, as
+# [{ id, refId, name }], ids as strings. Two levels like GetOrganization: a main group has refId == id
+# (12 rows), a sub-group has refId = its main group. Sub-groups under a disabled main group are left out.
+# Send id as groupId when adding an operation, and to GetEmployeeByGroup below.
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetEmployeeGroup
+Authorization: Bearer {{token}}
+
+###
+
+# Receivers (ผู้รับ) - enabled employees of one group (TblEmployeeGroup) as [{ id, nameTh }], same name
+# format as GetEmployee. groupId is required (400 without it); a disabled or unknown group gives [].
+# Send id as ownerId when adding an operation. Group 5 = การคลัง… - Agent. (34 people).
+GET {{ContactTogetherApi_HostAddress}}/ListOfValues/GetEmployeeByGroup?groupId=5
+Authorization: Bearer {{token}}
+
+###
+
 # Call types (ประเภทการรับสาย) - the enabled TblCategory rows with CategoryType "CONTACT", as a tree
 # of [{ id, nameTh, nameEn, children[] }]: group (Service / Non Service) > radio > drop-down.
 # Save the id of the leaf the user picked as TblContact.CategoryId (the radio itself if it has no children).

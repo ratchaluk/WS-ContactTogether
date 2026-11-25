@@ -13,6 +13,7 @@
 > [GetServiceById.md](GetServiceById.md) (เรื่องที่การดำเนินการนี้อยู่)
 >
 > **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `categoryId` ต้องเป็นชุด ACTIVITY, `dateClosed` server ตั้งเอง (ไม่รับจาก client)
+> · ปรับ 25 พ.ย. 2569: `groupId` ใช้ค่าจาก `GetEmployeeGroup` และเลือก `ownerId` จาก `GetEmployeeByGroup` ได้แล้ว
 
 ---
 
@@ -42,9 +43,9 @@
 | `summary` | ✔ | ไม่จำกัด | หัวข้อการดำเนินการ | ผู้ใช้กรอก ส่ง `""` หรือช่องว่างล้วน = 400 |
 | `detail` | | ไม่จำกัด | รายละเอียด | ผู้ใช้กรอก |
 | `categoryId` | **ตอนนี้ต้องส่ง** | 50 | ประเภทการดำเนินการ (ชุด `ACTIVITY`) | ดู 2.2 |
-| `ownerId` | | 50 | เจ้าหน้าที่ผู้รับผิดชอบ | ไม่ส่ง = **ผู้ที่ login อยู่** ส่งเองใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
+| `ownerId` | | 50 | เจ้าหน้าที่ผู้รับผิดชอบ (ผู้รับ) | ไม่ส่ง = **ผู้ที่ login อยู่** เลือกกลุ่มแล้วใช้ `id` จาก `GET /ListOfValues/GetEmployeeByGroup` ([GetEmployeeByGroup.md](GetEmployeeByGroup.md)) ถ้าไม่มีช่องกลุ่มใช้ `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
 | `contactId` | | 50 | การรับสายที่เกี่ยวข้อง (`TblContact`) | `id` ใน response ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) ไม่มีก็ไม่ต้องส่ง |
-| `groupId` | | 50 | กลุ่มงาน | ยังไม่มี lookup และ API ไม่ตรวจค่า **ไม่ต้องส่ง** จนกว่าจะตกลงกัน |
+| `groupId` | | 50 | กลุ่ม | `id` จาก `GET /ListOfValues/GetEmployeeGroup` ([GetEmployeeGroup.md](GetEmployeeGroup.md)) แล้วเลือกผู้รับ (`ownerId`) จาก `GET /ListOfValues/GetEmployeeByGroup` ([GetEmployeeByGroup.md](GetEmployeeByGroup.md)) API ยังไม่ตรวจค่านี้ |
 | `dateOpened` | | – | วันเวลาที่เริ่มดำเนินการ | ไม่ส่ง = **เวลาที่บันทึก** |
 
 **backend ใส่ให้เอง** (ส่งมาก็ไม่มีผล): `id`, `line`, `code`, `isEnable` (= `"T"`), `dateClosed` (ดู 2.2), `isReceived` (ดู 2.2),
@@ -54,6 +55,8 @@
 
 - **id ทุกตัวที่ส่งต้องมีอยู่จริง** ไม่งั้นได้ 400 ที่ field นั้น ส่ง id ตามที่ได้จาก API (ตัวพิมพ์ใหญ่) อย่าแปลงเป็นตัวเล็ก
   เพราะฐานข้อมูลเทียบตัวพิมพ์ (ยกเว้น `serviceId` ที่ backend แปลงให้)
+  **ยกเว้น `groupId`** ที่ backend ยังไม่ตรวจ บันทึกตามที่ส่งมา จึงต้องส่ง `id` จาก `GetEmployeeGroup` เท่านั้น
+  (เป็น string เช่น `"5"` อย่าแปลงเป็นตัวเลข)
 - **`statusId`**: ตอนนี้มี 3 ตัว เปิด (`OPEN`) / ปิด (`CLOSE`) / ยกเลิก (`CANCEL`) ให้เลือกจาก `isType` อย่า hard-code id
   ค่าเริ่มต้นของ drop-down ใช้แถวที่ `isDefault === "T"`
 - **`dateClosed`: server ตั้งเอง ไม่รับจาก client** (ส่งมาจะถูกข้าม) ถ้า `statusId` มี `isType` เป็น `CLOSE` / `CANCEL`
@@ -201,8 +204,9 @@ export interface CreateServiceOperationBody {
   summary: string;
   detail?: string | null;
   categoryId: string; // ชุด ACTIVITY (ตอนนี้ยังไม่มีค่าเริ่มต้น จึงต้องส่ง)
-  ownerId?: string | null;
+  ownerId?: string | null;    // id จาก GetEmployeeByGroup (ไม่ส่ง = ผู้ที่ login อยู่)
   contactId?: string | null;
+  groupId?: string | null;    // id จาก GetEmployeeGroup (string เช่น "5")
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย
   // ไม่มี dateClosed: server ตั้งเอง
 }
@@ -242,6 +246,8 @@ await addServiceOperation({
   categoryId: form.categoryId,
   summary: form.summary.trim(),
   detail: form.detail || null,
+  groupId: form.groupId || null, // drop-down กลุ่ม (GetEmployeeGroup)
+  ownerId: form.ownerId || null, // drop-down ผู้รับ (GetEmployeeByGroup?groupId=)
 }, { token });
 // ถ้าเลือกสถานะปิด/ยกเลิก response จะมี dateClosed เป็นเวลาของ server
 ```
@@ -268,7 +274,7 @@ curl -X POST "http://localhost:5018/Services/AddNewServiceOperations" \
 | **response ไม่มีชื่อ** | มีแต่ id ถ้าต้องการชื่อให้ใช้ `GetServiceOperations` |
 | **`dateClosed`** | server ตั้งเองตามสถานะ ไม่ต้องส่ง (ข้อ 2.2) |
 | **`categoryId`** | ชุด ACTIVITY เท่านั้น และตอนนี้ต้องส่ง เพราะยังไม่มีค่าเริ่มต้น (ข้อ 2.2) |
-| **`groupId`** | ยังไม่ใช้ ไม่ต้องส่ง |
+| **`groupId`** | ไม่บังคับ ใช้ `id` จาก `GetEmployeeGroup` แล้วเลือกผู้รับจาก `GetEmployeeByGroup?groupId=` API ยังไม่ตรวจว่ามีกลุ่มนี้จริง หรือผู้รับอยู่ในกลุ่มนี้ |
 | **ไฟล์แนบ** | ยังไม่รองรับ (ตารางมีคอลัมน์ไฟล์แนบ แต่ API ยังไม่รับ) |
 | **ลบการดำเนินการ** | ยังไม่มี endpoint |
 | **สถานะของเรื่องไม่เปลี่ยนตาม** | ปิดการดำเนินการไม่ได้ปิดเรื่อง ถ้าต้องปิดเรื่องด้วยให้เรียก `UpdateService` แยก |
