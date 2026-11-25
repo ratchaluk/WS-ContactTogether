@@ -568,6 +568,14 @@ Content-Type: application/json
 
 ###
 
+# Delete an operation by its TblActivity.Id, as the legacy app does: the row is disabled (isEnable "F"),
+# not removed, and drops out of GetServiceOperations and the home lists. Other lines keep their numbers.
+# 200 = the disabled row; 400 = a bad id; 404 = no enabled operation with that id (deleting twice = 404).
+DELETE {{ContactTogetherApi_HostAddress}}/Services/DeleteServiceOperations?id=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+###
+
 # Operations of a service, by Line, with status (nameTh, isType), category, owner, contact number and
 # created/updated-by names. Enabled ones only, no attachment. 200 = array ([] if none); 400 = no
 # serviceId; 404 = no enabled service with that id.
@@ -597,6 +605,16 @@ Authorization: Bearer {{token}}
 # status names (Thai when there is none).
 GET {{ContactTogetherApi_HostAddress}}/Home/GetProcessingServices?PageNumber=1&PageSize=10&Lang=en
 Authorization: Bearer {{token}}
+
+###
+
+# Home - real-time inbox via Server-Sent Events. "event: ready" on connect, then "event: inbox" with
+# { reason, serviceId } (reason: assigned / updated / removed / received) whenever the caller's inbox may
+# have changed; reload GetInboxServices on either. ": ping" every 25 s. Closes on logout, token expiry
+# or after 30 min (EventSource reconnects). Endless stream; cancel the request to stop. 401 = no token.
+GET {{ContactTogetherApi_HostAddress}}/Home/InboxStream
+Authorization: Bearer {{token}}
+Accept: text/event-stream
 
 ###
 
