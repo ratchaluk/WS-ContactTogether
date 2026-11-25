@@ -94,6 +94,8 @@ public partial class ApplicationDbContext : DbContext
 
     public virtual DbSet<TblTransferStatus> TblTransferStatuses { get; set; }
 
+    public virtual DbSet<TblUserGroup> TblUserGroups { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Thai_100_CS_AI");
@@ -154,17 +156,15 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<TblActivity>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("TblActivity");
+            entity.ToTable("TblActivity");
 
+            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_TblActivityId");
             entity.Property(e => e.CategoryId).HasMaxLength(50);
             entity.Property(e => e.Code).HasMaxLength(50);
             entity.Property(e => e.ContactId).HasMaxLength(50);
             entity.Property(e => e.CreatedBy).HasMaxLength(100);
             entity.Property(e => e.FileName).HasMaxLength(255);
             entity.Property(e => e.GroupId).HasMaxLength(50);
-            entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_TblActivityId");
             entity.Property(e => e.IsEnable).HasMaxLength(10);
             entity.Property(e => e.IsReceived).HasMaxLength(10);
             entity.Property(e => e.OwnerId).HasMaxLength(50);
@@ -942,6 +942,27 @@ public partial class ApplicationDbContext : DbContext
                 .IsUnicode(false)
                 .HasDefaultValue("T");
             entity.Property(e => e.TransferStatusText).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TblUserGroup>(entity =>
+        {
+            entity.HasKey(e => e.GroupId);
+
+            entity.ToTable("TblUserGroup");
+
+            entity.Property(e => e.GroupId).ValueGeneratedNever();
+            entity.Property(e => e.Created).HasColumnType("datetime");
+            entity.Property(e => e.CreatedBy).HasMaxLength(50);
+            entity.Property(e => e.Enable)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .IsFixedLength();
+            entity.Property(e => e.GroupName).HasMaxLength(100);
+            entity.Property(e => e.IsDefault)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .IsFixedLength();
+            entity.Property(e => e.LastUpdatedBy).HasMaxLength(50);
         });
 
         OnModelCreatingPartial(modelBuilder);
