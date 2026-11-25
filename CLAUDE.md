@@ -210,7 +210,10 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 ### Domain shape
 
 `TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
-channel, owner, category, status, severity/priority/secrecy levels, area, organization).
+channel, owner, category, status, severity/priority/secrecy levels, area, organization). Its `Id`
+(`varchar(200)`) has been the primary key (`PK_TblService`, non-clustered) since 2026-11-26.
+`AddNewService`/`UpdateService` still write it with SQL from before then, and could move to EF.
+`Summary` and `Service_Reference_Link` are `nvarchar(max)`.
 `TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
 `newsequentialid()` and the table's primary key since 2026-11-25; `ApplicationDbContext.Keys.cs` still
 declares it from before the DB had the PK, which is now redundant but harmless; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReOpenService` logs reopenings
