@@ -276,5 +276,5 @@ curl -X POST "http://localhost:5018/Services/AddNewServiceOperations" \
 | **`categoryId`** | ชุด ACTIVITY เท่านั้น และตอนนี้ต้องส่ง เพราะยังไม่มีค่าเริ่มต้น (ข้อ 2.2) |
 | **`groupId`** | ไม่บังคับ ใช้ `id` จาก `GetEmployeeGroup` แล้วเลือกผู้รับจาก `GetEmployeeByGroup?groupId=` API ยังไม่ตรวจว่ามีกลุ่มนี้จริง หรือผู้รับอยู่ในกลุ่มนี้ |
 | **ไฟล์แนบ** | ยังไม่รองรับ (ตารางมีคอลัมน์ไฟล์แนบ แต่ API ยังไม่รับ) |
-| **ลบการดำเนินการ** | ยังไม่มี endpoint |
+| **ลบการดำเนินการ** | `DELETE /Services/DeleteServiceOperations` ([DeleteServiceOperations.md](DeleteServiceOperations.md)) |
 | **สถานะของเรื่องไม่เปลี่ยนตาม** | ปิดการดำเนินการไม่ได้ปิดเรื่อง ถ้าต้องปิดเรื่องด้วยให้เรียก `UpdateService` แยก |

@@ -195,4 +195,4 @@ curl -X PUT "http://localhost:5018/Services/UpdateServiceOperations?id=<operatio
 | **`""` ล้างค่า** | เฉพาะ `detail` / `ownerId` / `contactId` / `groupId` ส่งเฉพาะ field ที่เปลี่ยน |
 | **`dateClosed`** | server ตั้ง/ล้างเองตามสถานะ ไม่ต้องส่ง (ข้อ 2.2) |
 | **สถานะของเรื่องไม่เปลี่ยนตาม** | ปิดการดำเนินการไม่ได้ปิดเรื่อง ใช้ `UpdateService` แยก |
-| **ลบการดำเนินการ** | ยังไม่มี endpoint |
+| **ลบการดำเนินการ** | `DELETE /Services/DeleteServiceOperations` ([DeleteServiceOperations.md](DeleteServiceOperations.md)) |
