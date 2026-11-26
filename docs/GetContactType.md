@@ -45,8 +45,8 @@
 
 ค่านี้คือค่าเดียวกับที่ระบบเดิมเก็บใน `TblContact.CategoryId` และรายงาน 05/06 นับจากค่านี้
 
-> ⚠️ **ยังไม่มี API สำหรับบันทึกการรับสาย** ตอนนี้มีแค่ endpoint ดึงตัวเลือก ส่วนชื่อ field ที่ใช้ส่ง id
-> จะแจ้งเมื่อ backend ทำ endpoint บันทึกเสร็จ
+> บันทึกค่านี้เป็น `categoryId` ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) ตอนกดปุ่มหลักของ
+> กล่องยืนยันในหน้ารับสาย (จุดที่ต้องเรียกในแต่ละกรณีอยู่ใน AddNewContact.md ข้อ 1)
 >
 > **อย่าเอา id ชุดนี้ไปใส่ใน `categoryId` ของ `POST /Services/AddNewService`** เพราะ field นั้นคือ
 > *ประเภทบริการ* (Q&A, Claim, …) ซึ่งเป็นคนละชุดกัน และ API จะไม่ฟ้อง error ด้วย เพราะเช็กแค่ว่า id

@@ -107,7 +107,7 @@
 
 | สถานการณ์ | ค่าที่ส่ง |
 |---|---|
-| กำลังรับสาย (บันทึกฟอร์มรับสายแล้ว) | `id` ใน response ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) เก็บไว้ใน state ของหน้าจนจบสาย |
+| กำลังรับสาย (มาจากหน้ารับสาย) | `id` ใน response ของ `POST /Contact/AddNewContact` ที่บันทึกตอนกดปุ่มหลักของกล่องยืนยัน ส่งต่อมากับหน้า (เช่น `?contactId=`) จนจบสาย ลำดับอยู่ใน [AddNewContact.md](AddNewContact.md) ข้อ 1 |
 | เปิดเรื่องเดิมมาทำงานต่อ (ไม่ได้อยู่ในสาย) | `contactId` ของการดำเนินการในเรื่องนั้นจาก `GetServiceOperations` ([GetServiceOperations.md](GetServiceOperations.md)) ระบบเดิมใช้ของรายการแรก (`line` 1) ถ้าไม่มีให้ใช้รายการล่าสุดที่มีค่า |
 | เรื่องเก่าที่ทุกรายการ `contactId` เป็น `null` (เปิดก่อน 26 พ.ย. 2569) หรือเป็นการติดต่อครั้งใหม่ เช่น โทรออก | บันทึกการติดต่อด้วย `AddNewContact` ก่อน แล้วใช้ `id` ที่ได้ |
 

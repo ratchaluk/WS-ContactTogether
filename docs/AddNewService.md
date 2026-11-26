@@ -33,7 +33,7 @@
 | Field | ยาวสุด | ความหมาย | เอาค่ามาจาก |
 |---|---|---|---|
 | `serviceTitleId` **(บังคับ)** | 50 | หัวข้อเรื่อง | `id` จาก `GET /ListOfValues/GetServiceTitle` ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
-| `contactId` **(บังคับ)** | 50 | การรับสายที่เปิดเรื่องนี้ (`TblContact`) **ไม่ได้เก็บใน `TblService`** แต่ใส่ให้การดำเนินการรายการแรก (ข้อ 3.2) ซึ่งรายงานใช้หาเบอร์ผู้ติดต่อ | `id` ใน response ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) ของสายนี้ ไม่ส่ง / `""` / id ที่ไม่มีจริง = 400 `errors.ContactId` |
+| `contactId` **(บังคับ)** | 50 | การรับสายที่เปิดเรื่องนี้ (`TblContact`) **ไม่ได้เก็บใน `TblService`** แต่ใส่ให้การดำเนินการรายการแรก (ข้อ 3.2) ซึ่งรายงานใช้หาเบอร์ผู้ติดต่อ | `id` ใน response ของ `POST /Contact/AddNewContact` ของสายนี้ ซึ่งบันทึกตอนกด "ค้นหาข้อมูลบริการ" หรือ "เพิ่มข้อมูลผู้ติดต่อ" ในหน้ารับสาย ไม่ใช่ตอนเปิดเรื่อง (ลำดับอยู่ใน [AddNewContact.md](AddNewContact.md) ข้อ 1) ไม่ส่ง / `""` / id ที่ไม่มีจริง = 400 `errors.ContactId` |
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
 | `statusId` | 200 | สถานะของเรื่อง | `id` จาก `GET /ListOfValues/GetStatus` (สถานะประเภท SERVICE ดู [GetStatus.md](GetStatus.md)) บันทึกตามที่ส่ง ส่งสถานะ ACTIVITY = 400 |
 | `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น โดยใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
