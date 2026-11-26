@@ -194,6 +194,7 @@ A request the client cancels (`OperationCanceledException`) is not caught and ge
   `UpdateServiceOperations`, `DeleteServiceOperations`, `ReceiveService` and `UpdateService` (on close or
   reopen). **Any new code that changes `TblActivity.OwnerId`/`IsReceived`/`IsEnable`/`StatusId`, or a
   service's open/closed state, must call it too.** Frontend guide: [docs/InboxStream.md](docs/InboxStream.md).
+  Backend walkthrough of the whole controller: [docs/HomeController.md](docs/HomeController.md).
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
