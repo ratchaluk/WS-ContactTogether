@@ -12,6 +12,7 @@
 >
 > **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `dateClosed` server จัดการเอง, `categoryId` ชุด ACTIVITY, `isReceived` server จัดการเอง
 > · ปรับ 25 พ.ย. 2569: `groupId` ใช้ค่าจาก `GetEmployeeGroup` และเลือก `ownerId` จาก `GetEmployeeByGroup` ได้แล้ว
+> · ปรับ 26 พ.ย. 2569: `contactId` ล้างไม่ได้แล้ว (ส่ง `""` = คงเดิม)
 
 ---
 
@@ -44,14 +45,14 @@
 | `categoryId` | คงเดิม | คงเดิม | ล้างไม่ได้ ต้องเป็นชุด `ACTIVITY` |
 | `detail` | คงเดิม | **ล้างค่า** | |
 | `ownerId` | คงเดิม | **ล้างค่า** | id จาก `GetEmployeeByGroup` (หรือ `GetEmployee` ถ้าไม่มีช่องกลุ่ม) เปลี่ยนผู้รับ = `isReceived` กลับเป็น `"F"` (ดูข้อ 2.2) |
-| `contactId` | คงเดิม | **ล้างค่า** | id ของ `AddNewContact` |
+| `contactId` | คงเดิม | คงเดิม | ล้างไม่ได้ (บังคับตอนเพิ่มงาน ตั้งแต่ 26 พ.ย. 2569) เปลี่ยนได้เป็น id ที่มีอยู่ใน `TblContact` เช่น id ของ `AddNewContact` |
 | `groupId` | คงเดิม | **ล้างค่า** | `id` จาก `GetEmployeeGroup` ([GetEmployeeGroup.md](GetEmployeeGroup.md)) ผู้รับของกลุ่มดูจาก `GetEmployeeByGroup` |
 | `dateOpened` | คงเดิม | – | ล้างไม่ได้ |
 
 แก้ไม่ได้: `serviceId`, `line`, `code` (ส่งมาก็ไม่มีผล)
 **backend ใส่ให้เอง**: `updated` (= เวลาที่บันทึก), `updatedBy` (= ผู้ที่ login อยู่), `dateClosed`, `isReceived` (ดูข้อ 2.2 ส่งมาจะถูกข้าม)
 
-> ⚠️ ถ้าฟอร์มส่งทุก field ทั้งก้อน ช่อง `detail` / `ownerId` / `contactId` / `groupId` ที่ว่างจะถูกล้าง
+> ⚠️ ถ้าฟอร์มส่งทุก field ทั้งก้อน ช่อง `detail` / `ownerId` / `groupId` ที่ว่างจะถูกล้าง
 > แนะนำให้ส่งเฉพาะ field ที่ผู้ใช้แก้ (เทียบกับค่าเดิม) ดูโค้ดตัวอย่างข้อ 4
 
 ### 2.2 กติกาที่ควรรู้
@@ -192,7 +193,7 @@ curl -X PUT "http://localhost:5018/Services/UpdateServiceOperations?id=<operatio
 | เรื่อง | ผลกับ frontend |
 |---|---|
 | **`id` ของการดำเนินการ** | ได้จาก `GetServiceOperations` ([GetServiceOperations.md](GetServiceOperations.md)) |
-| **`""` ล้างค่า** | เฉพาะ `detail` / `ownerId` / `contactId` / `groupId` ส่งเฉพาะ field ที่เปลี่ยน |
+| **`""` ล้างค่า** | เฉพาะ `detail` / `ownerId` / `groupId` ส่งเฉพาะ field ที่เปลี่ยน (`contactId` ส่ง `""` = คงเดิม ตั้งแต่ 26 พ.ย. 2569) |
 | **`dateClosed`** | server ตั้ง/ล้างเองตามสถานะ ไม่ต้องส่ง (ข้อ 2.2) |
 | **สถานะของเรื่องไม่เปลี่ยนตาม** | ปิดการดำเนินการไม่ได้ปิดเรื่อง ใช้ `UpdateService` แยก |
 | **ลบการดำเนินการ** | `DELETE /Services/DeleteServiceOperations` ([DeleteServiceOperations.md](DeleteServiceOperations.md)) |

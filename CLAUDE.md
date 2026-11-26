@@ -232,7 +232,9 @@ channel, owner, category, status, severity/priority/secrecy levels, area, organi
 `Summary` and `Service_Reference_Link` are `nvarchar(max)`.
 `TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
 `newsequentialid()` and the table's primary key since 2026-11-25; `ApplicationDbContext.Keys.cs` still
-declares it from before the DB had the PK, which is now redundant but harmless; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReOpenService` logs reopenings
+declares it from before the DB had the PK, which is now redundant but harmless; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number,
+which the reports and the legacy application read, so `AddNewService` (for Line 1) and `AddNewServiceOperations`
+require an existing one; the legacy application filled it from the session). `TblReOpenService` logs reopenings
 (`ServiceId` + `Line`, written by `UpdateService`; the older `TblReopenedLog`, composite key `SrId` +
 `Line`, is unused). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
