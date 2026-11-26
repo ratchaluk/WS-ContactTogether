@@ -238,7 +238,10 @@ require an existing one; the legacy application filled it from the session). `Tb
 (`ServiceId` + `Line`, written by `UpdateService`; the older `TblReopenedLog`, composite key `SrId` +
 `Line`, is unused). `TblContact` is the call log: one row per call, written by `POST /Contact/AddNewContact` when the
 agent confirms the call page (before searching or opening a service, never at open-service time; see
-[docs/AddNewContact.md](docs/AddNewContact.md)); reports 05/06 count its rows, and it has no account or call-count column.
+[docs/AddNewContact.md](docs/AddNewContact.md)); reports 05/06 count its rows by the date of `ContactStart` (when the
+call started, sent by the frontend), and it has no account or call-count column. `ContactEnd` is the confirm time until
+`AddNewService` moves it to the time the service is saved, as the legacy application did (only forward;
+`AddNewServiceOperations` leaves it alone, because it also runs outside a call).
 `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. Agents belong to groups: `TblUserGroup` (`int`

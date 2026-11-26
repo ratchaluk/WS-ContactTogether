@@ -584,6 +584,8 @@ public class ServicesController : ControllerBase
     /// สร้างงานแรก (<c>TblActivity</c> Line 1) ให้ด้วยใน transaction เดียวกัน ตามระบบเดิม: ประเภท "Call - Inbound",
     /// หัวข้อ "Call Inbound", รายละเอียด "เริ่มให้บริการ", สถานะปิด, เริ่ม = <c>DateOpened</c> ของเรื่อง, จบ = เวลาบันทึก
     /// และ <c>ContactId</c> = <c>ContactId</c> ของ request (บังคับ ต้องมีอยู่ใน <c>TblContact</c>)
+    /// แล้วเลื่อน <c>ContactEnd</c> ของการรับสายนั้นเป็นเวลาบันทึกเรื่องเหมือนระบบเดิม
+    /// (<c>AddNewContact</c> ใส่เวลายืนยันไว้ก่อน ค่านี้เลื่อนไปข้างหน้าเท่านั้น)
     /// </summary>
     [HttpPost("AddNewService")]
     [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status201Created)]
@@ -734,6 +736,13 @@ public class ServicesController : ControllerBase
             UpdatedBy = actingEmployeeId,
         });
         await _db.SaveChangesAsync(cancellationToken);
+
+        // As in the legacy application, the call that opened this service ends when the service is saved.
+        // AddNewContact set ContactEnd to the time the call was confirmed. Only moves forward, so a second
+        // service opened from the same call keeps the later time.
+        await _db.TblContacts
+            .Where(c => c.Id == contactId && (c.ContactEnd == null || c.ContactEnd < now))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.ContactEnd, (DateTime?)now), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 

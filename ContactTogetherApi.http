@@ -414,6 +414,7 @@ Content-Type: application/json
 # "เริ่มให้บริการ", status Closed, from DateOpened to now (see GetServiceOperations).
 # Required: serviceTitleId, and contactId (the id AddNewContact returned for this call; it goes on
 # operation Line 1, not on TblService, and must exist in TblContact). Missing/blank/unknown = 400.
+# A 201 also moves that contact's ContactEnd to the service's save time (only forward), as the legacy app did.
 # NOTE: a 201 writes real rows and uses up one service code and one operation code of the day.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
@@ -629,8 +630,9 @@ Accept: text/event-stream
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
 # channelId comes from GetChannel; categoryId is a leaf of GetContactType (the drop-down item, or
-# the radio itself when it has none). ID, CreatedBy (token sub) and ContactEnd (now) are set by the
-# server; contactStart is optional (Thai local time, no offset/Z, defaults to now).
+# the radio itself when it has none). ID, CreatedBy (token sub) and ContactEnd (now; AddNewService later
+# moves it to the time a service opened from this call is saved) are set by the server; contactStart is
+# optional (Thai local time, no offset/Z, defaults to now).
 # 201 = the saved row with channelNameTh / categoryNameTh.
 #
 # NOTE: every 201 case writes a real row. They all use contactDetail 0899999999 so the test rows can
