@@ -32,6 +32,7 @@ public class ContactController : ControllerBase
     /// <summary>
     /// บันทึกฟอร์มรับสายเป็นแถวใหม่ใน <c>TblContact</c> แล้วคืนแถวนั้นกลับไป
     /// <c>ID</c> สร้างให้อัตโนมัติ <c>CreatedBy</c> มาจาก token และ <c>ContactEnd</c> คือเวลาที่บันทึก
+    /// (ถ้าเปิดเรื่องใหม่จากสายนี้ <c>AddNewService</c> จะเลื่อนเป็นเวลาบันทึกเรื่อง)
     /// <c>CategoryId</c> ต้องเป็นรายการสุดท้าย (leaf) ของ <c>GetContactType</c>
     /// </summary>
     [HttpPost("AddNewContact")]

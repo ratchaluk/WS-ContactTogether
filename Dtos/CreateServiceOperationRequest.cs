@@ -31,7 +31,12 @@ public class CreateServiceOperationRequest
     [MaxLength(50)]
     public string? CategoryId { get; set; }
 
-    /// <summary><c>TblContact.Id</c> (เบอร์ผู้ติดต่อของงานนี้)</summary>
+    /// <summary>
+    /// <c>TblContact.Id</c> (การติดต่อ / เบอร์ผู้ติดต่อของงานนี้) บังคับ ต้องมีอยู่จริง: <c>id</c> จาก
+    /// <c>POST /Contact/AddNewContact</c> หรือ <c>contactId</c> ของงานเดิมในเรื่อง ระบบเดิมใส่ให้จาก session
+    /// (<c>ContactIDNow</c>) แต่ API ไม่มี session จึงต้องส่งมาเอง รายงานใช้ค่านี้หาเบอร์ผู้ติดต่อ
+    /// </summary>
+    [Required]
     [MaxLength(50)]
     public string? ContactId { get; set; }
 

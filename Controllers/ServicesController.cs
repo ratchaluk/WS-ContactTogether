@@ -583,6 +583,9 @@ public class ServicesController : ControllerBase
     /// ส่วน <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token
     /// สร้างงานแรก (<c>TblActivity</c> Line 1) ให้ด้วยใน transaction เดียวกัน ตามระบบเดิม: ประเภท "Call - Inbound",
     /// หัวข้อ "Call Inbound", รายละเอียด "เริ่มให้บริการ", สถานะปิด, เริ่ม = <c>DateOpened</c> ของเรื่อง, จบ = เวลาบันทึก
+    /// และ <c>ContactId</c> = <c>ContactId</c> ของ request (บังคับ ต้องมีอยู่ใน <c>TblContact</c>)
+    /// แล้วเลื่อน <c>ContactEnd</c> ของการรับสายนั้นเป็นเวลาบันทึกเรื่องเหมือนระบบเดิม
+    /// (<c>AddNewContact</c> ใส่เวลายืนยันไว้ก่อน ค่านี้เลื่อนไปข้างหน้าเท่านั้น)
     /// </summary>
     [HttpPost("AddNewService")]
     [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status201Created)]
@@ -602,6 +605,11 @@ public class ServicesController : ControllerBase
         }
 
         await ValidateLookupsAsync(request, request.ServiceTitleId, cancellationToken);
+
+        // For the first operation (Line 1). [Required] has already rejected a missing or blank value.
+        var contactId = request.ContactId!.Trim();
+        await CheckContactAsync(nameof(request.ContactId), contactId, cancellationToken);
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -710,6 +718,8 @@ public class ServicesController : ControllerBase
             ServiceId = service.Id,
             Line = 1,
             Code = operationCode,
+            // The legacy application reads the caller's number from the first operation, and so do the reports.
+            ContactId = contactId,
             CategoryId = InitialOperationCategoryId,
             StatusId = closedStatusId,
             DateOpened = dateOpened,
@@ -726,6 +736,13 @@ public class ServicesController : ControllerBase
             UpdatedBy = actingEmployeeId,
         });
         await _db.SaveChangesAsync(cancellationToken);
+
+        // As in the legacy application, the call that opened this service ends when the service is saved.
+        // AddNewContact set ContactEnd to the time the call was confirmed. Only moves forward, so a second
+        // service opened from the same call keeps the later time.
+        await _db.TblContacts
+            .Where(c => c.Id == contactId && (c.ContactEnd == null || c.ContactEnd < now))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.ContactEnd, (DateTime?)now), cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
@@ -1064,7 +1081,8 @@ public class ServicesController : ControllerBase
     /// <c>Line</c> ต่อจากงานล่าสุดของเรื่องเดียวกัน (งานแรกได้ 1) ส่วน <c>Code</c> ใช้รูปแบบเดียวกับ
     /// <see cref="AddNewService"/>: <c>yyMMdd</c> ปี พ.ศ. ตามด้วยเลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
     /// (นับแยกจากเลขของ <c>TblService</c>) <c>IsEnable</c> เป็น <c>T</c> เสมอ ส่วน
-    /// <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token
+    /// <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token <c>ContactId</c> บังคับและต้องมีอยู่ใน <c>TblContact</c>
+    /// (ระบบเดิมใส่ให้จาก session แต่ API ไม่มี session)
     /// </summary>
     [HttpPost("AddNewServiceOperations")]
     [ProducesResponseType(typeof(ServiceOperationResponse), StatusCodes.Status201Created)]
@@ -1124,11 +1142,10 @@ public class ServicesController : ControllerBase
             ModelState.AddModelError(nameof(request.OwnerId), $"No row with Id '{ownerId}'.");
         }
 
-        var contactId = Normalize(request.ContactId);
-        if (contactId is not null && !await _db.TblContacts.AnyAsync(c => c.Id == contactId, cancellationToken))
-        {
-            ModelState.AddModelError(nameof(request.ContactId), $"No row with Id '{contactId}'.");
-        }
+        // Required: the legacy application filled it from the session (ContactIDNow), which the API does not
+        // have. [Required] has already rejected a missing or blank value.
+        var contactId = request.ContactId!.Trim();
+        await CheckContactAsync(nameof(request.ContactId), contactId, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.Summary))
         {
@@ -1264,9 +1281,9 @@ public class ServicesController : ControllerBase
         }
 
         var contactId = Normalize(request.ContactId);
-        if (contactId is not null && !await _db.TblContacts.AnyAsync(c => c.Id == contactId, cancellationToken))
+        if (contactId is not null)
         {
-            ModelState.AddModelError(nameof(request.ContactId), $"No row with Id '{contactId}'.");
+            await CheckContactAsync(nameof(request.ContactId), contactId, cancellationToken);
         }
 
         if (!ModelState.IsValid)
@@ -1284,7 +1301,8 @@ public class ServicesController : ControllerBase
         activity.Summary = Normalize(request.Summary) ?? activity.Summary;
         // Nullable columns: null keeps, blank clears.
         activity.Detail = request.Detail is null ? activity.Detail : string.IsNullOrWhiteSpace(request.Detail) ? null : request.Detail;
-        activity.ContactId = Merge(request.ContactId, activity.ContactId);
+        // Required when an operation is created, so a blank value keeps it instead of clearing it.
+        activity.ContactId = contactId ?? activity.ContactId;
         var newOwnerId = Merge(request.OwnerId, activity.OwnerId);
         if (newOwnerId != activity.OwnerId)
         {
@@ -1553,6 +1571,18 @@ public class ServicesController : ControllerBase
             {
                 ModelState.AddModelError(field, $"No row with Id '{id}'.");
             }
+        }
+    }
+
+    /// <summary>
+    /// <c>TblActivity.ContactId</c> ไม่มี FK ใน DB จึงตรวจเองว่ามีแถวใน <c>TblContact</c> ถ้าไม่มีจะเพิ่ม validation error
+    /// ที่ <paramref name="field"/> เทียบตามที่ส่งมา (collation แยกตัวพิมพ์) ส่ง id ตามที่ <c>AddNewContact</c> คืนให้
+    /// </summary>
+    private async Task CheckContactAsync(string field, string contactId, CancellationToken cancellationToken)
+    {
+        if (!await _db.TblContacts.AnyAsync(c => c.Id == contactId, cancellationToken))
+        {
+            ModelState.AddModelError(field, $"No row with Id '{contactId}'.");
         }
     }
 

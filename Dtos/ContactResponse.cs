@@ -18,10 +18,13 @@ public class ContactResponse
 
     public string? CategoryNameTh { get; set; }
 
-    /// <summary>Thai local time.</summary>
+    /// <summary>Thai local time: when the call started. Reports 05/06 count calls by its date.</summary>
     public DateTime? ContactStart { get; set; }
 
-    /// <summary>Thai local time: when the form was saved.</summary>
+    /// <summary>
+    /// Thai local time: when the form was saved. <c>AddNewService</c> later moves it to the time a
+    /// service opened from this call is saved.
+    /// </summary>
     public DateTime? ContactEnd { get; set; }
 
     /// <summary><c>TblEmployee.Id</c> of the employee who took the call (the token's <c>sub</c>).</summary>

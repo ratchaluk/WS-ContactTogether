@@ -412,12 +412,16 @@ Content-Type: application/json
 # (e.g. อยู่ระหว่างดำเนินการ 19C49E66B6F9EF1BCE11A3B93DED12C8).
 # Also adds operation Line 1 (TblActivity), as the legacy app does: Call - Inbound / "Call Inbound" /
 # "เริ่มให้บริการ", status Closed, from DateOpened to now (see GetServiceOperations).
+# Required: serviceTitleId, and contactId (the id AddNewContact returned for this call; it goes on
+# operation Line 1, not on TblService, and must exist in TblContact). Missing/blank/unknown = 400.
+# A 201 also moves that contact's ContactEnd to the service's save time (only forward), as the legacy app did.
 # NOTE: a 201 writes real rows and uses up one service code and one operation code of the day.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
   "categoryId": "<TblCategory.Id>",
   "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
   "serviceTitleId": "81EE380A-96E2-F111-8E93-96F1F7A12F5E",
@@ -429,7 +433,8 @@ Content-Type: application/json
 
 ###
 
-# 400 - an ACTIVITY status (ปิด) is not a service status: errors.StatusId. Nothing is written.
+# 400 - an ACTIVITY status (ปิด) is not a service status: errors.StatusId (plus the missing
+# serviceTitleId / contactId). Nothing is written.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -537,7 +542,9 @@ Content-Type: application/json
 # ACTIVITY status (Open 0A57...04 / Closed CB0A...A1 / Cancel CD64...62). categoryId is an enabled
 # ACTIVITY category (Follow Up 1987...79 etc.); omitted = the ACTIVITY row with IsDefault = 'T' (none yet,
 # so 400). Omitted: ownerId = the caller, dateOpened = now. isReceived = "T" when owner = the caller, else "F"; dateClosed = the server's
-# clock when the status is CLOSE/CANCEL. 201 = the row; 400 = bad input; 404 = no enabled service.
+# clock when the status is CLOSE/CANCEL. contactId is required and must exist in TblContact (the id of
+# AddNewContact, or the contactId of an earlier operation of the service); missing/blank = 400.
+# 201 = the row; 400 = bad input; 404 = no enabled service.
 POST {{ContactTogetherApi_HostAddress}}/Services/AddNewServiceOperations
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -546,6 +553,7 @@ Content-Type: application/json
   "serviceId": "427D66AA13734763AC1D99775554659B",
   "statusId": "0A5753389CDCD23F173268D8D46AC004",
   "categoryId": "1987E8FF8070CEFA483F881ED0CD2170",
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
   "summary": "โทรติดต่อผู้ร้องเพื่อสอบถามข้อมูลเพิ่มเติม",
   "detail": "ผู้ร้องจะส่งเอกสารเพิ่มเติมภายในวันพรุ่งนี้"
 }
@@ -553,8 +561,8 @@ Content-Type: application/json
 ###
 
 # Edit an operation by its TblActivity.Id (the "id" AddNewServiceOperations returns). Only the fields sent
-# change; "" clears a nullable field (detail, contactId, ownerId, groupId) and is ignored for statusId,
-# summary and categoryId. A new ownerId resets isReceived to "F". ServiceId, Line and Code cannot change. dateClosed comes from the
+# change; "" clears a nullable field (detail, ownerId, groupId) and is ignored for statusId,
+# summary, categoryId and contactId (required on create, so it cannot be cleared). A new ownerId resets isReceived to "F". ServiceId, Line and Code cannot change. dateClosed comes from the
 # server: set when statusId becomes CLOSE/CANCEL, cleared when an OPEN statusId is sent. 200 = the row;
 # 400 = a bad id or lookup; 404 = no enabled operation with that id.
 PUT {{ContactTogetherApi_HostAddress}}/Services/UpdateServiceOperations?id=00000000-0000-0000-0000-000000000000
@@ -622,8 +630,9 @@ Accept: text/event-stream
 # ---------------------------------------------------------------------------------------------
 # AddNewContact - save the call-receiving form (รับสาย) as a TblContact row.
 # channelId comes from GetChannel; categoryId is a leaf of GetContactType (the drop-down item, or
-# the radio itself when it has none). ID, CreatedBy (token sub) and ContactEnd (now) are set by the
-# server; contactStart is optional (Thai local time, no offset/Z, defaults to now).
+# the radio itself when it has none). ID, CreatedBy (token sub) and ContactEnd (now; AddNewService later
+# moves it to the time a service opened from this call is saved) are set by the server; contactStart is
+# optional (Thai local time, no offset/Z, defaults to now).
 # 201 = the saved row with channelNameTh / categoryNameTh.
 #
 # NOTE: every 201 case writes a real row. They all use contactDetail 0899999999 so the test rows can

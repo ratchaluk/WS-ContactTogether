@@ -5,6 +5,8 @@ namespace ContactTogetherApi.Dtos;
 /// <summary>
 /// Payload of the call-receiving form (<c>POST /Contact/AddNewContact</c>), saved as one
 /// <c>TblContact</c> row. <c>Id</c>, <c>CreatedBy</c> and <c>ContactEnd</c> are set by the server.
+/// <c>ContactEnd</c> is the save time; <c>AddNewService</c> moves it to the time a service opened from
+/// this call is saved.
 /// </summary>
 public class CreateContactRequest
 {
@@ -31,7 +33,8 @@ public class CreateContactRequest
 
     /// <summary>
     /// When the call started, Thai local time without an offset or <c>Z</c> (e.g.
-    /// <c>2026-11-12T10:15:00</c>). Defaults to the time of the request.
+    /// <c>2026-11-12T10:15:00</c>). Defaults to the time of the request. Reports 05/06 count calls by
+    /// its date, so start it again for every call.
     /// </summary>
     public DateTime? ContactStart { get; set; }
 }

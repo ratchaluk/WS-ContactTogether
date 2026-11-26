@@ -27,11 +27,13 @@
 
 ### 2.1 Field
 
-**API ไม่บังคับ field ไหนเลย** (ดู 2.3) ทุก field เป็น string หรือ `null` ยกเว้นวันที่
-ชื่อ field ใน JSON เป็น camelCase
+**API บังคับ 2 field** คือ `serviceTitleId` และ `contactId` (บังคับตั้งแต่ 26 พ.ย. 2569) field อื่นไม่บังคับ (ดู 2.3)
+ทุก field เป็น string หรือ `null` ยกเว้นวันที่ ชื่อ field ใน JSON เป็น camelCase
 
 | Field | ยาวสุด | ความหมาย | เอาค่ามาจาก |
 |---|---|---|---|
+| `serviceTitleId` **(บังคับ)** | 50 | หัวข้อเรื่อง | `id` จาก `GET /ListOfValues/GetServiceTitle` ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
+| `contactId` **(บังคับ)** | 50 | การรับสายที่เปิดเรื่องนี้ (`TblContact`) **ไม่ได้เก็บใน `TblService`** แต่ใส่ให้การดำเนินการรายการแรก (ข้อ 3.2) ซึ่งรายงานใช้หาเบอร์ผู้ติดต่อ และเลื่อน `contactEnd` ของการรับสายนี้เป็นเวลาบันทึกเรื่อง ([AddNewContact.md](AddNewContact.md) ข้อ 5.1) | `id` ใน response ของ `POST /Contact/AddNewContact` ของสายนี้ ซึ่งบันทึกตอนกด "ค้นหาข้อมูลบริการ" หรือ "เพิ่มข้อมูลผู้ติดต่อ" ในหน้ารับสาย ไม่ใช่ตอนเปิดเรื่อง (ลำดับอยู่ใน [AddNewContact.md](AddNewContact.md) ข้อ 1) ไม่ส่ง / `""` / id ที่ไม่มีจริง = 400 `errors.ContactId` |
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
 | `statusId` | 200 | สถานะของเรื่อง | `id` จาก `GET /ListOfValues/GetStatus` (สถานะประเภท SERVICE ดู [GetStatus.md](GetStatus.md)) บันทึกตามที่ส่ง ส่งสถานะ ACTIVITY = 400 |
 | `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น โดยใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
@@ -73,7 +75,7 @@
 
 ### 2.3 Field ที่ต้องบังคับกรอก: ให้ frontend ตรวจเอง
 
-ตอนนี้ API ไม่มี field บังคับ ส่ง `{}` ก็ได้เรื่องเปล่า ๆ มาหนึ่งเรื่อง ให้ตรวจตาม design ก่อนส่ง
+นอกจาก `serviceTitleId` และ `contactId` API ไม่บังคับ field อื่น ให้ตรวจตาม design ก่อนส่ง
 อย่างน้อยควรบังคับ `categoryId`, `statusId`, `accountId`, `channelIncomingId`, `summary`
 ถ้าตกลงรายการ field บังคับกันได้ backend จะเพิ่มการตรวจให้ แล้วอัปเดตเอกสารนี้
 
@@ -81,6 +83,8 @@
 
 ```json
 {
+  "contactId": "<id จาก AddNewContact ของสายนี้>",
+  "serviceTitleId": "<id หัวข้อเรื่องจาก GetServiceTitle>",
   "categoryId": "<id ประเภทบริการจาก GetServiceType>",
   "statusId": "<id สถานะ>",
   "accountId": "<id ผู้ติดต่อจาก GetAccounts หรือ AddNewAccount>",
@@ -167,6 +171,7 @@
 | วันจบ (`dateClosed`) | เวลาของ server ตอนบันทึก |
 | ผู้รับผิดชอบ / ผู้สร้าง | ผู้ที่ login อยู่ |
 | `isReceived` | `"T"` (มอบให้ตัวเอง จึงรับงานแล้ว) |
+| `contactId` | `contactId` ที่ส่งมาใน request (เพิ่ม 26 พ.ย. 2569: ก่อนหน้านี้เป็น `null` ทุกเรื่อง) |
 
 response ของ `AddNewService` ไม่มีรายการนี้ ให้ดึงด้วย `GET /Services/GetServiceOperations?serviceId=<id>`
 ([GetServiceOperations.md](GetServiceOperations.md)) **frontend ไม่ต้องเรียก `AddNewServiceOperations` เองสำหรับรายการแรก**
@@ -227,6 +232,8 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 ```ts
 // lib/api/services.ts
 export interface CreateServiceRequest {
+  serviceTitleId: string;     // บังคับ: GetServiceTitle
+  contactId: string;          // บังคับ: id จาก POST /Contact/AddNewContact ของสายนี้
   categoryId?: string | null;
   statusId?: string | null;
   ownerId?: string | null;
@@ -295,6 +302,8 @@ export class CreateServiceError extends Error {
 }
 
 const FIELD_LABELS: Record<string, string> = {
+  serviceTitleId: "หัวข้อเรื่อง",
+  contactId: "ข้อมูลการรับสาย",
   categoryId: "ประเภทบริการ",
   statusId: "สถานะ",
   ownerId: "เจ้าของเรื่อง",
@@ -361,13 +370,15 @@ export function toThaiLocalIso(d: Date): string {
 import { useState } from "react";
 import { createService, CreateServiceError, type CreateServiceRequest } from "@/lib/api/services";
 
-/** field ที่ frontend บังคับเอง เพราะ API ยังไม่บังคับ (ดู 2.3) */
+/** field ที่ต้องมีก่อนส่ง: serviceTitleId / contactId API บังคับ ที่เหลือ frontend บังคับเอง (ดู 2.3) */
 const REQUIRED: (keyof CreateServiceRequest)[] = [
-  "categoryId", "statusId", "accountId", "channelIncomingId", "summary",
+  "serviceTitleId", "contactId", "categoryId", "statusId", "accountId", "channelIncomingId", "summary",
 ];
 
-export function NewServiceForm({ token }: { token: string }) {
-  const [form, setForm] = useState<CreateServiceRequest>({ callBack: "N" });
+/** contactId = id ที่ได้จาก POST /Contact/AddNewContact ตอนบันทึกฟอร์มรับสายของสายนี้ */
+export function NewServiceForm({ token, contactId }: { token: string; contactId: string }) {
+  const empty = (): CreateServiceRequest => ({ callBack: "N", contactId, serviceTitleId: "" });
+  const [form, setForm] = useState<CreateServiceRequest>(empty);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
@@ -388,7 +399,7 @@ export function NewServiceForm({ token }: { token: string }) {
       ) as CreateServiceRequest;
       const created = await createService(body, { token });
       setMessage(`เปิดเรื่องเลขที่ ${created.code} เรียบร้อยแล้ว`);
-      setForm({ callBack: "N" });
+      setForm(empty());
     } catch (err) {
       if (err instanceof CreateServiceError) {
         setErrors(err.fieldErrors);
@@ -445,9 +456,9 @@ export function NewServiceForm({ token }: { token: string }) {
 | เรื่อง | ผลกับ frontend |
 |---|---|
 | **`areaId` ส่งได้แล้ว** | ตารางพื้นที่มีข้อมูลแล้ว (19 พ.ย. 2026) ใช้ชุดเลือก จังหวัด → อำเภอ → ตำบล จาก `GetArea` ตัวเดียวกับหน้าผู้ติดต่อ แล้วส่ง id ชั้นที่ลึกที่สุดที่เลือก ไม่เลือกก็ส่ง `null` ได้ ([AreaId.md](AreaId.md)) |
-| **API ไม่มี field บังคับ** | frontend ต้องบังคับเอง (ดู 2.3) |
+| **API บังคับแค่ `serviceTitleId` / `contactId`** | field อื่น frontend ต้องบังคับเอง (ดู 2.3) |
 | **`GetServiceType` คืนทุกประเภทปนกัน** | กรอง `categoryType === "SERVICE"` เอง |
-| **ยังไม่ผูกกับการรับสาย** | ถ้าเปิดเรื่องต่อจากหน้ารับสาย (`AddNewContact`) ตอนนี้ยังไม่มี field เชื่อมสองอย่างนี้ |
+| **ผูกกับการรับสายผ่าน `contactId`** (26 พ.ย. 2569) | ต้องบันทึกฟอร์มรับสาย (`AddNewContact`) ก่อนเปิดเรื่อง แล้วส่ง `id` ที่ได้มาเป็น `contactId` (บันทึกไว้ที่การดำเนินการรายการแรก ไม่ใช่ที่เรื่อง) เปิดเรื่องสำเร็จแล้ว `contactEnd` ของการรับสายนั้นเลื่อนเป็นเวลาบันทึกเรื่อง (27 พ.ย. 2569) |
 | **กดซ้ำ = เรื่องซ้ำ** | ปิดปุ่มระหว่างรอ response |
 
 ถ้า backend แก้ข้อใดข้างบน จะแจ้งและอัปเดตเอกสารนี้
@@ -464,6 +475,8 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
+  "contactId": "<id จาก AddNewContact>",
+  "serviceTitleId": "<id หัวข้อเรื่อง>",
   "categoryId": "<id ประเภทบริการ>",
   "statusId": "<id สถานะ>",
   "accountId": "<id ผู้ติดต่อ>",
@@ -478,7 +491,7 @@ Content-Type: application/json
 curl -X POST "http://localhost:5018/Services/AddNewService" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"summary":"ทดสอบเปิดเรื่อง","callBack":"N","channelIncomingId":"332E6D76F258C8294B160C20642AB9F5"}'
+  -d '{"contactId":"<id จาก AddNewContact>","serviceTitleId":"<id หัวข้อเรื่อง>","summary":"ทดสอบเปิดเรื่อง","callBack":"N","channelIncomingId":"332E6D76F258C8294B160C20642AB9F5"}'
 ```
 
 เปิดแล้วตรวจได้ด้วย `GET /Services/SearchService?ServiceCode=<code ที่ได้>`
