@@ -11,7 +11,8 @@
 >
 > ที่มา: [Spec-Home-Inbox-Processing-API.md](Spec-Home-Inbox-Processing-API.md) (สรุปจากระบบเดิม) ส่วนที่ทำต่างจาก spec ดูข้อ 6
 >
-> เอกสารที่ใช้คู่กัน: [ReceiveService.md](ReceiveService.md) (กดเปิดเรื่องแล้วให้หายจากรายการรับ)
+> เอกสารที่ใช้คู่กัน: [ReceiveService.md](ReceiveService.md) (กดเปิดเรื่องแล้วให้หายจากรายการรับ),
+> [InboxStream.md](InboxStream.md) (ให้รายการรับอัปเดตเองแบบ real-time เพิ่ม 26 พ.ย. 2569)
 >
 > **เพิ่มเมื่อ 25 พ.ย. 2569**
 

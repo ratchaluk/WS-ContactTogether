@@ -91,11 +91,17 @@ these with free-form Thai messages.
 
 - [Program.cs](Program.cs): controllers, `ApplicationDbContext` on SQL Server, JWT bearer auth,
   Swagger (with a bearer scheme) in Development, QuestPDF licence and font registration, the
-  `report-export` rate limiter, `UseAuthentication()` → `UseAuthorization()` → `UseRateLimiter()`.
+  `report-export` rate limiter, a CORS default policy, and `UseCors()` → `UseAuthentication()` →
+  `UseAuthorization()` → `UseRateLimiter()`. CORS allows **any origin**, header and method (since
+  2026-11-26), without credentials, and exposes `Content-Disposition` for export file names. The
+  frontend itself still calls through its Vercel rewrite (`/api/backend/*`), which needs no CORS.
+  Narrow the policy to the real frontend origins before release if open access is not wanted.
 - [Reports/](Reports/): report export layouts and the PDF/Excel writers (see Exports below).
 - [Auth/](Auth/): hand-written auth services registered as singletons. `JwtTokenService`
   issues tokens, `PasswordVerifier` checks `TblEmployee.UserPassword`, and
   `MemoryTokenRevocationStore` holds logged-out `jti` values.
+- [Realtime/](Realtime/): `InboxNotifier` (singleton `IInboxNotifier`) pushes "inbox may have changed"
+  signals to the open `GET /Home/InboxStream` connections of an employee (see `HomeController` below).
 - [Data/ApplicationDbContext.cs](Data/ApplicationDbContext.cs): a single `partial` DbContext with
   all mapping in `OnModelCreating`. **Put hand-written model configuration in a separate partial
   class implementing `OnModelCreatingPartial`** so re-scaffolding does not clobber it.
@@ -179,6 +185,16 @@ A request the client cancels (`OperationCanceledException`) is not caught and ge
   sort by `Code` descending, and answer `PagedEnvelope<T>`. `POST /Services/ReceiveService` takes a
   service off the inbox. They replace neither `ServicesController.GetPendingServices` nor
   `GetInProcessServices`, which use other rules. Frontend guide: [docs/HomeServices.md](docs/HomeServices.md).
+  `GET InboxStream` makes the inbox real-time: a Server-Sent Events stream (the frontend reaches it
+  through its Vercel rewrite and `proxy.ts`, like `/Helper/time/stream`) that sends `ready` on connect
+  and `inbox` (`InboxSignal`: `reason`, `serviceId`) when the caller's inbox may have changed. It only
+  signals; the client reloads `GetInboxServices`. It pings every 25 s (Vercel cuts proxied streams
+  silent for 120 s) and closes on logout, token expiry or after 30 min. The signals come from
+  `ServicesController.NotifyInbox`, called after the change is saved in `AddNewServiceOperations`,
+  `UpdateServiceOperations`, `DeleteServiceOperations`, `ReceiveService` and `UpdateService` (on close or
+  reopen). **Any new code that changes `TblActivity.OwnerId`/`IsReceived`/`IsEnable`/`StatusId`, or a
+  service's open/closed state, must call it too.** Frontend guide: [docs/InboxStream.md](docs/InboxStream.md).
+  Backend walkthrough of the whole controller: [docs/HomeController.md](docs/HomeController.md).
 - `AdminController` is an empty shell. `WeatherForecastController` + [WeatherForecast.cs](WeatherForecast.cs)
   are leftover template code and can be deleted.
 
@@ -200,7 +216,8 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 - **Logout** — JWTs are stateless, so logout records the token's `jti` in
   [Auth/MemoryTokenRevocationStore.cs](Auth/MemoryTokenRevocationStore.cs) until its `exp`, and the
   `OnTokenValidated` event in `Program.cs` rejects it from then on. The store is per-process: scaling
-  out to more than one instance requires a shared store (Redis or a table).
+  out to more than one instance requires a shared store (Redis or a table). `InboxNotifier` is
+  per-process too and would need a shared bus (Redis pub/sub) across instances.
 - **Claims** — `sub` = `TblEmployee.Id`, `name` = `UserName`, `role` = `RoleId`, `org` =
   `OrganizationId`, `lang` = `DefaultLanguage`. Inbound claim mapping is disabled, so these arrive
   under exactly those names (constants are in [Auth/AuthClaimTypes.cs](Auth/AuthClaimTypes.cs)).
@@ -210,12 +227,23 @@ Endpoints opt in with `[Authorize]`; anything without it is anonymous.
 ### Domain shape
 
 `TblService` is the central service-request entity (opened/closed dates, incoming/outgoing
-channel, owner, category, status, severity/priority/secrecy levels, area, organization).
+channel, owner, category, status, severity/priority/secrecy levels, area, organization). Its `Id`
+(`varchar(200)`) has been the primary key (`PK_TblService`, non-clustered) since 2026-11-26.
+`AddNewService`/`UpdateService` still write it with SQL from before then, and could move to EF.
+`Summary` and `Service_Reference_Link` are `nvarchar(max)`.
 `TblActivity` is its per-request work log (`Id` is a `uniqueidentifier` filled by
 `newsequentialid()` and the table's primary key since 2026-11-25; `ApplicationDbContext.Keys.cs` still
-declares it from before the DB had the PK, which is now redundant but harmless; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number). `TblReOpenService` logs reopenings
+declares it from before the DB had the PK, which is now redundant but harmless; `Line` numbers the rows of one service from 1; `ContactId` → `TblContact` holds the caller's number,
+which the reports and the legacy application read, so `AddNewService` (for Line 1) and `AddNewServiceOperations`
+require an existing one; the legacy application filled it from the session). `TblReOpenService` logs reopenings
 (`ServiceId` + `Line`, written by `UpdateService`; the older `TblReopenedLog`, composite key `SrId` +
-`Line`, is unused). `TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
+`Line`, is unused). `TblContact` is the call log: one row per call, written by `POST /Contact/AddNewContact` when the
+agent confirms the call page (before searching or opening a service, never at open-service time; see
+[docs/AddNewContact.md](docs/AddNewContact.md)); reports 05/06 count its rows by the date of `ContactStart` (when the
+call started, sent by the frontend), and it has no account or call-count column. `ContactEnd` is the confirm time until
+`AddNewService` moves it to the time the service is saved, as the legacy application did (only forward;
+`AddNewServiceOperations` leaves it alone, because it also runs outside a call).
+`TblAccount`/`TblAccountDetail` is the caller/contact side. In `TblAccountDetail`,
 `DetailType` is `MOBILE`/`HOME`/`OFFICE`/`FAX`/`MAIL`. `TblEmployee` + `TblRole` + `TblRolePage` is
 the agent side and per-page permission matrix. Agents belong to groups: `TblUserGroup` (`int`
 `GroupId`, not generated by the DB; `Enable` is `char(1)` `T`/`F`; two levels via `RefGroupId`, a main

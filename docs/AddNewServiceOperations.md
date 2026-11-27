@@ -14,6 +14,7 @@
 >
 > **เพิ่มเมื่อ 23 พ.ย. 2569** · ปรับ 23 พ.ย. 2569: `categoryId` ต้องเป็นชุด ACTIVITY, `dateClosed` server ตั้งเอง (ไม่รับจาก client)
 > · ปรับ 25 พ.ย. 2569: `groupId` ใช้ค่าจาก `GetEmployeeGroup` และเลือก `ownerId` จาก `GetEmployeeByGroup` ได้แล้ว
+> · **ปรับ 26 พ.ย. 2569: `contactId` เป็นช่องบังคับ** ไม่ส่ง / ส่งค่าว่าง / id ที่ไม่มีจริง = 400 (ดูข้อ 2.4)
 
 ---
 
@@ -34,7 +35,7 @@
 
 ### 2.1 Field
 
-ชื่อ field ใน JSON เป็น camelCase **บังคับ 3 ตัว** คือ `serviceId`, `statusId`, `summary`
+ชื่อ field ใน JSON เป็น camelCase **บังคับ 4 ตัว** คือ `serviceId`, `statusId`, `summary`, `contactId`
 
 | Field | บังคับ | ยาวสุด | ความหมาย | เอาค่ามาจาก / ค่าเริ่มต้น |
 |---|---|---|---|---|
@@ -44,7 +45,7 @@
 | `detail` | | ไม่จำกัด | รายละเอียด | ผู้ใช้กรอก |
 | `categoryId` | **ตอนนี้ต้องส่ง** | 50 | ประเภทการดำเนินการ (ชุด `ACTIVITY`) | ดู 2.2 |
 | `ownerId` | | 50 | เจ้าหน้าที่ผู้รับผิดชอบ (ผู้รับ) | ไม่ส่ง = **ผู้ที่ login อยู่** เลือกกลุ่มแล้วใช้ `id` จาก `GET /ListOfValues/GetEmployeeByGroup` ([GetEmployeeByGroup.md](GetEmployeeByGroup.md)) ถ้าไม่มีช่องกลุ่มใช้ `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
-| `contactId` | | 50 | การรับสายที่เกี่ยวข้อง (`TblContact`) | `id` ใน response ของ `POST /Contact/AddNewContact` ([AddNewContact.md](AddNewContact.md)) ไม่มีก็ไม่ต้องส่ง |
+| `contactId` | ✔ | 50 | การติดต่อที่เกี่ยวข้อง (`TblContact`) รายงานใช้หาเบอร์ผู้ติดต่อ | ดูข้อ 2.4 ส่ง `""` หรือช่องว่างล้วน = 400 |
 | `groupId` | | 50 | กลุ่ม | `id` จาก `GET /ListOfValues/GetEmployeeGroup` ([GetEmployeeGroup.md](GetEmployeeGroup.md)) แล้วเลือกผู้รับ (`ownerId`) จาก `GET /ListOfValues/GetEmployeeByGroup` ([GetEmployeeByGroup.md](GetEmployeeByGroup.md)) API ยังไม่ตรวจค่านี้ |
 | `dateOpened` | | – | วันเวลาที่เริ่มดำเนินการ | ไม่ส่ง = **เวลาที่บันทึก** |
 
@@ -81,6 +82,7 @@
   "serviceId": "427D66AA13734763AC1D99775554659B",
   "statusId": "0A5753389CDCD23F173268D8D46AC004",
   "categoryId": "1987E8FF8070CEFA483F881ED0CD2170",
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
   "summary": "โทรติดต่อผู้ร้องเพื่อสอบถามข้อมูลเพิ่มเติม",
   "detail": "ผู้ร้องจะส่งเอกสารเพิ่มเติมภายในวันพรุ่งนี้"
 }
@@ -93,9 +95,24 @@
   "serviceId": "427D66AA13734763AC1D99775554659B",
   "statusId": "CB0A973609E8D684F2944D92ED4126A1",
   "categoryId": "1987E8FF8070CEFA483F881ED0CD2179",
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
   "summary": "แจ้งผลการดำเนินการให้ผู้ร้องทราบ"
 }
 ```
+
+### 2.4 เอา `contactId` มาจากไหน (บังคับตั้งแต่ 26 พ.ย. 2569)
+
+`contactId` คือ `id` ของการติดต่อใน `TblContact` ต้องมีอยู่จริง ส่ง id ตามที่ได้จาก API ห้ามแปลงตัวพิมพ์
+ระบบเดิมใส่ให้เองจาก session (contact ของสายที่กำลังรับ) แต่ API ไม่มี session frontend จึงต้องเก็บไว้แล้วส่งมาเอง
+
+| สถานการณ์ | ค่าที่ส่ง |
+|---|---|
+| กำลังรับสาย (มาจากหน้ารับสาย) | `id` ใน response ของ `POST /Contact/AddNewContact` ที่บันทึกตอนกดปุ่มหลักของกล่องยืนยัน ส่งต่อมากับหน้า (เช่น `?contactId=`) จนจบสาย ลำดับอยู่ใน [AddNewContact.md](AddNewContact.md) ข้อ 1 |
+| เปิดเรื่องเดิมมาทำงานต่อ (ไม่ได้อยู่ในสาย) | `contactId` ของการดำเนินการในเรื่องนั้นจาก `GetServiceOperations` ([GetServiceOperations.md](GetServiceOperations.md)) ระบบเดิมใช้ของรายการแรก (`line` 1) ถ้าไม่มีให้ใช้รายการล่าสุดที่มีค่า |
+| เรื่องเก่าที่ทุกรายการ `contactId` เป็น `null` (เปิดก่อน 26 พ.ย. 2569) หรือเป็นการติดต่อครั้งใหม่ เช่น โทรออก | บันทึกการติดต่อด้วย `AddNewContact` ก่อน แล้วใช้ `id` ที่ได้ |
+
+ไม่ส่ง / `null` / `""` → 400 `errors.ContactId` = `"The ContactId field is required."`,
+id ที่ไม่มีใน `TblContact` → 400 `errors.ContactId` = `"No row with Id '...'."`
 
 ---
 
@@ -111,7 +128,7 @@
 | `serviceId` | string | เรื่องที่อยู่ |
 | `line` | number | ลำดับการดำเนินการในเรื่องนี้ เริ่มที่ 1 |
 | `code` | string | เลขที่การดำเนินการ `yyMMdd` (ปี พ.ศ.) + เลขรัน 5 หลักของวัน เช่น `69112300001` (นับแยกจากเลขที่เรื่อง) |
-| `statusId`, `categoryId`, `ownerId`, `contactId`, `groupId` | string \| null | ค่าที่บันทึก (รวมค่าเริ่มต้นที่ backend ใส่ให้) |
+| `statusId`, `categoryId`, `ownerId`, `contactId`, `groupId` | string \| null | ค่าที่บันทึก (รวมค่าเริ่มต้นที่ backend ใส่ให้) `contactId` ของรายการที่เพิ่มใหม่มีค่าเสมอ แต่ type ยังเป็น `string \| null` เพราะรายการเก่าเป็น `null` |
 | `summary`, `detail` | string / string \| null | |
 | `isReceived` | string | `"T"` รับงานแล้ว / `"F"` รอการตอบรับ (ข้อ 2.2) |
 | `isEnable` | string | `"T"` |
@@ -124,7 +141,7 @@
   "serviceId": "427D66AA13734763AC1D99775554659B",
   "line": 1,
   "code": "69112300001",
-  "contactId": null,
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
   "categoryId": "1987E8FF8070CEFA483F881ED0CD2170",
   "statusId": "0A5753389CDCD23F173268D8D46AC004",
   "dateOpened": "2026-11-23T15:10:00",
@@ -149,7 +166,7 @@
 | HTTP | เมื่อไร | Body |
 |---|---|---|
 | 201 | บันทึกสำเร็จ | `ServiceOperation` |
-| 400 | ไม่ส่ง field บังคับ, id lookup ผิด, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>`) |
+| 400 | ไม่ส่ง field บังคับ (รวม `contactId`), id lookup ผิด, ยาวเกิน, รูปแบบวันที่ผิด, JSON พัง | ProblemDetails (`errors.<Field>`) |
 | 401 | ไม่มี token, token หมดอายุ หรือ logout แล้ว | ว่าง |
 | 404 | ไม่มีเรื่องที่ `serviceId` นี้ หรือเรื่องถูกปิดใช้งาน | `{ "statusCode": 404, "message": "ไม่พบข้อมูลเรื่อง" }` |
 | 409 | เลขรันของวันเต็ม (99,999 รายการต่อวัน) | `MessageResponse` |
@@ -164,6 +181,7 @@
   "errors": {
     "StatusId": ["No ACTIVITY TblStatus row with Id 'XXX'."],
     "CategoryId": ["No enabled ACTIVITY TblCategory row with Id 'XXX'."],
+    "ContactId": ["No row with Id 'XXX'."],
     "Summary": ["The Summary field is required."]
   }
 }
@@ -205,7 +223,7 @@ export interface CreateServiceOperationBody {
   detail?: string | null;
   categoryId: string; // ชุด ACTIVITY (ตอนนี้ยังไม่มีค่าเริ่มต้น จึงต้องส่ง)
   ownerId?: string | null;    // id จาก GetEmployeeByGroup (ไม่ส่ง = ผู้ที่ login อยู่)
-  contactId?: string | null;
+  contactId: string;          // บังคับ: id จาก AddNewContact หรือ contactId ของงานเดิม (ข้อ 2.4)
   groupId?: string | null;    // id จาก GetEmployeeGroup (string เช่น "5")
   dateOpened?: string | null; // "yyyy-MM-ddTHH:mm:ss" เวลาไทย
   // ไม่มี dateClosed: server ตั้งเอง
@@ -240,10 +258,22 @@ const defaultStatus = statuses.find((s) => s.isDefault === "T");
 const categories = (await fetchServiceTypes({ token }))   // GET /ListOfValues/GetServiceType
   .filter((c) => c.categoryType === "ACTIVITY");
 
+// contactId (บังคับ): สายที่กำลังรับ ไม่งั้นใช้ของงานเดิมในเรื่อง (ข้อ 2.4)
+const operations = await fetchServiceOperations(detail.id, { token }); // GET /Services/GetServiceOperations
+const contactId =
+  currentCall?.contactId                                   // id จาก POST /Contact/AddNewContact
+  ?? operations.find((o) => o.line === 1)?.contactId
+  ?? [...operations].reverse().find((o) => o.contactId)?.contactId;
+if (!contactId) {
+  // เรื่องเก่าที่ไม่มีการติดต่อ: ให้ผู้ใช้บันทึกการติดต่อ (AddNewContact) ก่อน
+  throw new Error("กรุณาบันทึกข้อมูลการติดต่อก่อนเพิ่มการดำเนินการ");
+}
+
 await addServiceOperation({
   serviceId: detail.id,
   statusId: form.statusId,
   categoryId: form.categoryId,
+  contactId,
   summary: form.summary.trim(),
   detail: form.detail || null,
   groupId: form.groupId || null, // drop-down กลุ่ม (GetEmployeeGroup)
@@ -261,7 +291,7 @@ await addServiceOperation({
 ```bash
 curl -X POST "http://localhost:5018/Services/AddNewServiceOperations" \
   -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
-  -d '{"serviceId":"427D66AA13734763AC1D99775554659B","statusId":"0A5753389CDCD23F173268D8D46AC004","summary":"ทดสอบ"}'
+  -d '{"serviceId":"427D66AA13734763AC1D99775554659B","statusId":"0A5753389CDCD23F173268D8D46AC004","categoryId":"1987E8FF8070CEFA483F881ED0CD2170","contactId":"EF5355C696E24159BEADE68EFEEC442C","summary":"ทดสอบ"}'
 ```
 
 ---
@@ -274,7 +304,8 @@ curl -X POST "http://localhost:5018/Services/AddNewServiceOperations" \
 | **response ไม่มีชื่อ** | มีแต่ id ถ้าต้องการชื่อให้ใช้ `GetServiceOperations` |
 | **`dateClosed`** | server ตั้งเองตามสถานะ ไม่ต้องส่ง (ข้อ 2.2) |
 | **`categoryId`** | ชุด ACTIVITY เท่านั้น และตอนนี้ต้องส่ง เพราะยังไม่มีค่าเริ่มต้น (ข้อ 2.2) |
+| **`contactId`** (26 พ.ย. 2569) | บังคับ ต้องเป็น id ที่มีอยู่ใน `TblContact` (ข้อ 2.4) เรื่องที่เปิดก่อนวันนี้ทุกรายการเป็น `null` ต้องบันทึกการติดต่อก่อน |
 | **`groupId`** | ไม่บังคับ ใช้ `id` จาก `GetEmployeeGroup` แล้วเลือกผู้รับจาก `GetEmployeeByGroup?groupId=` API ยังไม่ตรวจว่ามีกลุ่มนี้จริง หรือผู้รับอยู่ในกลุ่มนี้ |
 | **ไฟล์แนบ** | ยังไม่รองรับ (ตารางมีคอลัมน์ไฟล์แนบ แต่ API ยังไม่รับ) |
-| **ลบการดำเนินการ** | ยังไม่มี endpoint |
+| **ลบการดำเนินการ** | `DELETE /Services/DeleteServiceOperations` ([DeleteServiceOperations.md](DeleteServiceOperations.md)) |
 | **สถานะของเรื่องไม่เปลี่ยนตาม** | ปิดการดำเนินการไม่ได้ปิดเรื่อง ถ้าต้องปิดเรื่องด้วยให้เรียก `UpdateService` แยก |

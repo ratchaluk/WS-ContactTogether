@@ -15,4 +15,13 @@ public class CreateServiceRequest : ServiceFieldsRequest
     [Required]
     [MaxLength(50)]
     public string? ServiceTitleId { get; set; }
+
+    /// <summary>
+    /// <c>TblContact.Id</c> ของการรับสายที่เปิดเรื่องนี้ (<c>id</c> จาก <c>POST /Contact/AddNewContact</c>) บังคับ ต้องมีอยู่จริง
+    /// ไม่ใช่คอลัมน์ของ <c>TblService</c>: ใส่ให้งานแรก (<c>TblActivity</c> Line 1) ที่สร้างพร้อมเรื่อง
+    /// ซึ่งระบบเดิมและรายงานใช้หาเบอร์ผู้ติดต่อ
+    /// </summary>
+    [Required]
+    [MaxLength(50)]
+    public string? ContactId { get; set; }
 }

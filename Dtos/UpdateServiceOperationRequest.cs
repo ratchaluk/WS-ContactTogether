@@ -5,7 +5,7 @@ namespace ContactTogetherApi.Dtos;
 /// <summary>
 /// ช่องของงาน (<c>TblActivity</c>) ที่แก้ไขได้ ทุกช่องไม่บังคับ: ไม่ส่งมา (<c>null</c>) = คงค่าเดิม
 /// ค่าว่าง = ล้างเป็น NULL สำหรับช่องที่เป็น NULL ได้ ส่วนช่องที่ห้าม NULL (<c>StatusId</c>, <c>Summary</c>,
-/// <c>CategoryId</c>) ค่าว่างถือว่าคงค่าเดิม <c>IsReceived</c> และ <c>DateClosed</c> server ตั้งเอง <c>ServiceId</c>, <c>Line</c>, <c>Code</c>
+/// <c>CategoryId</c>) และ <c>ContactId</c> (บังคับตอนสร้างงาน) ค่าว่างถือว่าคงค่าเดิม <c>IsReceived</c> และ <c>DateClosed</c> server ตั้งเอง <c>ServiceId</c>, <c>Line</c>, <c>Code</c>
 /// แก้ไม่ได้ และ <c>Updated</c>/<c>UpdatedBy</c> server เป็นคนกำหนด
 /// </summary>
 public class UpdateServiceOperationRequest
@@ -23,7 +23,7 @@ public class UpdateServiceOperationRequest
     [MaxLength(50)]
     public string? CategoryId { get; set; }
 
-    /// <summary><c>TblContact.Id</c></summary>
+    /// <summary><c>TblContact.Id</c> ที่มีอยู่จริง; ค่าว่าง = คงค่าเดิม (ล้างไม่ได้)</summary>
     [MaxLength(50)]
     public string? ContactId { get; set; }
 

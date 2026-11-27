@@ -184,6 +184,6 @@ curl "http://localhost:5018/Services/GetServiceOperations?serviceId=427D66AA1373
 | เรื่อง | ผลกับ frontend |
 |---|---|
 | **ไม่มี paging** | คืนทุกรายการของเรื่องในครั้งเดียว (เรื่องหนึ่งมีไม่กี่รายการ) |
-| **การดำเนินการที่ถูกปิดใช้งาน** | ไม่แสดง (ยังไม่มี endpoint ลบ) |
+| **การดำเนินการที่ถูกปิดใช้งาน** | ไม่แสดง งานที่ลบด้วย `DeleteServiceOperations` ([DeleteServiceOperations.md](DeleteServiceOperations.md)) จะหายจากรายการนี้ |
 | **ไฟล์แนบ** | ไม่รวม ยังไม่รองรับ |
 | **`groupId`** | ยังไม่ใช้ ไม่มีชื่อแปลงให้ |

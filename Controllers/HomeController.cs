@@ -1,8 +1,12 @@
+using System.Text.Json;
+using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using ContactTogetherApi.Helper;
 using ContactTogetherApi.Models;
+using ContactTogetherApi.Realtime;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -37,11 +41,30 @@ public class HomeController : ControllerBase
     /// </summary>
     private static readonly string[] OpenStatusIsTypes = [StatusIsTypes.Open, StatusIsTypes.Pending];
 
-    private readonly ApplicationDbContext _db;
+    /// <summary>
+    /// ช่วงส่ง heartbeat ของ <see cref="InboxStream"/> ต้องน้อยกว่า 120 วินาทีที่ rewrite ของ Vercel
+    /// ยอมให้ stream เงียบได้ และใช้เป็นรอบตรวจว่า token ถูก logout แล้วหรือยัง
+    /// </summary>
+    private static readonly TimeSpan InboxHeartbeat = TimeSpan.FromSeconds(25);
 
-    public HomeController(ApplicationDbContext db)
+    /// <summary>
+    /// อายุสูงสุดของ stream หนึ่งเส้น ครบแล้วปิดเอง ให้ EventSource ต่อใหม่ด้วย cookie ล่าสุด
+    /// (stream ปิดเมื่อ token หมดอายุด้วย ถ้าถึงก่อน)
+    /// </summary>
+    private static readonly TimeSpan InboxStreamLifetime = TimeSpan.FromMinutes(30);
+
+    /// <summary>EventSource รอเท่านี้ (ms) ก่อนต่อใหม่หลัง stream ปิด</summary>
+    private const int InboxRetryMs = 3000;
+
+    private readonly ApplicationDbContext _db;
+    private readonly IInboxNotifier _inboxNotifier;
+    private readonly ITokenRevocationStore _revocations;
+
+    public HomeController(ApplicationDbContext db, IInboxNotifier inboxNotifier, ITokenRevocationStore revocations)
     {
         _db = db;
+        _inboxNotifier = inboxNotifier;
+        _revocations = revocations;
     }
 
     /// <summary>
@@ -96,6 +119,99 @@ public class HomeController : ControllerBase
         var services = OpenServices().Where(service => service.OwnerId == employeeId);
 
         return await ListAsync(services, request, cancellationToken);
+    }
+
+    /// <summary>
+    /// รายการรับแบบ real-time: Server-Sent Events (<c>text/event-stream</c>) ของพนักงานที่เรียก
+    /// ส่ง <c>event: ready</c> ทันทีที่ต่อติด และ <c>event: inbox</c> (<see cref="InboxSignal"/>) เมื่อรายการรับอาจเปลี่ยน
+    /// ทั้งสองแบบให้ frontend โหลด <c>GetInboxServices</c> ใหม่ ไม่ได้ส่งรายการมาด้วย ส่ง heartbeat (<c>: ping</c>)
+    /// ทุก 25 วินาที ปิดเองเมื่อ logout, token หมดอายุ หรือครบ 30 นาที แล้ว EventSource ต่อใหม่เอง
+    /// Swagger "Try it out" จะค้าง เพราะ stream ไม่จบ
+    /// </summary>
+    [HttpGet("InboxStream")]
+    [Produces("text/event-stream")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> InboxStream(CancellationToken cancellationToken)
+    {
+        var employeeId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(employeeId))
+        {
+            return NoEmployee();
+        }
+
+        var tokenId = User.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+        var lifetime = InboxStreamLifetime;
+        if (long.TryParse(User.FindFirst(JwtRegisteredClaimNames.Exp)?.Value, out var exp))
+        {
+            var untilExpiry = DateTimeOffset.FromUnixTimeSeconds(exp) - DateTimeOffset.UtcNow;
+            if (untilExpiry < lifetime)
+            {
+                lifetime = untilExpiry > TimeSpan.Zero ? untilExpiry : TimeSpan.Zero;
+            }
+        }
+
+        using var subscription = _inboxNotifier.Subscribe(employeeId);
+        using var streamEnd = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, subscription.Closed);
+        streamEnd.CancelAfter(lifetime);
+        var token = streamEnd.Token;
+
+        Response.Headers.ContentType = "text/event-stream";
+        // no-transform stops proxies (e.g. Next.js rewrites) from gzipping the stream, which buffers it.
+        Response.Headers.CacheControl = "no-cache, no-transform";
+        Response.Headers["X-Accel-Buffering"] = "no";
+        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+        try
+        {
+            // "ready" tells the client to reload now, which covers anything it missed while disconnected.
+            await Response.WriteAsync($"retry: {InboxRetryMs}\n\nevent: ready\ndata: {{}}\n\n", token);
+            await Response.Body.FlushAsync(token);
+
+            while (true)
+            {
+                using var tick = CancellationTokenSource.CreateLinkedTokenSource(token);
+                tick.CancelAfter(InboxHeartbeat);
+
+                bool hasSignals;
+                try
+                {
+                    hasSignals = await subscription.Reader.WaitToReadAsync(tick.Token);
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    // Heartbeat: nothing arrived. Stop if the token was logged out since the stream opened.
+                    if (string.IsNullOrEmpty(tokenId) || _revocations.IsRevoked(tokenId))
+                    {
+                        break;
+                    }
+
+                    await Response.WriteAsync(": ping\n\n", token);
+                    await Response.Body.FlushAsync(token);
+                    continue;
+                }
+
+                if (!hasSignals)
+                {
+                    break; // The notifier closed this stream.
+                }
+
+                while (subscription.Reader.TryRead(out var signal))
+                {
+                    var payload = JsonSerializer.Serialize(signal, JsonSerializerOptions.Web);
+                    await Response.WriteAsync($"event: inbox\ndata: {payload}\n\n", token);
+                }
+
+                await Response.Body.FlushAsync(token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The client left, the token expired, the lifetime ran out or the stream was pushed out:
+            // all normal ends of an SSE stream. EventSource reconnects by itself.
+        }
+
+        return new EmptyResult();
     }
 
     /// <summary>เรื่องที่เปิดใช้งาน และสถานะเป็นประเภทที่ยังไม่ปิด (<see cref="OpenStatusIsTypes"/>)</summary>

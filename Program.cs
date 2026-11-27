@@ -3,6 +3,7 @@ using ContactTogetherApi.Auth;
 using ContactTogetherApi.Data;
 using ContactTogetherApi.Dtos;
 using ContactTogetherApi.Helper;
+using ContactTogetherApi.Realtime;
 using ContactTogetherApi.Reports.Export;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,6 +18,16 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
+
+// CORS: any origin may call the API from a browser. The token travels in the Authorization header,
+// not a cookie, so no credentials are allowed (AllowAnyOrigin cannot be combined with them anyway).
+// Content-Disposition is exposed so a page can read the file name of a report export.
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy => policy
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .WithExposedHeaders("Content-Disposition")));
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -76,6 +87,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Real-time inbox (GET /Home/InboxStream) -------------------------------------
+
+builder.Services.AddSingleton<IInboxNotifier, InboxNotifier>();
 
 // Report export (ExportReport01-07) ----------------------------------------
 
@@ -137,6 +152,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Before authentication, so preflight (OPTIONS) requests get their CORS headers without a token.
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

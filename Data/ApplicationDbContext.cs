@@ -735,10 +735,13 @@ public partial class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<TblService>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("TblService");
+            entity.HasKey(e => e.Id).IsClustered(false);
 
+            entity.ToTable("TblService");
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(200)
+                .IsUnicode(false);
             entity.Property(e => e.AccountId)
                 .HasMaxLength(200)
                 .IsUnicode(false)
@@ -777,9 +780,6 @@ public partial class ApplicationDbContext : DbContext
             entity.Property(e => e.DateOpened)
                 .HasPrecision(0)
                 .HasColumnName("Date_Opened");
-            entity.Property(e => e.Id)
-                .HasMaxLength(200)
-                .IsUnicode(false);
             entity.Property(e => e.IsEnable)
                 .HasMaxLength(100)
                 .IsUnicode(false)
@@ -816,18 +816,15 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(500)
                 .IsUnicode(false)
                 .HasColumnName("Service_Reference");
-            entity.Property(e => e.ServiceReferenceLink)
-                .HasMaxLength(500)
-                .HasColumnName("Service_Reference_Link");
+            entity.Property(e => e.ServiceReferenceLink).HasColumnName("Service_Reference_Link");
             entity.Property(e => e.ServiceTitleId)
                 .HasMaxLength(50)
                 .IsUnicode(false)
-                .HasDefaultValue("81EE380A-96E2-F111-8E93-96F1F7A12F5E");
+                .HasDefaultValue("81EE380A-96E2-F111-8E93-96F1F7A12F5E", "DF__TblServic__Servi__208CD6FA");
             entity.Property(e => e.StatusId)
                 .HasMaxLength(200)
                 .IsUnicode(false)
                 .HasColumnName("Status_ID");
-            entity.Property(e => e.Summary).HasMaxLength(500);
             entity.Property(e => e.Updated).HasPrecision(0);
             entity.Property(e => e.UpdatedBy)
                 .HasMaxLength(200)

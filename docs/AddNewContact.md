@@ -1,10 +1,18 @@
 # Add Contact API (`POST /Contact/AddNewContact`) สำหรับ Frontend
 
-ใช้บันทึก **ฟอร์มรับสาย** (เบอร์โทรเข้า + ช่องทางติดต่อ + ประเภทการรับสาย) กดยืนยัน 1 ครั้ง
-ได้ 1 แถวใน `TblContact`
+ใช้บันทึก **การรับสาย** (เบอร์โทรเข้า + ช่องทางติดต่อ + ประเภทการรับสาย) **1 สาย = 1 แถวใน `TblContact`**
+บันทึกตอนกดปุ่มหลักของกล่องยืนยันในหน้ารับสาย (ดู "ลำดับการทำงานของหน้ารับสาย" ข้อ 1)
+`id` ที่ได้คือ `contactId` ที่ต้องส่งให้ `AddNewService` และ `AddNewServiceOperations`
 
 > อ้างอิงโค้ด: `Controllers/ContactController.cs`, `Dtos/CreateContactRequest.cs`, `Dtos/ContactResponse.cs`
-> เอกสารที่ต้องใช้คู่กัน: [GetChannel.md](GetChannel.md) (ตัวเลือกช่องทาง), [GetContactType.md](GetContactType.md) (ตัวเลือกประเภทการรับสาย)
+> เอกสารที่ต้องใช้คู่กัน: [GetChannel.md](GetChannel.md) (ตัวเลือกช่องทาง), [GetContactType.md](GetContactType.md) (ตัวเลือกประเภทการรับสาย),
+> [AddNewService.md](AddNewService.md) และ [AddNewServiceOperations.md](AddNewServiceOperations.md) (ใช้ `contactId`)
+>
+> **ปรับ 26 พ.ย. 2569:** กำหนดจุดที่ต้องเรียก API นี้ในแต่ละกรณี (ข้อ 1) เพราะ `AddNewService` / `AddNewServiceOperations`
+> บังคับ `contactId` แล้ว และช่อง "จำนวนสาย" ไม่ถูกเก็บ
+>
+> **ปรับ 27 พ.ย. 2569:** `contactEnd` ถูกเลื่อนเป็นเวลาบันทึกเรื่องเมื่อเปิดเรื่องใหม่จากสายนี้ (เหมือนระบบเดิม) และต้องเริ่มนับ
+> `contactStart` ใหม่ทุกสาย (ข้อ 5.1)
 
 ---
 
@@ -20,11 +28,47 @@
 
 ### ลำดับการทำงานของหน้ารับสาย
 
+**1 สาย = 1 แถว** บันทึกตอนกด **ปุ่มหลักของกล่องยืนยัน** ไม่ใช่ตอนกด "ยืนยันข้อมูล" และไม่ใช่ตอนเปิดเรื่อง
+
 1. เปิดหน้า → โหลด `GET /ListOfValues/GetChannel` และ `GET /ListOfValues/GetContactType`
    แล้ว **จำเวลาที่เริ่มรับสาย** ไว้ใช้เป็น `contactStart`
-2. ผู้ใช้กรอกเบอร์ เลือกช่องทาง และเลือกประเภทการรับสาย
-3. กด "ยืนยันข้อมูล" → `POST /Contact/AddNewContact`
-4. ได้ `201` → แสดงผลสำเร็จ หรือไปขั้นตอนถัดไป
+2. ผู้ใช้กรอกเบอร์ เลือกช่องทาง และเลือกประเภทการรับสาย ถ้าเป็น Service แสดงผู้ติดต่อของเบอร์นี้จาก
+   `GET /Account/GetAccountByPhoneNo` ให้เลือก
+3. กด "ยืนยันข้อมูล" → แสดงกล่องยืนยัน **ยังไม่บันทึก** (กด "กลับไปแก้ไข" ได้โดยไม่มีอะไรถูกบันทึก)
+4. กดปุ่มหลักในกล่อง → `POST /Contact/AddNewContact` แล้วไปขั้นต่อไปพร้อม `id` ที่ได้ (`contactId`)
+
+| กรณี | กล่องยืนยัน | ปุ่มที่บันทึก | หลังได้ `201` |
+|---|---|---|---|
+| Service + เลือกผู้ติดต่อแล้ว | ยืนยันข้อมูล | **ค้นหาข้อมูลบริการ** | ไปหน้าค้นหาบริการของเบอร์นี้พร้อม `contactId` แล้ว**เปิดเรื่องใหม่** (`POST /Services/AddNewService`) หรือ**เพิ่มการดำเนินการในเรื่องเดิม** (`POST /Services/AddNewServiceOperations`) โดยส่ง `contactId` นี้ |
+| Service + เบอร์นี้ไม่มีผู้ติดต่อ | ไม่มีข้อมูลผู้ติดต่อ | **เพิ่มข้อมูลผู้ติดต่อ** | ไปหน้าเพิ่มผู้ติดต่อพร้อม `contactId` → `POST /Account/AddNewAccount` → ค้นหา/เปิดเรื่องด้วย `contactId` เดิม |
+| Non Service | ยืนยันการบันทึก | **ยืนยันการบันทึก** | จบสาย ล้างฟอร์มรอสายถัดไป |
+
+#### ทำไมบันทึกตอนนี้ ไม่รอตอนเปิดเรื่อง
+
+- `TblContact` คือบันทึกการรับสาย ไม่ใช่บันทึกเรื่อง สายที่ไม่ได้เปิดเรื่องใหม่ (โทรมาติดตามเรื่องเดิม, สอบถาม,
+  วางสายระหว่างค้นหา) ก็ต้องถูกนับ ถ้ารอเปิดเรื่อง สายเหล่านี้จะหายไป
+- การเพิ่มการดำเนินการในเรื่องเดิมก็บังคับ `contactId` ถ้ารอเปิดเรื่องจะไม่มีค่าให้ใช้
+- ระบบเดิมก็บันทึกตั้งแต่รับสาย รวมสาย Service (ใน DB มีแถว New Service มากกว่า 1,200 แถว) แล้วใช้ค่านี้กับงานทุกงานของสายนั้น
+- กรณีไม่มีผู้ติดต่อ บันทึก**ก่อน**ไปหน้าเพิ่มผู้ติดต่อ เพราะ `TblContact` ไม่เก็บผู้ติดต่อ และถ้าผู้โทรวางสายก่อนกรอกเสร็จ
+  สายนี้ยังต้องถูกนับ
+- ผลที่ตามมา: จะมีแถว New Service ที่ไม่มีเรื่องตามมา (เป็นสายจริง ถูกต้องแล้ว) และ `contactEnd` เริ่มจากเวลาที่กดปุ่มในกล่อง
+  แล้วเลื่อนเป็นเวลาบันทึกเรื่องเมื่อเปิดเรื่องใหม่จากสายนี้ ไม่ใช่เวลาวางสาย (ข้อ 5.1)
+
+#### กติกาที่ต้องทำตาม
+
+1. **ปิดปุ่มระหว่างรอ response** กดสองครั้ง = บันทึกสองแถว และรายงาน 05/06 นับจำนวนแถว
+2. **ส่ง `contactId` ต่อทุกหน้าของสายนี้** เช่น ใส่ใน URL (`...?contactId=<id>`) รีเฟรชแล้วไม่หาย และไม่ปนกับสายอื่น
+3. **ย้อนกลับมาหน้ารับสายในสายเดิมแล้วยืนยันอีกครั้ง:** ถ้าเบอร์ ช่องทาง และประเภทเหมือนเดิม ให้ใช้ `contactId` เดิม
+   ไม่เรียก API นี้ซ้ำ (เปลี่ยนแค่ผู้ติดต่อก็ใช้ id เดิม เพราะ `TblContact` ไม่เก็บผู้ติดต่อ) ถ้าเปลี่ยนประเภทจะได้แถวใหม่
+   (ยังไม่มี API แก้แถวเดิม) ตัวอย่างการจำสายปัจจุบันอยู่ในข้อ 4.2
+4. **ปุ่ม "เพิ่มข้อมูลผู้ติดต่อ" ที่มุมขวาของรายการผู้ติดต่อ** (เบอร์นี้มีผู้ติดต่อแล้ว แต่ผู้โทรเป็นคนใหม่) **ไม่บันทึกสาย**
+   เพิ่มเสร็จให้กลับมาหน้ารับสาย เลือกคนใหม่ แล้วยืนยันตามปกติ
+5. **เปิดเรื่องใหม่ต้องเริ่มจากหน้ารับสาย** เพราะ `AddNewService` บังคับ `contactId` ส่วนเรื่องเดิมที่เปิดจากหน้าแรกหรือหน้าค้นหา
+   (ไม่ได้อยู่ในสาย) ใช้ `contactId` ของการดำเนินการเดิมในเรื่อง ดู [AddNewServiceOperations.md](AddNewServiceOperations.md) ข้อ 2.4
+6. **สายใหม่ต้องไม่มี `contactId` ของสายก่อน** ล้างค่าเดิมหลังบันทึก Non Service และเมื่อเริ่มรับสายใหม่
+   ไม่งั้นสายใหม่จากเบอร์เดิมด้วยประเภทเดิมจะไปใช้ id ของสายก่อน (นับขาด)
+   และเริ่มนับ `contactStart` ใหม่ในจังหวะเดียวกัน เพราะรายงาน 05/06 นับสายตามวันที่ของ `contactStart` (ข้อ 5.1)
+7. **ช่อง "จำนวนสาย" ไม่ถูกเก็บ** API ไม่รับค่านี้ กดยืนยัน 1 ครั้ง = 1 แถว ช่องนี้จึงไม่มีผลกับข้อมูลที่บันทึก
 
 ---
 
@@ -40,7 +84,7 @@
 | `contactStart` | string | – | (ไม่มีในฟอร์ม) | เวลาเริ่มรับสาย `yyyy-MM-ddTHH:mm:ss` เป็น **เวลาไทย ไม่มี timezone** (ดู 2.3) ถ้าไม่ส่งจะใช้เวลาตอนบันทึก |
 
 ชื่อ field ไม่สนตัวพิมพ์เล็ก/ใหญ่ ส่วนค่าอื่น server ใส่ให้เอง: `id` (UUID), `createdBy`
-(พนักงานจาก token) และ `contactEnd` (เวลาที่บันทึก)
+(พนักงานจาก token) และ `contactEnd` (เวลาที่บันทึก ถ้าเปิดเรื่องใหม่จากสายนี้จะถูกเลื่อนเป็นเวลาบันทึกเรื่อง ดูข้อ 5.1)
 
 ### 2.2 `categoryId` ต้องเป็น leaf
 
@@ -67,6 +111,7 @@
 - ❌ ห้ามใช้ปี **พ.ศ.** (เช่น locale `th-TH`) และห้ามใช้รูปแบบ `12/11/2026 10:15` → 400
 - ห้ามเป็นเวลาในอนาคต (เผื่อนาฬิกาเครื่องเดินเร็วได้ไม่เกิน 1 นาที)
 - เศษวินาทีถูกตัดทิ้ง
+- รายงาน 05/06 นับสายตาม**วันที่**ของค่านี้ จึงต้องเริ่มนับใหม่ทุกสาย (ข้อ 1 กติกาข้อ 6)
 
 ฟังก์ชันแปลง `Date` เป็นรูปแบบนี้ โดยบังคับเป็นเวลาไทยไม่ว่าเครื่องผู้ใช้จะตั้ง timezone อะไรไว้:
 
@@ -116,7 +161,7 @@ export function toThaiLocalIso(date: Date): string {
 | `categoryId` | string | |
 | `categoryNameTh` | string \| null | ชื่อของ leaf ที่เลือก เช่น `"เด็กโทรเล่น"` |
 | `contactStart` | string | เวลาเริ่ม (เวลาไทย ไม่มี timezone) |
-| `contactEnd` | string | เวลาที่บันทึก (เวลาไทย ไม่มี timezone) |
+| `contactEnd` | string | เวลาที่บันทึก (เวลาไทย ไม่มี timezone) ถ้าเปิดเรื่องใหม่จากสายนี้ภายหลัง ค่าใน DB จะถูกเลื่อนเป็นเวลาบันทึกเรื่อง (ข้อ 5.1) |
 | `createdBy` | string | id ของพนักงานที่รับสาย |
 
 ```json
@@ -242,47 +287,101 @@ export async function addNewContact(
 ### 4.2 ใช้ในฟอร์มรับสาย
 
 ใช้ร่วมกับ `ChannelSelect` ([GetChannel.md](GetChannel.md)) และ `ContactTypePicker`
-([GetContactType.md](GetContactType.md))
+([GetContactType.md](GetContactType.md)) กด "ยืนยันข้อมูล" แค่เปิดกล่องยืนยัน ส่วนการบันทึกอยู่ที่ปุ่มหลักของกล่อง (ข้อ 1)
+
+จำสายที่กำลังรับไว้ใน `sessionStorage` ให้อยู่รอดเมื่อเปลี่ยนหน้าหรือย้อนกลับ (กติกาข้อ 3 และ 6):
+
+```ts
+// lib/current-call.ts
+const KEY = "currentCall";
+
+export interface CurrentCall {
+  contactId: string;
+  /** เบอร์|ช่องทาง|ประเภท ตอนบันทึก ถ้ายืนยันซ้ำด้วยค่าเดิมให้ใช้ contactId เดิม */
+  formKey: string;
+}
+
+export const currentCall = {
+  get(): CurrentCall | null {
+    try { return JSON.parse(sessionStorage.getItem(KEY) ?? "null"); } catch { return null; }
+  },
+  set(value: CurrentCall) { sessionStorage.setItem(KEY, JSON.stringify(value)); },
+  /** เรียกเมื่อเริ่มรับสายใหม่ และหลังบันทึก Non Service */
+  clear() { sessionStorage.removeItem(KEY); },
+};
+```
 
 ```tsx
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { addNewContact, ContactApiError } from "@/lib/api/contact";
+import { currentCall } from "@/lib/current-call";
 import { toThaiLocalIso } from "@/lib/thai-time";
 import { ChannelSelect } from "@/components/ChannelSelect";
 import { ContactTypePicker } from "@/components/ContactTypePicker";
 
-export function ReceiveCallForm({ token }: { token: string }) {
-  // เวลาที่เปิดฟอร์ม = เวลาเริ่มรับสาย
+export function ReceiveCallForm({ token, serviceLeafIds }: {
+  token: string;
+  /** id ของ leaf ใต้ root "Service" จาก GetContactType (New Service, Follow Up) */
+  serviceLeafIds: Set<string>;
+}) {
+  const router = useRouter();
+  // เวลาเริ่มรับสาย: ตอนเปิดหน้า และเริ่มใหม่ทุกครั้งที่ล้างฟอร์มรอสายถัดไป (รายงาน 05/06 นับตามวันที่ของค่านี้)
   const startedAt = useRef(new Date());
 
   const [contactDetail, setContactDetail] = useState("");
   const [channelId, setChannelId] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null); // ผู้ติดต่อที่เลือก (Service)
+  const [confirming, setConfirming] = useState(false);              // กล่องยืนยันเปิดอยู่
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = contactDetail.trim() !== "" && channelId !== "" && categoryId !== null && !saving;
+  const isService = categoryId !== null && serviceLeafIds.has(categoryId);
+  const canSubmit = contactDetail.trim() !== "" && channelId !== "" && categoryId !== null;
 
-  async function onSubmit(e: React.FormEvent) {
+  // "ยืนยันข้อมูล": เปิดกล่องยืนยันเท่านั้น ยังไม่บันทึก
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (canSubmit) setConfirming(true);
+  }
 
+  // ปุ่มหลักในกล่อง: "ค้นหาข้อมูลบริการ" / "เพิ่มข้อมูลผู้ติดต่อ" / "ยืนยันการบันทึก"
+  async function onConfirm() {
+    if (saving) return;
     setSaving(true); // กันกดซ้ำ: กดสองครั้ง = บันทึกสองแถว
     setError(null);
     try {
-      const saved = await addNewContact(
-        {
-          contactDetail: contactDetail.trim(),
-          channelId,
-          categoryId: categoryId!,
-          contactStart: toThaiLocalIso(startedAt.current),
-        },
-        { token },
-      );
-      // สำเร็จ: saved.id, saved.categoryNameTh ...
-      alert(`บันทึกแล้ว: ${saved.categoryNameTh}`);
+      const body = {
+        contactDetail: contactDetail.trim(),
+        channelId,
+        categoryId: categoryId!,
+        contactStart: toThaiLocalIso(startedAt.current),
+      };
+      // ย้อนกลับมายืนยันสายเดิมด้วยเบอร์ ช่องทาง และประเภทเดิม = ใช้ id เดิม ไม่บันทึกซ้ำ
+      const formKey = `${body.contactDetail}|${body.channelId}|${body.categoryId}`;
+      const previous = currentCall.get();
+      const contactId = previous?.formKey === formKey
+        ? previous.contactId
+        : (await addNewContact(body, { token })).id;
+
+      if (!isService) {
+        currentCall.clear();            // Non Service: จบสาย
+        startedAt.current = new Date(); // สายถัดไปเริ่มนับเวลาใหม่
+        // ล้างฟอร์มรอสายถัดไป ...
+        return;
+      }
+
+      currentCall.set({ contactId, formKey });
+      const q = new URLSearchParams({ phone: body.contactDetail, contactId });
+      if (accountId) {
+        q.set("accountId", accountId);
+        router.push(`/services/search?${q}`); // ค้นหาข้อมูลบริการ (เส้นทางเป็นตัวอย่าง)
+      } else {
+        router.push(`/accounts/new?${q}`);    // เพิ่มข้อมูลผู้ติดต่อ (เส้นทางเป็นตัวอย่าง)
+      }
     } catch (err) {
       setError(err instanceof ContactApiError ? err.message : "บันทึกการรับสายไม่สำเร็จ");
     } finally {
@@ -300,30 +399,71 @@ export function ReceiveCallForm({ token }: { token: string }) {
       />
       <ChannelSelect token={token} value={channelId} onChange={setChannelId} />
       <ContactTypePicker token={token} onChange={setCategoryId} />
+      {/* Service: รายการผู้ติดต่อจาก GET /Account/GetAccountByPhoneNo → setAccountId */}
 
       {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={!canSubmit}>
-        {saving ? "กำลังบันทึก..." : "ยืนยันข้อมูล"}
-      </button>
+      <button type="submit" disabled={!canSubmit}>ยืนยันข้อมูล</button>
+
+      {confirming && (
+        <ConfirmDialog
+          primaryLabel={!isService ? "ยืนยันการบันทึก" : accountId ? "ค้นหาข้อมูลบริการ" : "เพิ่มข้อมูลผู้ติดต่อ"}
+          busy={saving}
+          onPrimary={onConfirm}
+          onBack={() => setConfirming(false)} // "กลับไปแก้ไข": ยังไม่มีอะไรถูกบันทึก
+        />
+      )}
     </form>
   );
 }
 ```
 
+หน้าถัดไปอ่าน `contactId` จาก URL แล้วส่งเป็น `contactId` ของ `AddNewService` / `AddNewServiceOperations`
+
 ---
 
-## 5. ข้อควรรู้ (สถานะ ณ 12 พ.ย. 2026)
+## 5. ข้อควรรู้ (ปรับล่าสุด 27 พ.ย. 2569)
 
 - **กดซ้ำ = บันทึกซ้ำ**: API ไม่กันรายการซ้ำ ต้องปิดปุ่มระหว่างรอ response (ตามตัวอย่าง `saving`)
+  และใช้ `contactId` เดิมเมื่อยืนยันสายเดิมซ้ำ (ข้อ 1 กติกาข้อ 3)
 - **API ไม่ตรวจรูปแบบเบอร์**: ตรวจแค่ว่ากรอกและยาวไม่เกิน 50 ถ้าต้องการบังคับรูปแบบเบอร์โทร
   (เช่น ช่องทาง Phone ต้องเป็นตัวเลขขึ้นต้นด้วย 0) ให้ตรวจที่ frontend ไปก่อน
   และ API **ไม่ลบขีด/ช่องว่างกลางเบอร์** ให้ ควรส่งเป็นตัวเลขล้วน (`0812225566`)
   เพื่อให้ค้นตรงกับ `GET /Account/GetAccountByPhoneNo` ได้
 - **ช่องทางเริ่มต้น**: design ตั้งเป็น Phone แต่ `GetChannel` ยังไม่บอกว่าตัวไหนเป็นค่าเริ่มต้น
-- **ยังไม่ผูกกับการเปิดเรื่อง**: ถ้าเลือก New Service / Follow Up แล้วไปเปิดเรื่องต่อ
-  (`POST /Services/AddNewService`) ตอนนี้ยังไม่มี field เชื่อมสองอย่างนี้ เก็บ `id` จาก response ไว้ก่อน
-  ถ้า backend เพิ่มการเชื่อมโยงจะอัปเดตเอกสารนี้
+- **ผูกกับการเปิดเรื่องด้วย `contactId`** (บังคับตั้งแต่ 26 พ.ย. 2569): `id` จาก response ต้องส่งเป็น `contactId` ของ
+  `POST /Services/AddNewService` (backend ใส่ให้การดำเนินการรายการแรกของเรื่อง) และ `POST /Services/AddNewServiceOperations`
+  ไม่ส่ง = 400
+- **ช่อง "จำนวนสาย" ไม่ถูกเก็บ**: `TblContact` ไม่มีคอลัมน์นี้และ API ไม่รับค่านี้ 1 การยืนยัน = 1 แถว
+- **Follow Up**: `GetContactType` ยังส่ง Follow Up มา (เปิดใช้งาน) ถ้าหน้ารับสายแสดงแค่ New Service สายที่โทรมาติดตามเรื่องเดิม
+  จะถูกบันทึกเป็น New Service ถ้าอยากแยกสองแบบนี้ ให้แสดง Follow Up ด้วยเหมือนระบบเดิม (ไม่กระทบรายงานปัจจุบัน)
 - **อย่าเอา `categoryId` ของหน้านี้ไปใส่ใน `AddNewService`**: field นั้นคือประเภทบริการ คนละชุดกัน
+- **เวลาเริ่มและเวลาจบของสาย** (`contactStart` / `contactEnd`): ดู 5.1
+
+### 5.1 `contactStart` และ `contactEnd` (27 พ.ย. 2569)
+
+| Field | ความหมาย | ใส่ / เปลี่ยนตอนไหน |
+|---|---|---|
+| `contactStart` | เวลาเริ่มรับสาย รายงาน 05/06 นับสายตาม**วันที่**ของค่านี้ | ใส่ครั้งเดียวตอน `AddNewContact` จากค่าที่ frontend ส่ง (ไม่ส่ง = เวลาบันทึก) ไม่มีที่ไหนแก้ |
+| `contactEnd` | เวลาที่จัดการสายนี้เสร็จ ไม่ใช่เวลาวางสาย (ระบบไม่รู้เวลาวางสาย) | `AddNewContact` ใส่เวลาบันทึก ถ้าเปิดเรื่องใหม่ด้วย `contactId` นี้ `AddNewService` จะเลื่อนเป็นเวลาบันทึกเรื่อง (เหมือนระบบเดิม และเลื่อนไปข้างหน้าเท่านั้น) |
+
+ตัวอย่าง สายเริ่ม 10:00:00:
+
+| กรณี | `contactEnd` สุดท้าย |
+|---|---|
+| Non Service กด "ยืนยันการบันทึก" 10:00:40 | 10:00:40 |
+| กด "ค้นหาข้อมูลบริการ" 10:00:30 แล้วบันทึกเรื่องใหม่ 10:05:10 | 10:05:10 |
+| กด "เพิ่มข้อมูลผู้ติดต่อ" 10:00:30 เพิ่มผู้ติดต่อ แล้วบันทึกเรื่องใหม่ 10:08:00 | 10:08:00 |
+| กด "ค้นหาข้อมูลบริการ" 10:00:30 แล้วเพิ่มการดำเนินการในเรื่องเดิม | 10:00:30 |
+| เปิด 2 เรื่องในสายเดียว (บันทึก 10:05:10 และ 10:12:00) | 10:12:00 |
+| วางสายก่อนเปิดเรื่อง | 10:00:30 |
+
+- การเพิ่มการดำเนินการในเรื่องเดิม (`AddNewServiceOperations`) **ไม่เลื่อน** `contactEnd` เพราะเรียกจากนอกสายได้ โดยใช้ `contactId`
+  ของการดำเนินการเดิม ([AddNewServiceOperations.md](AddNewServiceOperations.md) ข้อ 2.4) ถ้าเลื่อน เวลาจบของสายเก่าจะไปอยู่หลายวันต่อมา
+- **เริ่มนับ `contactStart` ตอนไหน:** ตอนเปิดหน้ารับสาย (ระบบโทรศัพท์เปิดหน้าพร้อมเบอร์ตอนสายเข้า) และเริ่มใหม่ทุกครั้งที่ล้างฟอร์ม
+  รอสายถัดไป (ข้อ 1 กติกาข้อ 6) ถ้าเปิดหน้าค้างไว้รอนานแล้วกรอกสายเอง เวลาที่รอจะถูกนับรวม และถ้าค้างข้ามวัน
+  รายงาน 05/06 จะนับสายนั้นเป็นของวันก่อน
+- response 201 ของ API นี้ส่ง `contactEnd` ณ ตอนบันทึก ค่าที่ถูกเลื่อนภายหลังยังไม่มี API ไหนส่งกลับ
+  (ยังไม่มีหน้าจอหรือรายงานที่ใช้ค่านี้)
 
 ---
 
