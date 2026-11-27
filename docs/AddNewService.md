@@ -34,6 +34,7 @@
 |---|---|---|---|
 | `serviceTitleId` **(บังคับ)** | 50 | หัวข้อเรื่อง | `id` จาก `GET /ListOfValues/GetServiceTitle` ตัวพิมพ์เล็กหรือใหญ่ก็ได้ |
 | `contactId` **(บังคับ)** | 50 | การรับสายที่เปิดเรื่องนี้ (`TblContact`) **ไม่ได้เก็บใน `TblService`** แต่ใส่ให้การดำเนินการรายการแรก (ข้อ 3.2) ซึ่งรายงานใช้หาเบอร์ผู้ติดต่อ และเลื่อน `contactEnd` ของการรับสายนี้เป็นเวลาบันทึกเรื่อง ([AddNewContact.md](AddNewContact.md) ข้อ 5.1) | `id` ใน response ของ `POST /Contact/AddNewContact` ของสายนี้ ซึ่งบันทึกตอนกด "ค้นหาข้อมูลบริการ" หรือ "เพิ่มข้อมูลผู้ติดต่อ" ในหน้ารับสาย ไม่ใช่ตอนเปิดเรื่อง (ลำดับอยู่ใน [AddNewContact.md](AddNewContact.md) ข้อ 1) ไม่ส่ง / `""` / id ที่ไม่มีจริง = 400 `errors.ContactId` |
+| `code` | 11 | เลขที่เรื่อง (เพิ่ม 27 พ.ย. 2569) **ปกติไม่ต้องส่ง** ระบบสร้างให้ (ข้อ 3.2) ส่งเฉพาะตอนต้องการกำหนดเลขเอง ซ้ำกับเรื่องอื่นได้ (เรื่องใหม่ได้ `id` ใหม่เสมอ) | ตัวเลข `0-9` 11 หลักเท่านั้น ไม่ส่ง / `null` / `""` = สร้างอัตโนมัติ รูปแบบอื่น (เช่น `"123"`, ตัวอักษร, เลขไทย) = 400 `errors.Code` |
 | `categoryId` | 200 | ประเภทบริการ | `id` จาก `GET /ListOfValues/GetServiceType` **เฉพาะรายการที่ `categoryType` เป็น `"SERVICE"`** (ดู 2.2) |
 | `statusId` | 200 | สถานะของเรื่อง | `id` จาก `GET /ListOfValues/GetStatus` (สถานะประเภท SERVICE ดู [GetStatus.md](GetStatus.md)) บันทึกตามที่ส่ง ส่งสถานะ ACTIVITY = 400 |
 | `ownerId` | 200 | เจ้าหน้าที่เจ้าของเรื่อง (`TblEmployee.Id`) ไม่ใช่ผู้บันทึก ผู้บันทึกมาจาก token เสมอ | ปกติไม่ต้องส่ง: ไม่ส่ง / `null` / `""` = **ผู้ที่ login อยู่** ส่งเองเฉพาะตอนมอบเรื่องให้เจ้าหน้าที่คนอื่น โดยใช้ `id` จาก `GET /ListOfValues/GetEmployee` ([GetEmployee.md](GetEmployee.md)) |
@@ -234,6 +235,7 @@ ProblemDetails key ใน `errors` เป็นชื่อ field แบบ **Pa
 export interface CreateServiceRequest {
   serviceTitleId: string;     // บังคับ: GetServiceTitle
   contactId: string;          // บังคับ: id จาก POST /Contact/AddNewContact ของสายนี้
+  code?: string | null;       // ไม่บังคับ: เลข 11 หลักที่กำหนดเอง ไม่ส่ง = ระบบสร้างให้
   categoryId?: string | null;
   statusId?: string | null;
   ownerId?: string | null;
@@ -460,6 +462,7 @@ export function NewServiceForm({ token, contactId }: { token: string; contactId:
 | **`GetServiceType` คืนทุกประเภทปนกัน** | กรอง `categoryType === "SERVICE"` เอง |
 | **ผูกกับการรับสายผ่าน `contactId`** (26 พ.ย. 2569) | ต้องบันทึกฟอร์มรับสาย (`AddNewContact`) ก่อนเปิดเรื่อง แล้วส่ง `id` ที่ได้มาเป็น `contactId` (บันทึกไว้ที่การดำเนินการรายการแรก ไม่ใช่ที่เรื่อง) เปิดเรื่องสำเร็จแล้ว `contactEnd` ของการรับสายนั้นเลื่อนเป็นเวลาบันทึกเรื่อง (27 พ.ย. 2569) |
 | **กดซ้ำ = เรื่องซ้ำ** | ปิดปุ่มระหว่างรอ response |
+| **ส่ง `code` เองได้** (27 พ.ย. 2569) | API ไม่ตรวจว่าเลขซ้ำ ถ้าส่งเลขของวันนี้ที่สูงกว่าเลขล่าสุด เลขที่ระบบสร้างครั้งถัดไปจะต่อจากเลขนั้น |
 
 ถ้า backend แก้ข้อใดข้างบน จะแจ้งและอัปเดตเอกสารนี้
 
