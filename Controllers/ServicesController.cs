@@ -579,7 +579,8 @@ public class ServicesController : ControllerBase
     /// <summary>
     /// เปิดเรื่องใหม่ (เพิ่มแถวใน <c>TblService</c>) แล้วคืนแถวนั้นกลับไป <c>Code</c> สร้างให้อัตโนมัติเป็น
     /// <c>yyMMdd</c> แบบปี พ.ศ. ตามด้วยเลขรัน 5 หลักที่เริ่มนับใหม่ทุกวัน
-    /// (เช่น <c>69082500001</c> คือเรื่องแรกของวันที่ 25 ส.ค. 2569) <c>IsEnable</c> เป็น <c>T</c> เสมอ
+    /// (เช่น <c>69082500001</c> คือเรื่องแรกของวันที่ 25 ส.ค. 2569) ถ้า request ส่ง <c>Code</c> (ตัวเลข 11 หลัก)
+    /// มา จะใช้ค่านั้นแทน และซ้ำกับเรื่องอื่นได้ <c>IsEnable</c> เป็น <c>T</c> เสมอ
     /// ส่วน <c>CreatedBy</c>/<c>UpdatedBy</c> มาจาก token
     /// สร้างงานแรก (<c>TblActivity</c> Line 1) ให้ด้วยใน transaction เดียวกัน ตามระบบเดิม: ประเภท "Call - Inbound",
     /// หัวข้อ "Call Inbound", รายละเอียด "เริ่มให้บริการ", สถานะปิด, เริ่ม = <c>DateOpened</c> ของเรื่อง, จบ = เวลาบันทึก
@@ -661,16 +662,23 @@ public class ServicesController : ControllerBase
         // has one (Id) since 2026-11-26, so this could become Add()/SaveChanges. The app lock makes
         // concurrent requests take numbers one at a time, so no two get the same code.
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        await _db.Database.ExecuteSqlRawAsync(
-            "EXEC sp_getapplock @Resource = 'TblService.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
-            cancellationToken);
 
-        var code = await NextDailyCodeAsync(_db.TblServices.Select(s => s.Code!), now, cancellationToken);
+        // A Code sent by the caller is used as is (already checked to be 11 digits). It may repeat
+        // another service's Code, since the new row always gets its own Id, so it needs no lock.
+        var code = Normalize(request.Code);
         if (code is null)
         {
-            return Conflict(new MessageResponse(
-                StatusCodes.Status409Conflict,
-                "The daily limit of service codes has been reached."));
+            await _db.Database.ExecuteSqlRawAsync(
+                "EXEC sp_getapplock @Resource = 'TblService.Code', @LockMode = 'Exclusive', @LockOwner = 'Transaction'",
+                cancellationToken);
+
+            code = await NextDailyCodeAsync(_db.TblServices.Select(s => s.Code!), now, cancellationToken);
+            if (code is null)
+            {
+                return Conflict(new MessageResponse(
+                    StatusCodes.Status409Conflict,
+                    "The daily limit of service codes has been reached."));
+            }
         }
 
         service.Code = code;

@@ -446,6 +446,26 @@ Content-Type: application/json
 
 ###
 
+# Open a service with a given Code instead of a generated one. code must be 11 digits (0-9); a blank or
+# missing code means "generate as usual". The Code may repeat another service's (the new row gets its
+# own Id). Anything else (e.g. "123", Thai digits) = 400 errors.Code.
+# NOTE: a 201 writes real rows. A sent code of today with a high running number also moves the next
+# generated code past it.
+POST {{ContactTogetherApi_HostAddress}}/Services/AddNewService
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "69112700001",
+  "contactId": "EF5355C696E24159BEADE68EFEEC442C",
+  "categoryId": "<TblCategory.Id>",
+  "statusId": "19C49E66B6F9EF1BCE11A3B93DED12C8",
+  "serviceTitleId": "81EE380A-96E2-F111-8E93-96F1F7A12F5E",
+  "summary": "ทดสอบเปิดเรื่องด้วยเลขที่กำหนด"
+}
+
+###
+
 # Search services (was GetServices). At least one filter is required (AccountId, AccountPhoneNo, ServicesStatus,
 # ServiceCode, ServiceSummary, ServiceType, ServiceTitleId, ServiceReference, LevelPriorityId,
 # ServiceOwner, OrganizationGroup, Organization, ServiceCreatedFrom/To).
